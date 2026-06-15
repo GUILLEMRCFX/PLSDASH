@@ -9,7 +9,7 @@
 <title>PLSDASH — PulseChain Portfolio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet">
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   :root{
@@ -30,7 +30,10 @@
     --pulse:linear-gradient(90deg,#FF3D9A 0%,#9B5DE5 50%,#28E0E6 100%);
     --display:'Space Grotesk',sans-serif;
     --body:'Inter',sans-serif;
-    --mono:'JetBrains Mono',monospace;
+    /* Números financieros en Space Grotesk limpio. Lo técnico (direcciones
+       0x… y el código de portfolio) mantiene una monospace real. */
+    --mono:'Space Grotesk',sans-serif;
+    --tech:'Courier New',monospace;
     --sat:env(safe-area-inset-top,0px);
     --sab:env(safe-area-inset-bottom,0px);
     --sal:env(safe-area-inset-left,0px);
@@ -64,7 +67,7 @@
   .brand b{font-weight:700}
   .brand span{color:var(--faint);font-weight:400}
   .nav-actions{display:flex;align-items:center;gap:10px}
-  .code-badge{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 13px;color:var(--dim);font-family:var(--mono);font-size:12.5px;cursor:pointer;transition:.16s}
+  .code-badge{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 13px;color:var(--dim);font-family:var(--tech);font-size:12.5px;cursor:pointer;transition:.16s}
   .code-badge:hover{border-color:var(--line-2);color:var(--text)}
   .code-badge svg{width:14px;height:14px;flex-shrink:0;color:var(--violet)}
   .code-badge.local{color:var(--faint)}
@@ -86,7 +89,7 @@
   .total{font-family:var(--display);font-weight:600;letter-spacing:-.03em;line-height:1;margin:16px 0 12px;font-size:clamp(48px,9vw,86px);font-variant-numeric:tabular-nums}
   .total .cents{color:var(--dim)}
   .hero-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:13.5px;color:var(--dim);padding-bottom:28px;min-height:20px}
-  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12.5px;font-weight:500}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .up{color:var(--mint)}.down{color:var(--red)}
   .chip.pill{background:rgba(43,227,167,.1);color:var(--mint);padding:5px 10px;border-radius:8px;border:1px solid rgba(43,227,167,.22)}
   .chip.pill.down{background:rgba(255,92,122,.1);color:var(--red);border-color:rgba(255,92,122,.22)}
@@ -105,7 +108,7 @@
   .wchip:hover{border-color:var(--line-2)}
   .wchip .wch-d{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-family:var(--mono);font-size:10px;color:#0C0710;font-weight:700;flex-shrink:0}
   .wchip .wch-i b{font-weight:600;font-size:12.5px}
-  .wchip .wch-i span{font-family:var(--mono);font-size:10.5px;color:var(--faint);display:block;line-height:1.2}
+  .wchip .wch-i span{font-family:var(--tech);font-size:10.5px;color:var(--faint);display:block;line-height:1.2}
   .wchip .x{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:none;border:none;cursor:pointer;color:var(--faint);transition:.15s}
   .wchip .x:hover{background:var(--bg-2);color:var(--red)}
   .wchip .x svg{width:13px;height:13px}
@@ -121,7 +124,7 @@
   .stat{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
   .stat h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:500;margin-bottom:12px}
   .stat .v{font-family:var(--display);font-size:25px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-  .stat .sub{font-size:12.5px;color:var(--dim);margin-top:5px;font-family:var(--mono)}
+  .stat .sub{font-size:12.5px;color:var(--dim);margin-top:5px;font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .perf-row{display:flex;align-items:center;gap:10px}
   .tk{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:11px;color:#0C0710;flex-shrink:0;overflow:hidden;position:relative}
   .tk img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
@@ -157,9 +160,9 @@
   .asset .nm b{font-weight:600;font-size:14.5px;display:block;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .asset .nm span{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
   .custom-tag{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);border:1px solid rgba(155,93,229,.4);padding:2px 5px;border-radius:5px;margin-left:7px;vertical-align:middle}
-  .num{font-family:var(--mono);font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums}
+  .num{font-family:var(--mono);font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .num .q{color:var(--dim);font-size:11px;display:block;margin-top:2px}
-  .val{font-family:var(--mono);font-size:14px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+  .val{font-family:var(--mono);font-size:14px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .val .d{font-size:11px;font-weight:500;margin-top:2px;display:block}
   .eye{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:none;border:1px solid transparent;cursor:pointer;color:var(--faint);transition:.15s;margin-left:auto}
   .eye:hover{background:var(--bg-2);border-color:var(--line);color:var(--text)}
@@ -170,8 +173,8 @@
   .wgroup .wl{display:flex;align-items:center;gap:11px}
   .wgroup .wd{width:32px;height:32px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-size:11px;color:var(--violet)}
   .wgroup .wn b{font-size:13.5px;display:block}
-  .wgroup .wn span{font-family:var(--mono);font-size:11px;color:var(--faint)}
-  .wgroup .wv{font-family:var(--mono);font-size:14px;font-weight:600;text-align:right}
+  .wgroup .wn span{font-family:var(--tech);font-size:11px;color:var(--faint)}
+  .wgroup .wv{font-family:var(--mono);font-size:14px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .wgroup .wv span{display:block;font-size:11px;font-weight:400;color:var(--faint)}
 
   .foot{padding:16px 22px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--faint);flex-wrap:wrap;gap:8px}
@@ -201,6 +204,41 @@
 
   .hide-on-wallet{display:block}
   body[data-view="wallet"] .hide-on-wallet{display:none}
+  /* En la vista Historial ocultamos la cabecera de tabla, las herramientas
+     de tokens y el pie de "añadir token": no aplican al calendario. */
+  body[data-view="history"] .thead,
+  body[data-view="history"] .head-tools,
+  body[data-view="history"] .foot{display:none}
+
+  /* ---------- HISTORIAL / CALENDARIO ---------- */
+  .hist-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .month-nav{display:flex;align-items:center;gap:10px}
+  .mn-btn{width:34px;height:34px;border-radius:9px;background:var(--bg-2);border:1px solid var(--line);color:var(--text);font-size:18px;cursor:pointer;display:grid;place-items:center;transition:.15s;line-height:1}
+  .mn-btn:hover{border-color:var(--line-2);background:var(--surface-2)}
+  .mn-lbl{font-family:var(--display);font-weight:600;font-size:15px;min-width:140px;text-align:center;text-transform:capitalize}
+  .hist-wallet{width:auto;min-width:170px;padding:9px 12px;font-family:var(--body);font-size:13px;cursor:pointer;letter-spacing:0}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:18px 22px}
+  .cal-wd{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint);padding-bottom:2px}
+  .cal-pad{aspect-ratio:1}
+  .cal-cell{position:relative;aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;padding:7px 8px;text-align:left;font-family:inherit}
+  .cal-cell.active{cursor:pointer;border-color:var(--line-2)}
+  .cal-cell.active:hover{border-color:var(--violet)}
+  .cal-cell.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan)}
+  .cal-fill{position:absolute;inset:0;background:var(--pulse);z-index:0}
+  .cal-d{position:relative;z-index:1;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+  .cal-v{position:relative;z-index:1;font-size:9px;font-weight:600;color:var(--text);font-family:var(--mono);letter-spacing:-.02em;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+  .hist-detail{padding:6px 22px 18px;border-top:1px solid var(--line)}
+  .hd-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:14px 0 10px;flex-wrap:wrap}
+  .hd-head b{font-family:var(--display);font-size:15px;font-weight:600;text-transform:capitalize}
+  .hd-head span{font-family:var(--mono);font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .htx{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+  .htx:last-child{border-bottom:none}
+  .htx .logo{box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+  .htx-i{flex:1;min-width:0}
+  .htx-i b{display:block;font-size:13.5px;font-weight:600;font-family:var(--mono);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .htx-i span{font-family:var(--tech);font-size:11px;color:var(--faint)}
+  .htx-v{font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--mint);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .hist-note{padding:14px 22px;text-align:center;font-size:11px;color:var(--faint);font-family:var(--mono);border-top:1px solid var(--line)}
 
   /* toast */
   .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw}
@@ -216,7 +254,7 @@
   .modal .lead{font-size:13.5px;color:var(--dim);margin-bottom:20px}
   .modal label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:8px;margin-top:16px}
   .modal label:first-of-type{margin-top:0}
-  .field{width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;color:var(--text);font-family:var(--mono);font-size:14px;transition:.16s}
+  .field{width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;color:var(--text);font-family:var(--tech);font-size:14px;transition:.16s}
   .field:focus{outline:none;border-color:var(--violet);background:var(--surface-2)}
   .field::placeholder{color:var(--faint)}
   .modal-actions{display:flex;gap:10px;margin-top:22px}
@@ -232,14 +270,14 @@
   .tok-preview .pv-logo{width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;display:grid;place-items:center;font-family:var(--display);font-weight:700;color:#0C0710;position:relative}
   .tok-preview .pv-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .tok-preview .pv-i b{font-size:14px;display:block}
-  .tok-preview .pv-i span{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .tok-preview .pv-i span{font-family:var(--mono);font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .modal .priv{font-size:11.5px;color:var(--faint);line-height:1.55;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);display:flex;gap:9px}
   .modal .priv svg{width:15px;height:15px;flex-shrink:0;margin-top:2px;color:var(--violet)}
   .seg{display:flex;gap:6px;background:var(--bg-2);border:1px solid var(--line);padding:4px;border-radius:11px;margin-bottom:4px}
   .seg button{flex:1;font-family:var(--body);font-weight:600;font-size:12.5px;color:var(--dim);background:none;border:none;padding:8px;border-radius:8px;cursor:pointer;transition:.15s}
   .seg button.on{background:var(--surface-2);color:var(--text)}
   .copy-row{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:6px}
-  .copy-row code{font-family:var(--mono);font-size:14px;color:var(--cyan);flex:1;word-break:break-all}
+  .copy-row code{font-family:var(--tech);font-size:14px;color:var(--cyan);flex:1;word-break:break-all}
   .copy-row button{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--text);font-family:var(--body);font-weight:600;font-size:12px;cursor:pointer;transition:.15s}
   .copy-row button:hover{border-color:var(--violet)}
 
@@ -259,12 +297,18 @@
     .eye{grid-column:3;grid-row:1/3}
     .panel-head{padding:16px}
     .total{margin-top:14px}
-    .btn-primary .bt-txt{display:none}
-    .btn-primary{padding:11px 13px}
+    .btn-primary .bt-txt,.btn-ghost .bt-txt{display:none}
+    .btn-primary,.btn-ghost{padding:11px 13px}
+    .hist-bar{padding:14px 16px}
+    .cal-grid{padding:14px 16px;gap:5px}
+    .hist-detail{padding:6px 16px 16px}
   }
   @media(max-width:420px){
     .brand span{display:none}
     .wrap{padding-left:calc(14px + var(--sal));padding-right:calc(14px + var(--sar))}
+    .cal-grid{gap:4px}
+    .cal-v{display:none}
+    .hist-wallet{flex:1;min-width:0}
   }
   @media(prefers-reduced-motion:reduce){
     .scan,.enddot,.eyebrow .live,.spinner,.sk,.modal{animation:none}
@@ -286,6 +330,10 @@
       <button class="code-badge local" id="codeBadge" onclick="openCloudModal()" aria-label="Portfolio en la nube">
         <svg viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.6A3.5 3.5 0 0 1 18 18H7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
         <span class="code-txt" id="codeTxt">Modo local</span>
+      </button>
+      <button class="btn btn-ghost" onclick="openLoadModal()" aria-label="Cargar portfolio">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="bt-txt">Cargar</span>
       </button>
       <button class="btn btn-primary" onclick="openWalletModal()" aria-label="Añadir wallet">
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#13060F" stroke-width="2.4" stroke-linecap="round"/></svg>
@@ -351,6 +399,7 @@
       <div class="tabs">
         <button class="tab on" onclick="setView('combined',this)">Combinado</button>
         <button class="tab" onclick="setView('wallet',this)">Por wallet</button>
+        <button class="tab" onclick="setView('history',this)">Historial</button>
       </div>
       <div class="head-tools">
         <button class="tool" id="hideTool" onclick="toggleShowHidden(this)">
@@ -466,6 +515,21 @@
   </div>
 </div>
 
+<div class="modal-bg" id="loadModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lmTitle">
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="lmTitle">Cargar portfolio existente</h2>
+    <p class="lead">Introduce tu código de portfolio o pega la URL completa para abrirlo en este dispositivo.</p>
+    <label for="lmInput">Código o URL</label>
+    <input class="field" id="lmInput" placeholder="Código o URL (plsdash.com/p/...)" autocomplete="off" spellcheck="false" oninput="document.getElementById('lmErr').textContent=''">
+    <div class="field-err" id="lmErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitLoad()">Cargar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -481,6 +545,7 @@
 const DEXSCREENER_API = 'https://api.dexscreener.com';
 const PULSECHAIN_RPC   = 'https://rpc.pulsechain.com';
 const PULSECHAIN_SCAN  = 'https://api.scan.pulsechain.com';
+const BLOCKSCOUT_API   = 'https://api.scan.pulsechain.com/api/v2';
 const CHAIN_ID         = 'pulsechain';
 const REFRESH_MS       = 30000;
 
@@ -825,9 +890,18 @@ function rowHtml(t){
 function render(){
   // --- estado vacío ---
   if(!state.wallets.length){
+    if(state.view==='history'){loadHistory();updateHeader();renderWalletBar();return;}
     renderEmpty();
     updateHeader();
     renderWalletBar();
+    return;
+  }
+  // --- vista Historial: calendario de transacciones ---
+  if(state.view==='history'){
+    updateHeader();
+    if(tokensCombined.length)renderStats();
+    renderWalletBar();
+    loadHistory();   // refetch sólo si cambió la firma (wallets/filtro)
     return;
   }
   // --- aún cargando (sin datos) ---
@@ -1039,7 +1113,8 @@ function setView(v,el){
   document.body.dataset.view=v;
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
-  render();
+  if(v==='history')loadHistory();
+  else render();
 }
 function cycleSort(){
   const order=['value','change','name'];
@@ -1051,6 +1126,180 @@ function cycleSort(){
 function toggleShowHidden(){
   state.showHidden=!state.showHidden;
   render();
+}
+
+/* ============================================================
+   HISTORIAL — calendario de transacciones (Blockscout v2)
+   Lista las transferencias ENTRANTES de tokens de cada wallet,
+   las agrupa por día y pinta un calendario tipo "contributions".
+   Los valores USD son aproximados con el PRECIO ACTUAL (no hay
+   API de precio histórico gratis) — se avisa en la UI.
+   Los datos son temporales: viven en memoria, no se guardan en KV.
+   ============================================================ */
+const historyState={
+  month:startOfMonth(new Date()),
+  wallet:'all',          // 'all' | address
+  transfers:[],          // [{ts,date,tokenAddr,symbol,name,amount,from,logo,usd,wallet}]
+  loading:false,
+  error:false,
+  loadedSig:null,        // firma de wallets+filtro ya cargada
+  selectedDay:null,      // 'YYYY-MM-DD'
+};
+function startOfMonth(d){return new Date(d.getFullYear(),d.getMonth(),1);}
+function dayKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function fmtCompactUsd(n){
+  if(n==null)return '';
+  const a=Math.abs(n);
+  if(a>=1e6)return '$'+(n/1e6).toFixed(1)+'M';
+  if(a>=1e3)return '$'+(n/1e3).toFixed(1)+'K';
+  if(a>=1)return '$'+n.toFixed(0);
+  if(a===0)return '$0';
+  return '$'+n.toFixed(2);
+}
+
+async function loadHistory(){
+  if(!state.wallets.length){historyState.transfers=[];historyState.loadedSig=null;renderHistory();return;}
+  const sig=JSON.stringify({w:state.wallets.map(w=>lc(w.address)),f:historyState.wallet});
+  if(historyState.loading)return;
+  if(sig===historyState.loadedSig){renderHistory();return;}  // ya cargado: sólo dibujar
+  historyState.loading=true;historyState.error=false;
+  renderHistory();                                            // muestra spinner
+  try{
+    const targets=historyState.wallet==='all'?state.wallets.map(w=>lc(w.address)):[historyState.wallet];
+    const all=[];
+    for(const addr of targets){
+      // Blockscout v2: transfers de tokens, filtradas a entrantes.
+      const r=await fetch(`${BLOCKSCOUT_API}/addresses/${addr}/token-transfers?type=ERC-20&filter=to`);
+      if(!r.ok)continue;
+      const j=await r.json();
+      const items=Array.isArray(j.items)?j.items:[];
+      for(const it of items){
+        const to=lc(it.to?.hash||it.to||'');
+        if(to!==addr)continue;                                // sólo entrantes
+        const tok=it.token||{};
+        const tokenAddr=lc(tok.address||tok.address_hash||'');
+        let dec=parseInt(tok.decimals!=null?tok.decimals:(it.total&&it.total.decimals));
+        if(isNaN(dec))dec=18;
+        const rawVal=(it.total&&(it.total.value!=null?it.total.value:it.total))||it.value||'0';
+        let amount=0;try{amount=bigToNum(BigInt(rawVal),dec);}catch(e){continue;}
+        if(amount<=0)continue;
+        const ts=new Date(it.timestamp||it.block_timestamp||Date.now());
+        all.push({ts,date:dayKey(ts),tokenAddr,symbol:tok.symbol||'?',name:tok.name||'Token',
+          amount,from:lc(it.from?.hash||it.from||''),logo:tok.icon_url||null,wallet:addr,usd:null});
+      }
+    }
+    // Valor USD aproximado con el precio actual (DexScreener, cacheado).
+    const uniq=[...new Set(all.map(t=>t.tokenAddr).filter(isAddr))];
+    if(uniq.length)await fetchPrices(uniq);
+    for(const t of all){
+      const pc=priceCache.get(t.tokenAddr)||{};
+      t.usd=pc.price!=null?t.amount*pc.price:null;
+      if(!t.logo&&pc.logo)t.logo=pc.logo;
+    }
+    all.sort((a,b)=>b.ts-a.ts);
+    historyState.transfers=all;
+    historyState.loadedSig=sig;
+  }catch(e){console.error(e);historyState.error=true;}
+  finally{historyState.loading=false;renderHistory();}
+}
+
+function renderHistory(){
+  const rows=$('rows');
+  const monthLbl=historyState.month.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
+  const walletOpts=`<option value="all">Todas las wallets</option>`+state.wallets.map(w=>{
+    const a=lc(w.address);
+    return `<option value="${a}" ${historyState.wallet===a?'selected':''}>${escapeHtml(w.label||shortAddr(a))}</option>`;
+  }).join('');
+  let html=`<div class="hist-bar">
+    <div class="month-nav">
+      <button class="mn-btn" onclick="histShiftMonth(-1)" aria-label="Mes anterior">‹</button>
+      <span class="mn-lbl">${escapeHtml(monthLbl)}</span>
+      <button class="mn-btn" onclick="histShiftMonth(1)" aria-label="Mes siguiente">›</button>
+    </div>
+    <select class="hist-wallet field" onchange="histSetWallet(this.value)" aria-label="Filtrar por wallet">${walletOpts}</select>
+  </div>`;
+
+  if(historyState.loading){
+    rows.innerHTML=html+`<div class="state-block"><div class="spinner"></div><p>Cargando historial desde el explorer…</p></div>`;
+    return;
+  }
+  if(historyState.error){
+    rows.innerHTML=html+`<div class="state-block error"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div><h3>No se pudo cargar el historial</h3><p>El explorer de PulseChain no respondió. Inténtalo de nuevo.</p><button class="btn btn-ghost" onclick="loadHistory()">Reintentar</button></div>`;
+    return;
+  }
+
+  // Transfers del mes visible, agrupadas por día.
+  const y=historyState.month.getFullYear(),mo=historyState.month.getMonth();
+  const monthTx=historyState.transfers.filter(t=>t.ts.getFullYear()===y&&t.ts.getMonth()===mo);
+  const byDay={};
+  for(const t of monthTx)(byDay[t.date]=byDay[t.date]||[]).push(t);
+  const dayTotals={};let maxTotal=0;
+  for(const d in byDay){const s=byDay[d].reduce((a,t)=>a+(t.usd||0),0);dayTotals[d]=s;if(s>maxTotal)maxTotal=s;}
+
+  if(!monthTx.length){
+    rows.innerHTML=html+`<div class="state-block"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>Sin actividad este mes</h3><p>No hay transferencias entrantes en ${escapeHtml(monthLbl)}. Prueba otro mes o cambia de wallet.</p></div>`+histDisclaimer();
+    return;
+  }
+
+  // Cuadrícula del mes (semana empieza en lunes).
+  const firstWd=(new Date(y,mo,1).getDay()+6)%7;
+  const days=new Date(y,mo+1,0).getDate();
+  const wd=['L','M','X','J','V','S','D'];
+  html+=`<div class="cal-grid">`+wd.map(d=>`<div class="cal-wd">${d}</div>`).join('');
+  for(let i=0;i<firstWd;i++)html+=`<div class="cal-pad"></div>`;
+  for(let day=1;day<=days;day++){
+    const key=`${y}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const tot=dayTotals[key];
+    if(tot!=null){
+      const i=maxTotal>0?(0.18+0.82*(tot/maxTotal)):0.5;
+      const sel=historyState.selectedDay===key?' sel':'';
+      html+=`<button class="cal-cell active${sel}" onclick="histSelectDay('${key}')" aria-label="${day}: ${escapeHtml(fmtUsd(tot))}, ${byDay[key].length} transfer(s)"><span class="cal-fill" style="opacity:${i.toFixed(2)}"></span><span class="cal-d">${day}</span><span class="cal-v">${fmtCompactUsd(tot)}</span></button>`;
+    }else{
+      html+=`<div class="cal-cell"><span class="cal-d" style="color:var(--faint);font-weight:400">${day}</span></div>`;
+    }
+  }
+  html+=`</div>`;
+
+  // Detalle del día seleccionado.
+  if(historyState.selectedDay&&byDay[historyState.selectedDay]){
+    html+=histDayDetail(historyState.selectedDay,byDay[historyState.selectedDay]);
+  }
+  html+=histDisclaimer();
+  rows.innerHTML=html;
+}
+
+function histDayDetail(key,transfers){
+  const d=new Date(key+'T00:00:00');
+  const fdate=d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const total=transfers.reduce((a,t)=>a+(t.usd||0),0);
+  const sorted=[...transfers].sort((a,b)=>(b.usd||0)-(a.usd||0));
+  const items=sorted.map(t=>{
+    const grad=gradientFor(t.tokenAddr||t.symbol);
+    const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
+    const usd=t.usd!=null?fmtUsd(t.usd):'—';
+    return `<div class="htx"><div class="logo" style="width:34px;height:34px;font-size:12px;background:${grad}">${img}<span class="ini">${escapeHtml((t.symbol||'?')[0].toUpperCase())}</span></div>
+      <div class="htx-i"><b>+${escapeHtml(fmtAmount(t.amount))} ${escapeHtml(t.symbol||'')}</b><span>de ${shortAddr(t.from||'0x000000')}</span></div>
+      <div class="htx-v">${usd}</div></div>`;
+  }).join('');
+  return `<div class="hist-detail"><div class="hd-head"><b>${escapeHtml(fdate)}</b><span>${transfers.length} transfer${transfers.length>1?'s':''} · ${escapeHtml(fmtUsd(total))}</span></div>${items}</div>`;
+}
+function histDisclaimer(){
+  return `<div class="hist-note">Valores calculados con precios actuales (no históricos)</div>`;
+}
+function histShiftMonth(delta){
+  historyState.month=new Date(historyState.month.getFullYear(),historyState.month.getMonth()+delta,1);
+  historyState.selectedDay=null;
+  renderHistory();
+}
+function histSetWallet(v){
+  historyState.wallet=v;
+  historyState.selectedDay=null;
+  historyState.loadedSig=null;   // fuerza recarga con el nuevo filtro
+  loadHistory();
+}
+function histSelectDay(key){
+  historyState.selectedDay=historyState.selectedDay===key?null:key;
+  renderHistory();
 }
 
 /* ============================================================
@@ -1135,6 +1384,18 @@ function submitWallet(){
   const r=addWallet($('wmAddr').value,$('wmLabel').value);
   if(r.ok){closeModals();toast('Wallet añadida');}
   else $('wmErr').textContent=r.msg;
+}
+
+/* ---------- cargar portfolio existente (código o URL) ---------- */
+function openLoadModal(){closeModals();$('loadModal').classList.add('show');$('lmInput').value='';$('lmErr').textContent='';setTimeout(()=>$('lmInput').focus(),50);}
+function submitLoad(){
+  const raw=$('lmInput').value.trim();
+  if(!raw){$('lmErr').textContent='Introduce un código o una URL.';return;}
+  // Si pegan una URL con /p/<code>, extraer el código; si no, usar tal cual.
+  let code=raw;
+  if(raw.includes('/p/'))code=raw.split('/p/')[1].split(/[/?#]/)[0];
+  if(!/^[A-Za-z0-9_-]{3,32}$/.test(code)){$('lmErr').textContent='Ese código no parece válido (3–32 caracteres: letras, números, guion o guion bajo).';return;}
+  location.href='/p/'+code;
 }
 
 function openTokenModal(){closeModals();$('tokenModal').classList.add('show');$('tmAddr').value='';$('tmErr').textContent='';$('tmPreview').className='tok-preview';setAddBtn(false);setTimeout(()=>$('tmAddr').focus(),50);}
@@ -1225,6 +1486,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape')closeModals();
   if(e.key==='Enter'){
     if($('walletModal').classList.contains('show'))submitWallet();
+    else if($('loadModal').classList.contains('show'))submitLoad();
     else if($('tokenModal').classList.contains('show')&&!$('tmAddBtn').disabled)submitToken();
   }
 });
