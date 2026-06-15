@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0C0710">
+<meta name="description" content="PLSDASH — Portfolio tracker en tiempo real para PulseChain. Pega tus wallets y mira todos tus tokens, precios y valor total.">
+<title>PLSDASH — PulseChain Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0C0710;
+    --bg-2:#100A16;
+    --surface:#17101F;
+    --surface-2:#1E1529;
+    --line:rgba(255,255,255,.07);
+    --line-2:rgba(255,255,255,.12);
+    --text:#F4EFFA;
+    --dim:#A99FB8;
+    --faint:#6E6480;
+    --pink:#FF3D9A;
+    --violet:#9B5DE5;
+    --cyan:#28E0E6;
+    --mint:#2BE3A7;
+    --red:#FF5C7A;
+    --pulse:linear-gradient(90deg,#FF3D9A 0%,#9B5DE5 50%,#28E0E6 100%);
+    --display:'Space Grotesk',sans-serif;
+    --body:'Inter',sans-serif;
+    --mono:'JetBrains Mono',monospace;
+    --sat:env(safe-area-inset-top,0px);
+    --sab:env(safe-area-inset-bottom,0px);
+    --sal:env(safe-area-inset-left,0px);
+    --sar:env(safe-area-inset-right,0px);
+  }
+  html{-webkit-text-size-adjust:100%}
+  body{
+    font-family:var(--body);
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+  }
+  /* ambient glow */
+  body::before{
+    content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(900px 500px at 15% -5%,rgba(255,61,154,.10),transparent 60%),
+      radial-gradient(800px 600px at 95% 0%,rgba(40,224,230,.08),transparent 55%),
+      radial-gradient(700px 500px at 50% 110%,rgba(155,93,229,.10),transparent 60%);
+  }
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:max(0px,var(--sat)) calc(22px + var(--sar)) calc(80px + var(--sab)) calc(22px + var(--sal))}
+
+  /* ---------- NAV ---------- */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0 30px;gap:16px}
+  .brand{display:flex;align-items:center;gap:11px;font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.01em;cursor:pointer;user-select:none}
+  .brand .mark{width:30px;height:30px;border-radius:9px;background:var(--pulse);display:grid;place-items:center;box-shadow:0 0 22px rgba(155,93,229,.5)}
+  .brand .mark svg{width:18px;height:18px}
+  .brand b{font-weight:700}
+  .brand span{color:var(--faint);font-weight:400}
+  .nav-actions{display:flex;align-items:center;gap:10px}
+  .code-badge{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:9px 13px;color:var(--dim);font-family:var(--mono);font-size:12.5px;cursor:pointer;transition:.16s}
+  .code-badge:hover{border-color:var(--line-2);color:var(--text)}
+  .code-badge svg{width:14px;height:14px;flex-shrink:0;color:var(--violet)}
+  .code-badge.local{color:var(--faint)}
+  .btn{font-family:var(--body);font-weight:600;font-size:13.5px;border:none;border-radius:11px;padding:11px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.18s ease;white-space:nowrap}
+  .btn svg{width:15px;height:15px}
+  .btn-primary{background:var(--pulse);color:#13060F;box-shadow:0 6px 22px -6px rgba(255,61,154,.6)}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 10px 26px -6px rgba(255,61,154,.7)}
+  .btn-primary:active{transform:translateY(0)}
+  .btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--line)}
+  .btn-ghost:hover{border-color:var(--line-2);background:var(--surface-2)}
+  .btn:focus-visible,.tool:focus-visible,.tab:focus-visible,.eye:focus-visible,.code-badge:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+  /* ---------- HERO ---------- */
+  .hero{position:relative;background:linear-gradient(180deg,var(--surface) 0%,var(--bg-2) 100%);border:1px solid var(--line);border-radius:24px;padding:34px 34px 0;overflow:hidden;margin-bottom:16px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:9px}
+  .eyebrow .live{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 0 rgba(43,227,167,.6);animation:beat 2.4s infinite}
+  .eyebrow .live.stale{background:var(--faint);animation:none}
+  @keyframes beat{0%{box-shadow:0 0 0 0 rgba(43,227,167,.55)}70%{box-shadow:0 0 0 7px rgba(43,227,167,0)}100%{box-shadow:0 0 0 0 rgba(43,227,167,0)}}
+  .total{font-family:var(--display);font-weight:600;letter-spacing:-.03em;line-height:1;margin:16px 0 12px;font-size:clamp(48px,9vw,86px);font-variant-numeric:tabular-nums}
+  .total .cents{color:var(--dim)}
+  .hero-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:13.5px;color:var(--dim);padding-bottom:28px;min-height:20px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12.5px;font-weight:500}
+  .up{color:var(--mint)}.down{color:var(--red)}
+  .chip.pill{background:rgba(43,227,167,.1);color:var(--mint);padding:5px 10px;border-radius:8px;border:1px solid rgba(43,227,167,.22)}
+  .chip.pill.down{background:rgba(255,92,122,.1);color:var(--red);border-color:rgba(255,92,122,.22)}
+  .dot-sep{width:3px;height:3px;border-radius:50%;background:var(--faint)}
+  /* pulse line */
+  .pulse-wrap{position:relative;margin:0 -34px;height:120px}
+  .pulse-wrap svg{display:block;width:100%;height:100%}
+  .scan{animation:scan 3.4s linear infinite}
+  @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .enddot{animation:pop 2.4s ease-in-out infinite}
+  @keyframes pop{0%,100%{r:4}50%{r:6}}
+
+  /* ---------- WALLET BAR ---------- */
+  .wallet-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center}
+  .wchip{display:inline-flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 10px 8px 12px;font-size:13px;color:var(--text);transition:.16s}
+  .wchip:hover{border-color:var(--line-2)}
+  .wchip .wch-d{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;font-family:var(--mono);font-size:10px;color:#0C0710;font-weight:700;flex-shrink:0}
+  .wchip .wch-i b{font-weight:600;font-size:12.5px}
+  .wchip .wch-i span{font-family:var(--mono);font-size:10.5px;color:var(--faint);display:block;line-height:1.2}
+  .wchip .x{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:none;border:none;cursor:pointer;color:var(--faint);transition:.15s}
+  .wchip .x:hover{background:var(--bg-2);color:var(--red)}
+  .wchip .x svg{width:13px;height:13px}
+  .wchip .lbl-btn{background:none;border:none;cursor:pointer;color:var(--faint);padding:0;display:grid;place-items:center}
+  .wchip .lbl-btn:hover{color:var(--violet)}
+  .wchip .lbl-btn svg{width:12px;height:12px}
+  .add-wallet-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg-2);border:1px dashed var(--line-2);border-radius:12px;padding:9px 14px;font-family:var(--body);font-weight:500;font-size:12.5px;color:var(--dim);cursor:pointer;transition:.16s}
+  .add-wallet-chip:hover{color:var(--text);border-color:var(--violet)}
+  .add-wallet-chip svg{width:14px;height:14px}
+
+  /* ---------- STAT STRIP ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .stat h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:500;margin-bottom:12px}
+  .stat .v{font-family:var(--display);font-size:25px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .stat .sub{font-size:12.5px;color:var(--dim);margin-top:5px;font-family:var(--mono)}
+  .perf-row{display:flex;align-items:center;gap:10px}
+  .tk{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:11px;color:#0C0710;flex-shrink:0;overflow:hidden;position:relative}
+  .tk img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+  /* mini donut */
+  .donut{display:flex;align-items:center;gap:16px}
+  .donut svg{width:62px;height:62px;flex-shrink:0;transform:rotate(-90deg)}
+  .legend{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--dim)}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px}
+
+  /* ---------- HOLDINGS ---------- */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
+  .tabs{display:flex;gap:4px;background:var(--bg-2);padding:4px;border-radius:12px;border:1px solid var(--line)}
+  .tab{font-family:var(--body);font-weight:600;font-size:13px;color:var(--dim);background:none;border:none;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.16s}
+  .tab.on{background:var(--surface-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
+  .head-tools{display:flex;align-items:center;gap:8px}
+  .tool{display:inline-flex;align-items:center;gap:7px;font-family:var(--body);font-weight:500;font-size:12.5px;color:var(--dim);background:var(--bg-2);border:1px solid var(--line);padding:8px 12px;border-radius:10px;cursor:pointer;transition:.16s}
+  .tool:hover{color:var(--text);border-color:var(--line-2)}
+  .tool svg{width:14px;height:14px}
+  .tool.active{color:var(--text);border-color:var(--violet)}
+
+  .thead{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr 44px;gap:14px;padding:13px 22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--line)}
+  .thead .r{text-align:right}
+  .row{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr 44px;gap:14px;padding:15px 22px;align-items:center;border-bottom:1px solid var(--line);transition:.15s}
+  .row:last-child{border-bottom:none}
+  .row:hover{background:var(--surface-2)}
+  .row.hidden-tok{opacity:.38}
+  .asset{display:flex;align-items:center;gap:13px;min-width:0}
+  .logo{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:14px;color:#0C0710;flex-shrink:0;position:relative;box-shadow:0 0 0 1px rgba(255,255,255,.06);overflow:hidden}
+  .logo img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;z-index:2;background:#17101F}
+  .logo .ini{position:relative;z-index:1}
+  .asset .nm{min-width:0}
+  .asset .nm b{font-weight:600;font-size:14.5px;display:block;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .asset .nm span{font-family:var(--mono);font-size:11.5px;color:var(--faint)}
+  .custom-tag{font-family:var(--mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--violet);border:1px solid rgba(155,93,229,.4);padding:2px 5px;border-radius:5px;margin-left:7px;vertical-align:middle}
+  .num{font-family:var(--mono);font-size:13.5px;text-align:right;font-variant-numeric:tabular-nums}
+  .num .q{color:var(--dim);font-size:11px;display:block;margin-top:2px}
+  .val{font-family:var(--mono);font-size:14px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
+  .val .d{font-size:11px;font-weight:500;margin-top:2px;display:block}
+  .eye{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:none;border:1px solid transparent;cursor:pointer;color:var(--faint);transition:.15s;margin-left:auto}
+  .eye:hover{background:var(--bg-2);border-color:var(--line);color:var(--text)}
+  .eye svg{width:16px;height:16px}
+
+  /* wallet group header (by-wallet view) */
+  .wgroup{padding:16px 22px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)}
+  .wgroup .wl{display:flex;align-items:center;gap:11px}
+  .wgroup .wd{width:32px;height:32px;border-radius:9px;background:var(--surface-2);border:1px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-size:11px;color:var(--violet)}
+  .wgroup .wn b{font-size:13.5px;display:block}
+  .wgroup .wn span{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .wgroup .wv{font-family:var(--mono);font-size:14px;font-weight:600;text-align:right}
+  .wgroup .wv span{display:block;font-size:11px;font-weight:400;color:var(--faint)}
+
+  .foot{padding:16px 22px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--faint);flex-wrap:wrap;gap:8px}
+  .foot a{color:var(--violet);text-decoration:none}
+  .foot a:hover{text-decoration:underline}
+  .add-tok{display:inline-flex;align-items:center;gap:7px;font-family:var(--body);font-weight:500;font-size:12.5px;color:var(--dim);cursor:pointer;background:none;border:none}
+  .add-tok:hover{color:var(--text)}
+  .add-tok svg{width:14px;height:14px}
+
+  /* state blocks */
+  .state-block{padding:60px 22px;text-align:center;color:var(--dim)}
+  .state-block .ico{width:54px;height:54px;border-radius:16px;background:var(--bg-2);border:1px solid var(--line);display:grid;place-items:center;margin:0 auto 16px;color:var(--violet)}
+  .state-block .ico svg{width:26px;height:26px}
+  .state-block h3{font-family:var(--display);font-size:19px;font-weight:600;color:var(--text);margin-bottom:6px;letter-spacing:-.01em}
+  .state-block p{font-size:13.5px;max-width:340px;margin:0 auto 18px}
+  .state-block.error .ico{color:var(--red)}
+  .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line-2);border-top-color:var(--violet);margin:0 auto 16px;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  /* skeleton rows */
+  .sk-row{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr 44px;gap:14px;padding:15px 22px;align-items:center;border-bottom:1px solid var(--line)}
+  .sk{background:linear-gradient(90deg,var(--surface-2) 25%,var(--bg-2) 37%,var(--surface-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;border-radius:6px;height:14px}
+  .sk.circle{width:40px;height:40px;border-radius:50%}
+  .sk-asset{display:flex;align-items:center;gap:13px}
+  @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+
+  .note{margin-top:18px;font-size:11.5px;color:var(--faint);text-align:center;font-family:var(--mono);letter-spacing:.02em;line-height:1.6}
+
+  .hide-on-wallet{display:block}
+  body[data-view="wallet"] .hide-on-wallet{display:none}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+  .toast.err{border-color:rgba(255,92,122,.4)}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(8,4,11,.7);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-bg.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--line-2);border-radius:22px;width:100%;max-width:440px;padding:26px;position:relative;animation:rise .25s cubic-bezier(.2,.8,.2,1)}
+  @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .modal h2{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.01em;margin-bottom:6px}
+  .modal .lead{font-size:13.5px;color:var(--dim);margin-bottom:20px}
+  .modal label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:8px;margin-top:16px}
+  .modal label:first-of-type{margin-top:0}
+  .field{width:100%;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;color:var(--text);font-family:var(--mono);font-size:14px;transition:.16s}
+  .field:focus{outline:none;border-color:var(--violet);background:var(--surface-2)}
+  .field::placeholder{color:var(--faint)}
+  .modal-actions{display:flex;gap:10px;margin-top:22px}
+  .modal-actions .btn{flex:1;justify-content:center}
+  .modal-close{position:absolute;top:18px;right:18px;width:32px;height:32px;border-radius:9px;background:var(--bg-2);border:1px solid var(--line);display:grid;place-items:center;cursor:pointer;color:var(--dim);transition:.15s}
+  .modal-close:hover{color:var(--text);border-color:var(--line-2)}
+  .modal-close svg{width:15px;height:15px}
+  .field-err{font-size:12px;color:var(--red);margin-top:8px;min-height:16px}
+  .field-ok{font-size:12px;color:var(--mint);margin-top:8px;min-height:16px}
+  /* token preview */
+  .tok-preview{display:none;align-items:center;gap:13px;margin-top:16px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:13px}
+  .tok-preview.show{display:flex}
+  .tok-preview .pv-logo{width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;display:grid;place-items:center;font-family:var(--display);font-weight:700;color:#0C0710;position:relative}
+  .tok-preview .pv-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .tok-preview .pv-i b{font-size:14px;display:block}
+  .tok-preview .pv-i span{font-family:var(--mono);font-size:12px;color:var(--dim)}
+  .modal .priv{font-size:11.5px;color:var(--faint);line-height:1.55;margin-top:18px;padding-top:16px;border-top:1px solid var(--line);display:flex;gap:9px}
+  .modal .priv svg{width:15px;height:15px;flex-shrink:0;margin-top:2px;color:var(--violet)}
+  .seg{display:flex;gap:6px;background:var(--bg-2);border:1px solid var(--line);padding:4px;border-radius:11px;margin-bottom:4px}
+  .seg button{flex:1;font-family:var(--body);font-weight:600;font-size:12.5px;color:var(--dim);background:none;border:none;padding:8px;border-radius:8px;cursor:pointer;transition:.15s}
+  .seg button.on{background:var(--surface-2);color:var(--text)}
+  .copy-row{display:flex;align-items:center;gap:10px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:6px}
+  .copy-row code{font-family:var(--mono);font-size:14px;color:var(--cyan);flex:1;word-break:break-all}
+  .copy-row button{background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;color:var(--text);font-family:var(--body);font-weight:600;font-size:12px;cursor:pointer;transition:.15s}
+  .copy-row button:hover{border-color:var(--violet)}
+
+  /* ---------- RESPONSIVE ---------- */
+  @media(max-width:760px){
+    .code-badge .code-txt{display:none}
+    .stats{grid-template-columns:1fr}
+    .hero{padding:26px 22px 0;border-radius:20px}
+    .pulse-wrap{margin:0 -22px;height:96px}
+    .thead{display:none}
+    .row{grid-template-columns:1fr auto 30px;gap:6px 12px;padding:14px 16px}
+    .asset{grid-row:span 2;grid-column:1}
+    .num.price{display:none}
+    .num.bal{grid-column:2;grid-row:1;text-align:right;align-self:end}
+    .num.bal .q{display:inline;color:var(--faint)}
+    .val{grid-column:2;grid-row:2;align-self:start}
+    .eye{grid-column:3;grid-row:1/3}
+    .panel-head{padding:16px}
+    .total{margin-top:14px}
+    .btn-primary .bt-txt{display:none}
+    .btn-primary{padding:11px 13px}
+  }
+  @media(max-width:420px){
+    .brand span{display:none}
+    .wrap{padding-left:calc(14px + var(--sal));padding-right:calc(14px + var(--sar))}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .scan,.enddot,.eyebrow .live,.spinner,.sk,.modal{animation:none}
+  }
+</style>
+</head>
+<body data-view="combined">
+<div class="wrap">
+
+  <!-- NAV -->
+  <nav>
+    <div class="brand" onclick="goHome()" role="link" tabindex="0" aria-label="PLSDASH inicio">
+      <span class="mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-6 4 12 2-6h6" stroke="#13060F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+      <div><b>pls</b><span>dash</span></div>
+    </div>
+    <div class="nav-actions">
+      <button class="code-badge local" id="codeBadge" onclick="openCloudModal()" aria-label="Portfolio en la nube">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.6A3.5 3.5 0 0 1 18 18H7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span class="code-txt" id="codeTxt">Modo local</span>
+      </button>
+      <button class="btn btn-primary" onclick="openWalletModal()" aria-label="Añadir wallet">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#13060F" stroke-width="2.4" stroke-linecap="round"/></svg>
+        <span class="bt-txt">Añadir wallet</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow"><span class="live" id="liveDot"></span> Valor total del portfolio</div>
+    <div class="total" id="totalVal">$0<span class="cents">.00</span></div>
+    <div class="hero-meta" id="heroMeta">
+      <span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>
+    </div>
+    <div class="pulse-wrap">
+      <svg viewBox="0 0 1100 120" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="pg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#FF3D9A"/>
+            <stop offset="50%" stop-color="#9B5DE5"/>
+            <stop offset="100%" stop-color="#28E0E6"/>
+          </linearGradient>
+          <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#9B5DE5" stop-opacity=".22"/>
+            <stop offset="100%" stop-color="#9B5DE5" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="M0,86 L120,84 L180,88 L240,70 L300,74 L360,40 L380,96 L400,16 L420,90 L470,72 L540,76 L600,58 L660,62 L720,66 L760,40 L780,92 L800,30 L820,80 L880,66 L940,60 L1000,52 L1060,44 L1100,40 L1100,120 L0,120 Z" fill="url(#fade)"/>
+        <path d="M0,86 L120,84 L180,88 L240,70 L300,74 L360,40 L380,96 L400,16 L420,90 L470,72 L540,76 L600,58 L660,62 L720,66 L760,40 L780,92 L800,30 L820,80 L880,66 L940,60 L1000,52 L1060,44 L1100,40" fill="none" stroke="url(#pg)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+        <g class="scan"><rect width="120" height="120" fill="url(#pg)" opacity=".10"/></g>
+        <circle class="enddot" cx="1100" cy="40" r="4" fill="#28E0E6"/>
+      </svg>
+    </div>
+  </section>
+
+  <!-- WALLET BAR -->
+  <section class="wallet-bar" id="walletBar"></section>
+
+  <!-- STAT STRIP -->
+  <section class="stats">
+    <div class="stat">
+      <h4>Cambio 24h</h4>
+      <div class="v" id="st24Val">—</div>
+      <div class="sub" id="st24Sub">Sin datos todavía</div>
+    </div>
+    <div class="stat">
+      <h4>Mejor activo hoy</h4>
+      <div class="v perf-row" id="stBest"><span style="color:var(--faint);font-size:16px">—</span></div>
+      <div class="sub" id="stBestSub">Esperando datos</div>
+    </div>
+    <div class="stat">
+      <h4>Distribución</h4>
+      <div class="donut" id="stDonut">
+        <span class="sub" style="margin:0">Sin tokens todavía</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOLDINGS -->
+  <section class="panel">
+    <div class="panel-head">
+      <div class="tabs">
+        <button class="tab on" onclick="setView('combined',this)">Combinado</button>
+        <button class="tab" onclick="setView('wallet',this)">Por wallet</button>
+      </div>
+      <div class="head-tools">
+        <button class="tool" id="hideTool" onclick="toggleShowHidden(this)">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="2"/></svg>
+          <span id="hideLbl">Ocultos (0)</span>
+        </button>
+        <button class="tool" id="sortTool" onclick="cycleSort()">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span id="sortLbl">Valor</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- COMBINED column header -->
+    <div class="thead hide-on-wallet">
+      <div>Activo</div>
+      <div class="r">Balance</div>
+      <div class="r">Precio</div>
+      <div class="r">Valor</div>
+      <div></div>
+    </div>
+
+    <!-- ROWS render target -->
+    <div id="rows"></div>
+
+    <div class="foot">
+      <button class="add-tok" onclick="openTokenModal()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Añadir token personalizado (pega el contrato 0x…)
+      </button>
+      <div>Precios vía <a href="https://dexscreener.com" target="_blank" rel="noopener">DexScreener</a> · balances vía <a href="https://pulsechain.com" target="_blank" rel="noopener">PulseChain RPC</a></div>
+    </div>
+  </section>
+
+  <div class="note" id="footNote">◆ Pega una dirección de wallet pública de PulseChain (0x…) para ver tu cartera en tiempo real. No se conecta ninguna wallet — solo lectura.</div>
+
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-bg" id="walletModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="wmTitle">Añadir wallet</h2>
+    <p class="lead">Pega una dirección pública de PulseChain. No conectas tu wallet: solo se lee el balance público.</p>
+    <label for="wmAddr">Dirección</label>
+    <input class="field" id="wmAddr" placeholder="0x…" autocomplete="off" spellcheck="false" oninput="document.getElementById('wmErr').textContent=''">
+    <label for="wmLabel">Etiqueta (opcional)</label>
+    <input class="field" id="wmLabel" placeholder="Main, Cold, Trading…" autocomplete="off" maxlength="24">
+    <div class="field-err" id="wmErr"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitWallet()">Añadir</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="tokenModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="tmTitle">Añadir token personalizado</h2>
+    <p class="lead">Pega el contrato del token (0x…). Lo buscamos en DexScreener para confirmar que existe.</p>
+    <label for="tmAddr">Contrato del token</label>
+    <input class="field" id="tmAddr" placeholder="0x…" autocomplete="off" spellcheck="false" oninput="onTokenInput()">
+    <div class="field-err" id="tmErr"></div>
+    <div class="tok-preview" id="tmPreview"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
+      <button class="btn btn-primary" id="tmAddBtn" onclick="submitToken()" disabled style="opacity:.5">Añadir</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="cloudModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cmTitle">
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <div id="cloudCreate">
+      <h2 id="cmTitle">Portfolio en la nube</h2>
+      <p class="lead">Crea un código para sincronizar tu portfolio entre dispositivos. Sin cuenta ni contraseña.</p>
+      <div class="seg">
+        <button class="on" id="segAuto" onclick="setCodeMode('auto')">Código automático</button>
+        <button id="segCustom" onclick="setCodeMode('custom')">Personalizado</button>
+      </div>
+      <div id="customWrap" style="display:none">
+        <label for="cmCode">Tu código</label>
+        <input class="field" id="cmCode" placeholder="guillem" autocomplete="off" spellcheck="false" oninput="document.getElementById('cmErr').textContent=''">
+      </div>
+      <div class="field-err" id="cmErr"></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
+        <button class="btn btn-primary" id="cmCreateBtn" onclick="submitCreatePortfolio()">Crear portfolio</button>
+      </div>
+      <div class="priv">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span>Quien tenga tu código puede ver y editar este portfolio. Trátalo como un enlace privado. Las direcciones de blockchain son públicas de todos modos.</span>
+      </div>
+    </div>
+    <div id="cloudInfo" style="display:none">
+      <h2>Tu portfolio en la nube</h2>
+      <p class="lead">Abre esta URL en cualquier dispositivo para cargar el mismo portfolio.</p>
+      <label>Tu código</label>
+      <div class="copy-row"><code id="ciCode"></code><button onclick="copyCode()">Copiar</button></div>
+      <label>URL para compartir</label>
+      <div class="copy-row"><code id="ciUrl"></code><button onclick="copyUrl()">Copiar</button></div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="disconnectCloud()">Desconectar</button>
+        <button class="btn btn-primary" onclick="closeModals()">Listo</button>
+      </div>
+      <div class="priv">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        <span>Quien tenga este código puede ver y editar tu portfolio. Compártelo solo con quien confíes.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   PLSDASH — PulseChain portfolio tracker
+   Vanilla JS, sin build. Datos en vivo desde el navegador:
+     · Balances    → PulseChain RPC + explorer (Blockscout) scan API
+     · Precios/logo → DexScreener API
+   Persistencia: localStorage (caché) + Cloudflare KV (fuente de
+   verdad) vía la Pages Function /api/portfolio/[code].
+   ============================================================ */
+
+const DEXSCREENER_API = 'https://api.dexscreener.com';
+const PULSECHAIN_RPC   = 'https://rpc.pulsechain.com';
+const PULSECHAIN_SCAN  = 'https://api.scan.pulsechain.com';
+const CHAIN_ID         = 'pulsechain';
+const REFRESH_MS       = 30000;
+
+// WPLS — usado para precio del PLS nativo (PLS no es PRC-20).
+const WPLS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27';
+const LS_KEY = 'plsdash:portfolio';
+
+/* ---------- ESTADO ---------- */
+const state = {
+  code: null,            // código de portfolio en la nube (null = modo local)
+  wallets: [],           // [{address, label}]
+  customTokens: [],      // [address(lowercase)]
+  hidden: [],            // [tokenKey] — tokenKey = 'native' o address lowercase
+  view: 'combined',
+  sort: 'value',         // value | change | name
+  showHidden: false,
+};
+
+// Datos vivos calculados en cada refresh.
+let tokensCombined = [];     // [{key,address,name,symbol,decimals,balance,price,change24,logo,value,custom,perWallet:{}}]
+let perWalletTotals = {};    // address -> usdValue
+let lastUpdate = 0;
+let refreshTimer = null;
+let tickTimer = null;
+let isFetching = false;
+const priceCache = new Map();    // tokenAddress -> {price,change24,logo,name,symbol,ts}
+const PRICE_TTL = 25000;
+
+/* ============================================================
+   UTILIDADES
+   ============================================================ */
+const $ = id => document.getElementById(id);
+const isAddr = a => /^0x[0-9a-fA-F]{40}$/.test((a||'').trim());
+const lc = a => (a||'').trim().toLowerCase();
+
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function shortAddr(a){return a.slice(0,6)+'…'+a.slice(-4);}
+
+// Hash determinista del address → gradiente de respaldo (estilo PulseX/DexScreener).
+function gradientFor(seed){
+  let h=0; for(let i=0;i<seed.length;i++){h=(h*31+seed.charCodeAt(i))|0;}
+  const h1=Math.abs(h)%360, h2=(h1+48)%360;
+  return `linear-gradient(135deg,hsl(${h1} 70% 58%),hsl(${h2} 65% 42%))`;
+}
+
+function fmtUsd(n){
+  if(n==null||isNaN(n))return '—';
+  if(n===0)return '$0.00';
+  if(n<0.01)return '$'+n.toFixed(n<0.0001?8:6);
+  return '$'+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+// Precio: más decimales cuanto más pequeño.
+function fmtPrice(p){
+  if(p==null||isNaN(p))return '—';
+  if(p===0)return '$0';
+  if(p>=1)return '$'+p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:4});
+  if(p>=0.01)return '$'+p.toFixed(4);
+  if(p>=0.0001)return '$'+p.toFixed(6);
+  return '$'+p.toFixed(10).replace(/0+$/,'');
+}
+// Cantidad de tokens con sufijos K/M/B/T.
+function fmtAmount(n){
+  if(n==null||isNaN(n))return '0';
+  const abs=Math.abs(n);
+  if(abs>=1e12)return (n/1e12).toFixed(2)+'T';
+  if(abs>=1e9)return (n/1e9).toFixed(2)+'B';
+  if(abs>=1e6)return (n/1e6).toFixed(2)+'M';
+  if(abs>=1e3)return n.toLocaleString('en-US',{maximumFractionDigits:1});
+  if(abs>=1)return n.toLocaleString('en-US',{maximumFractionDigits:3});
+  if(abs===0)return '0';
+  return n.toFixed(4);
+}
+function fmtPct(p){
+  if(p==null||isNaN(p))return '0.0%';
+  return (p>=0?'+':'')+p.toFixed(1)+'%';
+}
+
+function toast(msg,isErr){
+  const t=$('toast');
+  t.textContent=msg;
+  t.className='toast show'+(isErr?' err':'');
+  clearTimeout(t._t);
+  t._t=setTimeout(()=>t.className='toast'+(isErr?' err':''),3200);
+}
+
+/* ============================================================
+   RPC (PulseChain) — balances on-chain
+   ============================================================ */
+async function rpc(method,params){
+  const r=await fetch(PULSECHAIN_RPC,{
+    method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})
+  });
+  if(!r.ok)throw new Error('RPC '+r.status);
+  const j=await r.json();
+  if(j.error)throw new Error(j.error.message||'RPC error');
+  return j.result;
+}
+// balanceOf(address) → selector 0x70a08231
+function balanceOfData(addr){return '0x70a08231'+lc(addr).slice(2).padStart(64,'0');}
+// decimals() → selector 0x313ce567
+const DECIMALS_DATA='0x313ce567';
+
+async function rpcTokenBalance(token,holder){
+  const res=await rpc('eth_call',[{to:lc(token),data:balanceOfData(holder)},'latest']);
+  return BigInt(res||'0x0');
+}
+async function rpcTokenDecimals(token){
+  try{const res=await rpc('eth_call',[{to:lc(token),data:DECIMALS_DATA},'latest']);return parseInt(res,16)||18;}
+  catch{return 18;}
+}
+async function rpcNativeBalance(holder){
+  const res=await rpc('eth_getBalance',[lc(holder),'latest']);
+  return BigInt(res||'0x0');
+}
+function bigToNum(bi,decimals){
+  // Conversión segura a Number para visualización (precisión suficiente para portfolio).
+  const d=BigInt(10)**BigInt(decimals);
+  const whole=bi/d, frac=bi%d;
+  return Number(whole)+Number(frac)/Number(d);
+}
+
+/* ============================================================
+   DESCUBRIMIENTO DE TOKENS
+   Estrategia: el explorer (Blockscout) lista todos los PRC-20 de
+   una dirección con balance + metadatos en una sola llamada.
+   Fallback: si el explorer no responde, consultamos por RPC los
+   custom tokens uno a uno (ampliable a una lista de populares).
+   ============================================================ */
+async function discoverWalletTokens(address){
+  const out=[]; // {address,name,symbol,decimals,raw(BigInt)}
+  // 1) PLS nativo
+  try{
+    const nb=await rpcNativeBalance(address);
+    out.push({address:'native',name:'Pulse',symbol:'PLS',decimals:18,raw:nb});
+  }catch(e){/* si falla el RPC, seguimos con tokens */}
+
+  // 2) PRC-20 vía explorer
+  let listed=new Set();
+  try{
+    const r=await fetch(`${PULSECHAIN_SCAN}/api?module=account&action=tokenlist&address=${address}`);
+    if(r.ok){
+      const j=await r.json();
+      if(Array.isArray(j.result)){
+        for(const t of j.result){
+          if(t.type && !/ERC-20|PRC-20/i.test(t.type))continue; // ignorar NFTs
+          const addr=lc(t.contractAddress);
+          if(!isAddr(addr))continue;
+          const dec=parseInt(t.decimals,10);
+          out.push({address:addr,name:t.name||'Token',symbol:t.symbol||'?',
+            decimals:isNaN(dec)?18:dec,raw:BigInt(t.balance||'0')});
+          listed.add(addr);
+        }
+      }
+    }
+  }catch(e){/* explorer caído → usamos sólo custom vía RPC abajo */}
+
+  // 3) Custom tokens no listados por el explorer → RPC directo
+  for(const ct of state.customTokens){
+    if(listed.has(ct))continue;
+    try{
+      const [bal,dec]=await Promise.all([rpcTokenBalance(ct,address),rpcTokenDecimals(ct)]);
+      out.push({address:ct,name:'Token',symbol:'?',decimals:dec,raw:bal});
+    }catch(e){/* token inválido, lo ignoramos */}
+  }
+  return out;
+}
+
+/* ============================================================
+   PRECIOS + LOGOS (DexScreener)
+   Agrupamos en lotes de 30 direcciones (endpoint multi-token) para
+   respetar el rate limit (300 req/min) y cacheamos 25s.
+   ============================================================ */
+async function fetchPrices(addresses){
+  const need=[...new Set(addresses.map(lc))].filter(a=>{
+    const c=priceCache.get(a);
+    return !c || (Date.now()-c.ts)>PRICE_TTL;
+  });
+  // Lotes de 30
+  for(let i=0;i<need.length;i+=30){
+    const batch=need.slice(i,i+30);
+    try{
+      const r=await fetch(`${DEXSCREENER_API}/tokens/v1/${CHAIN_ID}/${batch.join(',')}`);
+      if(!r.ok)continue;
+      const pairs=await r.json();
+      // Agrupar por token, quedarnos con el par de mayor liquidez.
+      const best={};
+      for(const p of (pairs||[])){
+        const base=lc(p.baseToken?.address);
+        if(!batch.includes(base))continue;
+        const liq=p.liquidity?.usd||0;
+        if(!best[base]||liq>best[base].liquidity?.usd){best[base]=p;}
+      }
+      for(const a of batch){
+        const p=best[a];
+        if(p){
+          priceCache.set(a,{
+            price:parseFloat(p.priceUsd)||0,
+            change24:p.priceChange?.h24!=null?parseFloat(p.priceChange.h24):null,
+            logo:p.info?.imageUrl||null,
+            name:p.baseToken?.name||null,
+            symbol:p.baseToken?.symbol||null,
+            ts:Date.now()
+          });
+        }else{
+          // Sin par → sin precio (se mostrará "—").
+          priceCache.set(a,{price:null,change24:null,logo:null,name:null,symbol:null,ts:Date.now()});
+        }
+      }
+    }catch(e){/* red caída → reintenta en el próximo ciclo */}
+  }
+}
+
+// Lookup de un único token (usado en el preview del modal "Añadir token").
+async function lookupToken(addr){
+  try{
+    const r=await fetch(`${DEXSCREENER_API}/token-pairs/v1/${CHAIN_ID}/${lc(addr)}`);
+    if(!r.ok)return null;
+    const pairs=await r.json();
+    if(!Array.isArray(pairs)||!pairs.length)return null;
+    let best=pairs[0];
+    for(const p of pairs){if((p.liquidity?.usd||0)>(best.liquidity?.usd||0))best=p;}
+    return {
+      address:lc(addr),
+      name:best.baseToken?.name||'Token',
+      symbol:best.baseToken?.symbol||'?',
+      price:parseFloat(best.priceUsd)||0,
+      logo:best.info?.imageUrl||null,
+    };
+  }catch{return null;}
+}
+
+/* ============================================================
+   REFRESH PRINCIPAL — balances + precios → render
+   ============================================================ */
+async function refresh(){
+  if(isFetching||!state.wallets.length)return;
+  isFetching=true;
+  try{
+    // 1) Balances de todas las wallets en paralelo.
+    const perWallet=await Promise.all(state.wallets.map(async w=>({
+      address:lc(w.address),
+      tokens:await discoverWalletTokens(lc(w.address))
+    })));
+
+    // 2) Combinar por token (sumar balances entre wallets).
+    const map=new Map(); // key -> token agregado
+    for(const wl of perWallet){
+      for(const t of wl.tokens){
+        const key=t.address; // 'native' o contract lc
+        const amount=bigToNum(t.raw,t.decimals);
+        if(amount<=0)continue;
+        if(!map.has(key)){
+          map.set(key,{key,address:t.address,name:t.name,symbol:t.symbol,
+            decimals:t.decimals,balance:0,perWallet:{},custom:state.customTokens.includes(t.address)});
+        }
+        const agg=map.get(key);
+        agg.balance+=amount;
+        agg.perWallet[wl.address]=(agg.perWallet[wl.address]||0)+amount;
+        // Preferir metadatos no genéricos.
+        if((agg.symbol==='?'||!agg.symbol)&&t.symbol&&t.symbol!=='?')agg.symbol=t.symbol;
+        if((agg.name==='Token'||!agg.name)&&t.name&&t.name!=='Token')agg.name=t.name;
+      }
+    }
+
+    // 3) Precios — para PLS nativo usamos WPLS.
+    const priceAddrs=[...map.keys()].map(k=>k==='native'?WPLS:k);
+    await fetchPrices(priceAddrs);
+
+    // 4) Aplicar precios + logos y calcular valores.
+    const arr=[];
+    perWalletTotals={};
+    for(const t of map.values()){
+      const pk=t.key==='native'?WPLS:t.key;
+      const pc=priceCache.get(pk)||{};
+      t.price=pc.price; t.change24=pc.change24; t.logo=pc.logo;
+      if(t.key==='native'){t.logo=pc.logo||t.logo;}
+      // Completar metadatos desde DexScreener si seguían genéricos.
+      if((t.symbol==='?'||!t.symbol)&&pc.symbol)t.symbol=pc.symbol;
+      if((t.name==='Token'||!t.name)&&pc.name)t.name=pc.name;
+      t.value=(t.price!=null)?t.balance*t.price:0;
+      arr.push(t);
+      for(const [w,amt] of Object.entries(t.perWallet)){
+        perWalletTotals[w]=(perWalletTotals[w]||0)+(t.price!=null?amt*t.price:0);
+      }
+    }
+    tokensCombined=arr;
+    lastUpdate=Date.now();
+    render();
+  }catch(e){
+    console.error(e);
+    if(!tokensCombined.length)renderError('No pudimos cargar los balances. Reintentando en 30s.');
+  }finally{
+    isFetching=false;
+  }
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function visibleTokens(){
+  return tokensCombined.filter(t=>!state.hidden.includes(t.key));
+}
+function sortTokens(list){
+  const s=[...list];
+  if(state.sort==='value')s.sort((a,b)=>b.value-a.value);
+  else if(state.sort==='change')s.sort((a,b)=>(b.change24||-999)-(a.change24||-999));
+  else s.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
+  return s;
+}
+
+function eyeOpenSvg(){return '<svg viewBox="0 0 24 24" fill="none"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="2"/></svg>';}
+function eyeOffSvg(){return '<svg viewBox="0 0 24 24" fill="none"><path d="m2 2 20 20M9.6 5.1A9.6 9.6 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.6M6 6.5A17 17 0 0 0 2 12s4 7 10 7a9.5 9.5 0 0 0 4-.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';}
+
+function logoHtml(t,size){
+  const initial=escapeHtml((t.symbol||'?')[0]||'?').toUpperCase();
+  const grad=gradientFor(t.address);
+  const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
+  return `<div class="logo" style="background:${grad}">${img}<span class="ini">${initial}</span></div>`;
+}
+
+function rowHtml(t){
+  const hidden=state.hidden.includes(t.key);
+  const chgCls=t.change24==null?'':(t.change24>=0?'up':'down');
+  const chgStyle=t.change24==null?'style="color:var(--faint)"':'';
+  const chgTxt=t.change24==null?'—':fmtPct(t.change24);
+  const priceTxt=t.price==null?'—':fmtPrice(t.price);
+  const valTxt=t.price==null?'—':fmtUsd(t.value);
+  const custom=t.custom?'<span class="custom-tag">custom</span>':'';
+  return `<div class="row ${hidden?'hidden-tok':''}" data-key="${escapeHtml(t.key)}">
+    <div class="asset">${logoHtml(t)}
+      <div class="nm"><b>${escapeHtml(t.name||'Token')}</b><span>${escapeHtml(t.symbol||'?')}${custom}</span></div>
+    </div>
+    <div class="num bal">${fmtAmount(t.balance)} <span class="q">${escapeHtml(t.symbol||'')}</span></div>
+    <div class="num price">${priceTxt}</div>
+    <div class="val">${valTxt}<span class="d ${chgCls}" ${chgStyle}>${chgTxt}</span></div>
+    <button class="eye" data-key="${escapeHtml(t.key)}" title="${hidden?'Mostrar':'Ocultar'}" aria-label="${hidden?'Mostrar token':'Ocultar token'}">${hidden?eyeOffSvg():eyeOpenSvg()}</button>
+  </div>`;
+}
+
+function render(){
+  // --- estado vacío ---
+  if(!state.wallets.length){
+    renderEmpty();
+    updateHeader();
+    renderWalletBar();
+    return;
+  }
+  // --- aún cargando (sin datos) ---
+  if(!tokensCombined.length){
+    if(isFetching){renderSkeleton();}
+    else renderEmptyHoldings();
+    updateHeader();
+    renderWalletBar();
+    return;
+  }
+
+  const rows=$('rows');
+  const list=state.showHidden?tokensCombined:visibleTokens();
+
+  if(state.view==='combined'){
+    const sorted=sortTokens(list);
+    rows.innerHTML=sorted.length?sorted.map(rowHtml).join(''):emptyHoldingsHtml();
+  }else{
+    // Por wallet: agrupar.
+    let html='';
+    const total=visibleTokens().reduce((s,t)=>s+t.value,0);
+    for(const w of state.wallets){
+      const addr=lc(w.address);
+      const wtokens=list.filter(t=>t.perWallet[addr]>0).map(t=>{
+        const amt=t.perWallet[addr];
+        return {...t,balance:amt,value:t.price!=null?amt*t.price:0};
+      });
+      const sorted=sortTokens(wtokens);
+      const wtotal=perWalletTotals[addr]||0;
+      const pct=total>0?Math.round(wtotal/total*100):0;
+      html+=`<div class="wgroup">
+        <div class="wl"><div class="wd">${escapeHtml((w.label||'W')[0].toUpperCase())}</div>
+          <div class="wn"><b>${escapeHtml(w.label||'Wallet')}</b><span>${shortAddr(lc(w.address))}</span></div></div>
+        <div class="wv">${fmtUsd(wtotal)}<span>${pct}% del total</span></div>
+      </div>`;
+      html+=sorted.length?sorted.map(rowHtml).join(''):'<div class="state-block" style="padding:26px"><p>Sin tokens con balance en esta wallet.</p></div>';
+    }
+    rows.innerHTML=html;
+  }
+
+  updateHeader();
+  renderStats();
+  renderWalletBar();
+  updateHideLabel();
+}
+
+function updateHeader(){
+  const total=visibleTokens().reduce((s,t)=>s+t.value,0);
+  const [w,c]=total.toFixed(2).split('.');
+  $('totalVal').innerHTML=(total>=0?'$':'-$')+Math.abs(+w).toLocaleString('en-US')+'<span class="cents">.'+c+'</span>';
+
+  // Cambio 24h del portfolio.
+  let prev=0,has=false;
+  for(const t of visibleTokens()){
+    if(t.change24!=null&&t.price!=null){has=true;prev+=t.value/(1+t.change24/100);}
+    else prev+=t.value;
+  }
+  const diff=total-prev;
+  const pct=prev>0?(diff/prev*100):0;
+
+  const meta=$('heroMeta');
+  if(!state.wallets.length){
+    meta.innerHTML='<span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>';
+    return;
+  }
+  const up=diff>=0;
+  const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} hoy</span><span class="dot-sep"></span>`:'';
+  const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
+  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${visibleTokens().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
+}
+
+function renderStats(){
+  const vis=visibleTokens().filter(t=>t.value>0);
+  // 24h
+  let prev=0,total=0,has=false;
+  for(const t of vis){total+=t.value;if(t.change24!=null){has=true;prev+=t.value/(1+t.change24/100);}else prev+=t.value;}
+  const diff=total-prev;
+  $('st24Val').className='v '+(diff>=0?'up':'down');
+  $('st24Val').textContent=has?(diff>=0?'+':'−')+fmtUsd(Math.abs(diff)).slice(1):'—';
+  $('st24Sub').textContent=has?`de ${fmtUsd(prev)} → ${fmtUsd(total)}`:'Sin datos de cambio';
+
+  // Mejor activo
+  const best=[...vis].filter(t=>t.change24!=null).sort((a,b)=>b.change24-a.change24)[0];
+  if(best){
+    $('stBest').innerHTML=`<span class="tk" style="background:${gradientFor(best.address)}">${best.logo?`<img src="${escapeHtml(best.logo)}" onerror="this.remove()">`:''}${escapeHtml((best.symbol||'?')[0].toUpperCase())}</span><span>${escapeHtml(best.symbol||'?')} <span class="${best.change24>=0?'up':'down'}" style="font-size:16px">${fmtPct(best.change24)}</span></span>`;
+    $('stBestSub').textContent=`${escapeHtml(best.name||'')} · ${fmtPrice(best.price)}`;
+  }else{
+    $('stBest').innerHTML='<span style="color:var(--faint);font-size:16px">—</span>';
+    $('stBestSub').textContent='Sin datos de cambio';
+  }
+
+  // Donut distribución
+  const sorted=[...vis].sort((a,b)=>b.value-a.value);
+  const colors=['#FF3D9A','#9B5DE5','#28E0E6','#2BE3A7'];
+  const top=sorted.slice(0,3);
+  const otherVal=sorted.slice(3).reduce((s,t)=>s+t.value,0);
+  const segs=top.map((t,i)=>({label:t.symbol,val:t.value,color:colors[i]}));
+  if(otherVal>0)segs.push({label:'Otros',val:otherVal,color:colors[3]});
+  if(!total){$('stDonut').innerHTML='<span class="sub" style="margin:0">Sin tokens todavía</span>';return;}
+  let off=0;
+  const circles=segs.map(s=>{
+    const pct=Math.round(s.val/total*100);
+    const c=`<circle cx="18" cy="18" r="15.9" fill="none" stroke="${s.color}" stroke-width="4.2" stroke-dasharray="${pct} 100" stroke-dashoffset="${-off}"/>`;
+    off+=pct;return c;
+  }).join('');
+  const legend=segs.map(s=>`<span><i style="background:${s.color}"></i>${escapeHtml(s.label)} ${Math.round(s.val/total*100)}%</span>`).join('');
+  $('stDonut').innerHTML=`<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#241a30" stroke-width="4.2"/>${circles}</svg><div class="legend">${legend}</div>`;
+}
+
+function renderWalletBar(){
+  const bar=$('walletBar');
+  let html=state.wallets.map((w,i)=>{
+    const addr=lc(w.address);
+    return `<div class="wchip"><div class="wch-d" style="background:${gradientFor(addr)}">${escapeHtml((w.label||'W')[0].toUpperCase())}</div>
+      <div class="wch-i"><b>${escapeHtml(w.label||'Wallet '+(i+1))}</b><span>${shortAddr(addr)}</span></div>
+      <button class="lbl-btn" title="Renombrar" aria-label="Renombrar wallet" onclick="renameWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17v3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+      <button class="x" title="Eliminar" aria-label="Eliminar wallet" onclick="removeWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    </div>`;
+  }).join('');
+  html+=`<button class="add-wallet-chip" onclick="openWalletModal()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Añadir wallet</button>`;
+  bar.innerHTML=html;
+}
+
+function updateHideLabel(){
+  const n=state.hidden.filter(k=>tokensCombined.some(t=>t.key===k)).length;
+  $('hideLbl').textContent=state.showHidden?'Mostrando ocultos':`Ocultos (${n})`;
+  $('hideTool').classList.toggle('active',state.showHidden);
+}
+
+/* ---------- estados (vacío / carga / error) ---------- */
+function renderEmpty(){
+  $('rows').innerHTML=`<div class="state-block">
+    <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="2"/><path d="M3 7l2-3h14l2 3M16 13h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+    <h3>Tu cartera, en tiempo real</h3>
+    <p>Pega una dirección pública de PulseChain (0x…) y verás todos tus tokens, precios y el valor total al instante.</p>
+    <button class="btn btn-primary" onclick="openWalletModal()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#13060F" stroke-width="2.4" stroke-linecap="round"/></svg>Añadir wallet</button>
+  </div>`;
+}
+function emptyHoldingsHtml(){
+  return `<div class="state-block"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+    <h3>Sin tokens con balance</h3><p>Esta dirección no tiene tokens con saldo, o aún se están cargando. Añade un token personalizado si falta alguno.</p></div>`;
+}
+function renderEmptyHoldings(){$('rows').innerHTML=emptyHoldingsHtml();}
+function renderSkeleton(){
+  let s='';
+  for(let i=0;i<5;i++)s+=`<div class="sk-row"><div class="sk-asset"><div class="sk circle"></div><div style="flex:1"><div class="sk" style="width:90px;margin-bottom:7px"></div><div class="sk" style="width:50px;height:10px"></div></div></div><div class="sk" style="width:70px;justify-self:end"></div><div class="sk" style="width:70px;justify-self:end"></div><div class="sk" style="width:70px;justify-self:end"></div><div></div></div>`;
+  $('rows').innerHTML=s;
+}
+function renderError(msg){
+  $('rows').innerHTML=`<div class="state-block error"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div>
+    <h3>No se pudieron cargar los datos</h3><p>${escapeHtml(msg)}</p><button class="btn btn-ghost" onclick="refresh()">Reintentar ahora</button></div>`;
+}
+
+/* ============================================================
+   ACCIONES — wallets / tokens / visibilidad
+   ============================================================ */
+function addWallet(address,label){
+  const addr=lc(address);
+  if(!isAddr(addr))return {ok:false,msg:'Esa dirección no parece válida (debe ser 0x + 40 caracteres).'};
+  if(state.wallets.some(w=>lc(w.address)===addr))return {ok:false,msg:'Esa wallet ya está en tu portfolio.'};
+  state.wallets.push({address:addr,label:(label||'').trim()});
+  savePortfolio();
+  tokensCombined=[];
+  render();
+  refresh();
+  return {ok:true};
+}
+function removeWallet(addr){
+  state.wallets=state.wallets.filter(w=>lc(w.address)!==lc(addr));
+  savePortfolio();
+  tokensCombined=[];
+  render();
+  if(state.wallets.length)refresh();
+  toast('Wallet eliminada');
+}
+function renameWallet(addr){
+  const w=state.wallets.find(x=>lc(x.address)===lc(addr));
+  if(!w)return;
+  const label=prompt('Etiqueta para esta wallet:',w.label||'');
+  if(label===null)return;
+  w.label=label.trim().slice(0,24);
+  savePortfolio();
+  render();
+}
+async function addCustomToken(addr){
+  const a=lc(addr);
+  if(!isAddr(a))return {ok:false,msg:'Contrato no válido.'};
+  if(state.customTokens.includes(a))return {ok:false,msg:'Ese token ya está añadido.'};
+  state.customTokens.push(a);
+  savePortfolio();
+  tokensCombined=[];
+  render();
+  refresh();
+  return {ok:true};
+}
+function toggleTokenVisibility(key){
+  const i=state.hidden.indexOf(key);
+  if(i>=0)state.hidden.splice(i,1);
+  else state.hidden.push(key);
+  savePortfolio();
+  render();
+}
+
+/* ============================================================
+   VISTA / ORDEN / OCULTOS
+   ============================================================ */
+function setView(v,el){
+  state.view=v;
+  document.body.dataset.view=v;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  render();
+}
+function cycleSort(){
+  const order=['value','change','name'];
+  const labels={value:'Valor',change:'Cambio 24h',name:'Nombre'};
+  state.sort=order[(order.indexOf(state.sort)+1)%order.length];
+  $('sortLbl').textContent=labels[state.sort];
+  render();
+}
+function toggleShowHidden(){
+  state.showHidden=!state.showHidden;
+  render();
+}
+
+/* ============================================================
+   PERSISTENCIA — localStorage (caché) + KV (fuente de verdad)
+   ============================================================ */
+function serialize(){
+  return {wallets:state.wallets,customTokens:state.customTokens,hidden:state.hidden,
+    view:state.view,sort:state.sort,v:1};
+}
+function applyData(d){
+  if(!d)return;
+  state.wallets=Array.isArray(d.wallets)?d.wallets.filter(w=>isAddr(w.address)).map(w=>({address:lc(w.address),label:(w.label||'').toString().slice(0,24)})):[];
+  state.customTokens=Array.isArray(d.customTokens)?d.customTokens.filter(isAddr).map(lc):[];
+  state.hidden=Array.isArray(d.hidden)?d.hidden:[];
+  if(d.sort)state.sort=d.sort;
+}
+function saveLocal(){
+  try{localStorage.setItem(LS_KEY,JSON.stringify({code:state.code,data:serialize()}));}catch(e){}
+}
+
+let saveTimer=null;
+function savePortfolio(){
+  saveLocal();
+  if(!state.code)return;            // modo local: sólo localStorage
+  clearTimeout(saveTimer);          // debounce de escrituras a KV
+  saveTimer=setTimeout(pushToKV,800);
+}
+async function pushToKV(){
+  if(!state.code)return;
+  try{
+    const r=await fetch(`/api/portfolio/${encodeURIComponent(state.code)}`,{
+      method:'PUT',headers:{'content-type':'application/json'},
+      body:JSON.stringify(serialize())
+    });
+    if(!r.ok)throw new Error('PUT '+r.status);
+  }catch(e){toast('No se pudo sincronizar con la nube (guardado local OK)',true);}
+}
+async function loadPortfolio(code){
+  // localStorage primero (arranque instantáneo), KV como fuente de verdad.
+  try{
+    const cached=JSON.parse(localStorage.getItem(LS_KEY)||'null');
+    if(cached&&cached.code===code&&cached.data)applyData(cached.data);
+  }catch(e){}
+  state.code=code;
+  updateCodeBadge();
+  render();
+  if(state.wallets.length)refresh();
+  // Traer de KV.
+  try{
+    const r=await fetch(`/api/portfolio/${encodeURIComponent(code)}`);
+    if(r.status===404){toast('Ese portfolio no existe. Trabajando en modo local.',true);state.code=null;updateCodeBadge();saveLocal();return;}
+    if(r.ok){
+      const d=await r.json();
+      if(d){applyData(d);saveLocal();render();if(state.wallets.length)refresh();}
+    }
+  }catch(e){/* offline → usamos la caché */}
+}
+
+/* ---------- crear / conectar portfolio nube ---------- */
+function randomCode(){
+  const chars='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const a=new Uint32Array(10);crypto.getRandomValues(a);
+  return [...a].map(n=>chars[n%62]).join('');
+}
+async function codeExists(code){
+  try{const r=await fetch(`/api/portfolio/${encodeURIComponent(code)}`);return r.status!==404;}
+  catch{return false;}
+}
+async function createPortfolio(code){
+  state.code=code;
+  await pushToKV();
+  history.replaceState(null,'',`/p/${code}`);
+  saveLocal();
+  updateCodeBadge();
+}
+
+/* ============================================================
+   MODALES
+   ============================================================ */
+function openWalletModal(){closeModals();$('walletModal').classList.add('show');$('wmAddr').value='';$('wmLabel').value='';$('wmErr').textContent='';setTimeout(()=>$('wmAddr').focus(),50);}
+function submitWallet(){
+  const r=addWallet($('wmAddr').value,$('wmLabel').value);
+  if(r.ok){closeModals();toast('Wallet añadida');}
+  else $('wmErr').textContent=r.msg;
+}
+
+function openTokenModal(){closeModals();$('tokenModal').classList.add('show');$('tmAddr').value='';$('tmErr').textContent='';$('tmPreview').className='tok-preview';setAddBtn(false);setTimeout(()=>$('tmAddr').focus(),50);}
+let pendingToken=null;
+let tokenLookupTimer=null;
+function setAddBtn(on){const b=$('tmAddBtn');b.disabled=!on;b.style.opacity=on?'1':'.5';}
+function onTokenInput(){
+  $('tmErr').textContent='';
+  $('tmPreview').className='tok-preview';
+  setAddBtn(false);pendingToken=null;
+  const a=$('tmAddr').value.trim();
+  clearTimeout(tokenLookupTimer);
+  if(!isAddr(a))return;
+  if(state.customTokens.includes(lc(a))){$('tmErr').textContent='Ese token ya está añadido.';return;}
+  tokenLookupTimer=setTimeout(async()=>{
+    $('tmErr').textContent='Buscando en DexScreener…';
+    const tok=await lookupToken(a);
+    if(!tok){$('tmErr').textContent='No encontramos ese token en DexScreener. Revisa el contrato.';return;}
+    $('tmErr').textContent='';
+    pendingToken=tok;
+    const grad=gradientFor(tok.address);
+    const img=tok.logo?`<img src="${escapeHtml(tok.logo)}" onerror="this.remove()">`:'';
+    $('tmPreview').innerHTML=`<div class="pv-logo" style="background:${grad}">${img}<span>${escapeHtml((tok.symbol||'?')[0].toUpperCase())}</span></div><div class="pv-i"><b>${escapeHtml(tok.name)}</b><span>${escapeHtml(tok.symbol)} · ${fmtPrice(tok.price)}</span></div>`;
+    $('tmPreview').className='tok-preview show';
+    setAddBtn(true);
+  },450);
+}
+async function submitToken(){
+  if(!pendingToken)return;
+  const r=await addCustomToken(pendingToken.address);
+  if(r.ok){closeModals();toast('Token añadido');}
+  else $('tmErr').textContent=r.msg;
+}
+
+let codeMode='auto';
+function openCloudModal(){
+  closeModals();
+  $('cloudModal').classList.add('show');
+  if(state.code){
+    $('cloudCreate').style.display='none';
+    $('cloudInfo').style.display='block';
+    $('ciCode').textContent=state.code;
+    $('ciUrl').textContent=`${location.origin}/p/${state.code}`;
+  }else{
+    $('cloudCreate').style.display='block';
+    $('cloudInfo').style.display='none';
+    $('cmErr').textContent='';
+  }
+}
+function setCodeMode(m){
+  codeMode=m;
+  $('segAuto').classList.toggle('on',m==='auto');
+  $('segCustom').classList.toggle('on',m==='custom');
+  $('customWrap').style.display=m==='custom'?'block':'none';
+  $('cmErr').textContent='';
+}
+async function submitCreatePortfolio(){
+  const btn=$('cmCreateBtn');btn.disabled=true;btn.style.opacity='.6';
+  try{
+    let code;
+    if(codeMode==='custom'){
+      code=$('cmCode').value.trim();
+      if(!/^[a-zA-Z0-9_-]{3,32}$/.test(code)){$('cmErr').textContent='Usa 3–32 caracteres: letras, números, guion o guion bajo.';return;}
+      $('cmErr').textContent='Comprobando disponibilidad…';
+      if(await codeExists(code)){$('cmErr').textContent='Ese código ya está en uso. Prueba otro.';return;}
+    }else{
+      code=randomCode();
+    }
+    await createPortfolio(code);
+    openCloudModal(); // ahora muestra la info
+    toast('Portfolio creado en la nube');
+  }finally{btn.disabled=false;btn.style.opacity='1';}
+}
+function disconnectCloud(){
+  state.code=null;
+  history.replaceState(null,'','/');
+  saveLocal();
+  updateCodeBadge();
+  closeModals();
+  toast('Desconectado de la nube (datos locales conservados)');
+}
+function copyCode(){navigator.clipboard.writeText(state.code).then(()=>toast('Código copiado'));}
+function copyUrl(){navigator.clipboard.writeText(`${location.origin}/p/${state.code}`).then(()=>toast('URL copiada'));}
+
+function closeModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('show'));}
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals();}));
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeModals();
+  if(e.key==='Enter'){
+    if($('walletModal').classList.contains('show'))submitWallet();
+    else if($('tokenModal').classList.contains('show')&&!$('tmAddBtn').disabled)submitToken();
+  }
+});
+
+function updateCodeBadge(){
+  const b=$('codeBadge'),t=$('codeTxt');
+  if(state.code){b.classList.remove('local');t.textContent=state.code;b.setAttribute('aria-label','Portfolio: '+state.code);}
+  else{b.classList.add('local');t.textContent='Modo local';}
+}
+function goHome(){if(location.pathname!=='/'){location.href='/';}}
+
+/* ---------- eventos de fila (ojo) por delegación ---------- */
+$('rows').addEventListener('click',e=>{
+  const eye=e.target.closest('.eye');
+  if(eye){toggleTokenVisibility(eye.dataset.key);}
+});
+
+/* ============================================================
+   ARRANQUE
+   ============================================================ */
+function startTimers(){
+  if(refreshTimer)clearInterval(refreshTimer);
+  if(tickTimer)clearInterval(tickTimer);
+  refreshTimer=setInterval(()=>{if(state.wallets.length)refresh();},REFRESH_MS);
+  // Actualizar "hace Xs" y el punto de estado cada segundo.
+  tickTimer=setInterval(()=>{
+    const chip=$('agoChip');
+    if(chip&&lastUpdate){
+      const ago=Math.round((Date.now()-lastUpdate)/1000);
+      chip.textContent=`actualizado hace ${ago}s`;
+      $('liveDot').classList.toggle('stale',ago>90);
+    }
+  },1000);
+}
+
+async function init(){
+  // ¿URL /p/<code>?
+  const m=location.pathname.match(/^\/p\/([A-Za-z0-9_-]{3,32})$/);
+  if(m){
+    await loadPortfolio(m[1]);
+  }else{
+    // Modo local: cargar caché.
+    try{
+      const cached=JSON.parse(localStorage.getItem(LS_KEY)||'null');
+      if(cached&&!cached.code&&cached.data)applyData(cached.data);
+    }catch(e){}
+    updateCodeBadge();
+    render();
+    if(state.wallets.length)refresh();
+  }
+  startTimers();
+}
+init();
+</script>
+</body>
+</html>
