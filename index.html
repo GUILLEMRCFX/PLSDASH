@@ -276,6 +276,27 @@
   .chart-foot a{color:var(--violet);text-decoration:none;font-size:12.5px;font-weight:600}
   .chart-foot a:hover{text-decoration:underline}
 
+  /* ---------- MERCADO / STATS ---------- */
+  body[data-view="market"] .thead,
+  body[data-view="market"] .head-tools,
+  body[data-view="market"] .foot{display:none}
+  .mkt-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .mkt-title{font-family:var(--display);font-weight:600;font-size:15px}
+  .mkt-sub{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:2px}
+  .mkt-sort{width:auto;min-width:170px;padding:9px 12px;font-family:var(--body);font-size:13px;cursor:pointer;letter-spacing:0}
+  .mkt-head{display:grid;grid-template-columns:34px 2.2fr 1.1fr .9fr 1.2fr 1.2fr 1.3fr;gap:12px;padding:12px 22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--line)}
+  .mkt-head .r{text-align:right}
+  .mkt-row{display:grid;grid-template-columns:34px 2.2fr 1.1fr .9fr 1.2fr 1.2fr 1.3fr;gap:12px;padding:13px 22px;align-items:center;border-bottom:1px solid var(--line);cursor:pointer;transition:.15s}
+  .mkt-row:last-child{border-bottom:none}
+  .mkt-row:hover{background:var(--surface-2)}
+  .mkt-rank{font-family:var(--mono);font-size:12px;color:var(--faint);text-align:center;font-variant-numeric:tabular-nums}
+  .mkt-tok{display:flex;align-items:center;gap:11px;min-width:0}
+  .mkt-tok .nm{min-width:0}
+  .mkt-tok .nm b{font-weight:600;font-size:14px;display:block;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mkt-tok .nm span{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .mkt-num{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .mkt-num.up{color:var(--mint)}.mkt-num.down{color:var(--red)}
+
   /* toast */
   .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw}
   .toast.show{transform:translateX(-50%) translateY(0)}
@@ -335,6 +356,10 @@
     .total{margin-top:14px}
     .btn-primary .bt-txt,.btn-ghost .bt-txt{display:none}
     .btn-primary,.btn-ghost{padding:11px 13px}
+    /* Mercado en móvil: Token | 24h | Market cap (resto oculto). */
+    .mkt-head,.mkt-row{grid-template-columns:1.8fr .8fr 1.1fr;gap:10px;padding:13px 16px}
+    .mkt-c-rank,.mkt-c-price,.mkt-c-vol,.mkt-c-liq{display:none}
+    .mkt-bar{padding:14px 16px}
     .hist-bar{padding:14px 16px}
     .hist-detail,.hist-summary{padding-left:16px;padding-right:16px}
     /* En móvil no caben cantidades por celda: mostramos sólo los iconos
@@ -444,6 +469,7 @@
         <button class="tab on" onclick="setView('combined',this)">Combinado</button>
         <button class="tab" onclick="setView('wallet',this)">Por wallet</button>
         <button class="tab" onclick="setView('history',this)">Historial</button>
+        <button class="tab" onclick="setView('market',this)">Mercado</button>
       </div>
       <div class="head-tools">
         <div class="tf-seg" id="tfSeg" role="group" aria-label="Periodo del cambio de precio">
@@ -963,6 +989,8 @@ function rowHtml(t){
 }
 
 function render(){
+  // --- Mercado: vista global, no depende del portfolio ---
+  if(state.view==='market'){updateHeader();renderWalletBar();loadMarket();return;}
   // --- estado vacío ---
   if(!state.wallets.length){
     if(state.view==='history'){loadHistory();updateHeader();renderWalletBar();return;}
@@ -1194,6 +1222,7 @@ function setView(v,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
   if(v==='history')loadHistory();
+  else if(v==='market')loadMarket();
   else render();
 }
 function cycleSort(){
@@ -1274,6 +1303,112 @@ function openChart(pair,sym){
   $('chartModal').classList.add('show');
 }
 function closeChart(){$('chartModal').classList.remove('show');$('chartWrap').innerHTML='';}
+
+/* ============================================================
+   MERCADO / STATS — principales tokens de PulseChain
+   Fuente: GeckoTerminal (pools de PulseChain) → precio, cambio 24h,
+   volumen 24h, liquidez y market cap (FDV cuando no hay circulante).
+   Es una vista global (no depende del portfolio). Al tocar una fila
+   se abre el gráfico en vivo del token.
+   ============================================================ */
+const marketState={tokens:[],loading:false,error:false,loaded:false,sort:'mcap',ts:0};
+
+// USD compacto para cifras grandes (market cap, volumen, liquidez).
+function fmtBigUsd(n){
+  if(n==null||isNaN(n)||n===0)return '—';
+  const a=Math.abs(n);
+  if(a>=1e12)return '$'+(n/1e12).toFixed(2)+'T';
+  if(a>=1e9)return '$'+(n/1e9).toFixed(2)+'B';
+  if(a>=1e6)return '$'+(n/1e6).toFixed(2)+'M';
+  if(a>=1e3)return '$'+(n/1e3).toFixed(1)+'K';
+  return '$'+n.toFixed(0);
+}
+
+async function loadMarket(force){
+  if(marketState.loading)return;
+  if(marketState.loaded&&!force&&Date.now()-marketState.ts<60000){renderMarket();return;}
+  marketState.loading=true;marketState.error=false;
+  renderMarket();
+  try{
+    const out=[],seen=new Set();
+    // Dos páginas de pools (≈40) deduplicadas por token base.
+    for(const page of [1,2]){
+      const r=await fetch(`${GECKOTERMINAL_API}/networks/${CHAIN_ID}/pools?include=base_token&page=${page}`);
+      if(!r.ok)throw 0;
+      const j=await r.json();
+      const inc={};
+      for(const it of (j.included||[]))inc[it.id]=it.attributes||{};
+      for(const p of (j.data||[])){
+        const a=p.attributes||{};
+        const baseId=p.relationships&&p.relationships.base_token&&p.relationships.base_token.data&&p.relationships.base_token.data.id;
+        const tok=inc[baseId]||{};
+        const addr=lc(tok.address||(baseId?baseId.split('_').pop():'')||'');
+        if(!isAddr(addr)||seen.has(addr))continue;
+        seen.add(addr);
+        const img=tok.image_url&&!/missing/i.test(tok.image_url)?tok.image_url:null;
+        out.push({
+          address:addr,
+          name:tok.name||a.name||'Token',
+          symbol:tok.symbol||'?',
+          logo:img,
+          price:parseFloat(a.base_token_price_usd)||null,
+          change24:a.price_change_percentage&&a.price_change_percentage.h24!=null?parseFloat(a.price_change_percentage.h24):null,
+          vol24:parseFloat(a.volume_usd&&a.volume_usd.h24)||0,
+          liq:parseFloat(a.reserve_in_usd)||0,
+          mcap:parseFloat(a.market_cap_usd)||parseFloat(a.fdv_usd)||0,
+          pair:a.address||null,
+        });
+      }
+    }
+    marketState.tokens=out;marketState.loaded=true;marketState.ts=Date.now();
+  }catch(e){console.error(e);marketState.error=true;}
+  finally{marketState.loading=false;renderMarket();}
+}
+
+function mktSetSort(v){marketState.sort=v;renderMarket();}
+
+function mktRowHtml(t,rank){
+  const chg=t.change24;
+  const chgCls=chg==null?'':(chg>=0?'up':'down');
+  const grad=gradientFor(t.address);
+  const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
+  return `<div class="mkt-row" data-pair="${escapeHtml(t.pair||'')}" data-sym="${escapeHtml(t.symbol||'')}">
+    <div class="mkt-rank mkt-c-rank">${rank}</div>
+    <div class="mkt-tok"><div class="logo" style="width:34px;height:34px;font-size:12px;background:${grad}">${img}<span class="ini">${escapeHtml((t.symbol||'?')[0].toUpperCase())}</span></div><div class="nm"><b>${escapeHtml(t.name||'Token')}</b><span>${escapeHtml(t.symbol||'?')}</span></div></div>
+    <div class="mkt-num mkt-c-price">${t.price!=null?fmtPrice(t.price):'—'}</div>
+    <div class="mkt-num ${chgCls}">${chg==null?'—':fmtPct(chg)}</div>
+    <div class="mkt-num mkt-c-vol">${fmtBigUsd(t.vol24)}</div>
+    <div class="mkt-num mkt-c-liq">${fmtBigUsd(t.liq)}</div>
+    <div class="mkt-num">${fmtBigUsd(t.mcap)}</div>
+  </div>`;
+}
+
+function renderMarket(){
+  const rows=$('rows');
+  const sel=k=>marketState.sort===k?'selected':'';
+  const bar=`<div class="mkt-bar">
+    <div><div class="mkt-title">Mercado · PulseChain</div><div class="mkt-sub">${marketState.loaded?(marketState.tokens.length+' tokens principales'):'Cargando…'}</div></div>
+    <select class="mkt-sort field" onchange="mktSetSort(this.value)" aria-label="Ordenar mercado">
+      <option value="mcap" ${sel('mcap')}>Market cap</option>
+      <option value="volume" ${sel('volume')}>Volumen 24h</option>
+      <option value="change" ${sel('change')}>Cambio 24h</option>
+      <option value="price" ${sel('price')}>Precio</option>
+    </select></div>`;
+  if(marketState.loading&&!marketState.loaded){
+    rows.innerHTML=bar+`<div class="state-block"><div class="spinner"></div><p>Cargando el mercado de PulseChain…</p></div>`;return;
+  }
+  if(marketState.error&&!marketState.tokens.length){
+    rows.innerHTML=bar+`<div class="state-block error"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div><h3>No se pudo cargar el mercado</h3><p>GeckoTerminal no respondió. Inténtalo de nuevo.</p><button class="btn btn-ghost" onclick="loadMarket(true)">Reintentar</button></div>`;return;
+  }
+  const list=[...marketState.tokens];
+  if(marketState.sort==='mcap')list.sort((a,b)=>b.mcap-a.mcap);
+  else if(marketState.sort==='volume')list.sort((a,b)=>b.vol24-a.vol24);
+  else if(marketState.sort==='change')list.sort((a,b)=>(b.change24==null?-1e9:b.change24)-(a.change24==null?-1e9:a.change24));
+  else list.sort((a,b)=>(b.price||0)-(a.price||0));
+  const head=`<div class="mkt-head"><div class="mkt-c-rank">#</div><div>Token</div><div class="r mkt-c-price">Precio</div><div class="r">24h</div><div class="r mkt-c-vol">Volumen 24h</div><div class="r mkt-c-liq">Liquidez</div><div class="r">Market cap</div></div>`;
+  const body=list.map((t,i)=>mktRowHtml(t,i+1)).join('');
+  rows.innerHTML=bar+head+body+`<div class="hist-note">Datos de mercado vía GeckoTerminal · el market cap usa FDV cuando no hay circulante. Toca un token para ver su gráfico.</div>`;
+}
 
 /* ============================================================
    HISTORIAL — calendario de transacciones (Blockscout v2)
@@ -1727,7 +1862,9 @@ $('rows').addEventListener('click',e=>{
   const eye=e.target.closest('.eye');
   if(eye){toggleTokenVisibility(eye.dataset.key);return;}
   const cb=e.target.closest('.chartbtn');
-  if(cb){openChart(cb.dataset.pair,cb.dataset.sym);}
+  if(cb){openChart(cb.dataset.pair,cb.dataset.sym);return;}
+  const mr=e.target.closest('.mkt-row');
+  if(mr){if(mr.dataset.pair)openChart(mr.dataset.pair,mr.dataset.sym);else toast('Este token no tiene gráfico disponible');}
 });
 
 /* ============================================================
