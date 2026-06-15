@@ -394,12 +394,12 @@
   <!-- STAT STRIP -->
   <section class="stats">
     <div class="stat">
-      <h4>Cambio 24h</h4>
+      <h4 id="st24Title">Cambio 24h</h4>
       <div class="v" id="st24Val">—</div>
       <div class="sub" id="st24Sub">Sin datos todavía</div>
     </div>
     <div class="stat">
-      <h4>Mejor activo hoy</h4>
+      <h4 id="stBestTitle">Mejor activo hoy</h4>
       <div class="v perf-row" id="stBest"><span style="color:var(--faint);font-size:16px">—</span></div>
       <div class="sub" id="stBestSub">Esperando datos</div>
     </div>
@@ -1003,10 +1003,11 @@ function updateHeader(){
   const [w,c]=total.toFixed(2).split('.');
   $('totalVal').innerHTML=(total>=0?'$':'-$')+Math.abs(+w).toLocaleString('en-US')+'<span class="cents">.'+c+'</span>';
 
-  // Cambio 24h del portfolio.
+  // Cambio del portfolio en el periodo seleccionado (24h / 7d / 30d).
   let prev=0,has=false;
   for(const t of visibleTokens()){
-    if(t.change24!=null&&t.price!=null){has=true;prev+=t.value/(1+t.change24/100);}
+    const chg=tokenChange(t);
+    if(chg!=null&&t.price!=null){has=true;prev+=t.value/(1+chg/100);}
     else prev+=t.value;
   }
   const diff=total-prev;
@@ -1018,26 +1019,29 @@ function updateHeader(){
     return;
   }
   const up=diff>=0;
-  const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} hoy</span><span class="dot-sep"></span>`:'';
+  const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
   meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${visibleTokens().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
 }
 
 function renderStats(){
   const vis=visibleTokens().filter(t=>t.value>0);
-  // 24h
+  // Cambio del periodo seleccionado.
+  $('st24Title').textContent='Cambio '+state.timeframe;
+  $('stBestTitle').textContent=state.timeframe==='24h'?'Mejor activo hoy':('Mejor activo '+state.timeframe);
   let prev=0,total=0,has=false;
-  for(const t of vis){total+=t.value;if(t.change24!=null){has=true;prev+=t.value/(1+t.change24/100);}else prev+=t.value;}
+  for(const t of vis){total+=t.value;const chg=tokenChange(t);if(chg!=null){has=true;prev+=t.value/(1+chg/100);}else prev+=t.value;}
   const diff=total-prev;
   $('st24Val').className='v '+(diff>=0?'up':'down');
   $('st24Val').textContent=has?(diff>=0?'+':'−')+fmtUsd(Math.abs(diff)).slice(1):'—';
   $('st24Sub').textContent=has?`de ${fmtUsd(prev)} → ${fmtUsd(total)}`:'Sin datos de cambio';
 
-  // Mejor activo
-  const best=[...vis].filter(t=>t.change24!=null).sort((a,b)=>b.change24-a.change24)[0];
+  // Mejor activo del periodo.
+  const best=[...vis].map(t=>({t,chg:tokenChange(t)})).filter(x=>x.chg!=null).sort((a,b)=>b.chg-a.chg)[0];
   if(best){
-    $('stBest').innerHTML=`<span class="tk" style="background:${gradientFor(best.address)}">${best.logo?`<img src="${escapeHtml(best.logo)}" onerror="this.remove()">`:''}${escapeHtml((best.symbol||'?')[0].toUpperCase())}</span><span>${escapeHtml(best.symbol||'?')} <span class="${best.change24>=0?'up':'down'}" style="font-size:16px">${fmtPct(best.change24)}</span></span>`;
-    $('stBestSub').textContent=`${escapeHtml(best.name||'')} · ${fmtPrice(best.price)}`;
+    const bt=best.t;
+    $('stBest').innerHTML=`<span class="tk" style="background:${gradientFor(bt.address)}">${bt.logo?`<img src="${escapeHtml(bt.logo)}" onerror="this.remove()">`:''}${escapeHtml((bt.symbol||'?')[0].toUpperCase())}</span><span>${escapeHtml(bt.symbol||'?')} <span class="${best.chg>=0?'up':'down'}" style="font-size:16px">${fmtPct(best.chg)}</span></span>`;
+    $('stBestSub').textContent=`${escapeHtml(bt.name||'')} · ${fmtPrice(bt.price)}`;
   }else{
     $('stBest').innerHTML='<span style="color:var(--faint);font-size:16px">—</span>';
     $('stBestSub').textContent='Sin datos de cambio';
@@ -1195,6 +1199,8 @@ function tokenChange(t){
   if(!c)return null;                                  // aún cargando o sin histórico
   return state.timeframe==='7d'?c.pct7:c.pct30;
 }
+// "hoy" / "en 7d" / "en 30d" para la frase del hero.
+function tfPeriodWord(){return state.timeframe==='24h'?'hoy':('en '+state.timeframe);}
 async function fetchExtendedChange(priceAddr,pair,livePrice){
   const cached=extCache.get(priceAddr);
   if(cached&&Date.now()-cached.ts<EXT_TTL)return cached;
