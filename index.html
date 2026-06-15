@@ -296,6 +296,11 @@
   .mkt-tok .nm span{font-family:var(--mono);font-size:11px;color:var(--faint)}
   .mkt-num{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .mkt-num.up{color:var(--mint)}.mkt-num.down{color:var(--red)}
+  .mkt-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
+  .mkt-card{background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .mkt-card h5{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:8px;font-weight:500}
+  .mkt-card .v{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:9px}
+  .mkt-card .v .tk{width:24px;height:24px;font-size:10px}
 
   /* toast */
   .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw}
@@ -360,6 +365,7 @@
     .mkt-head,.mkt-row{grid-template-columns:1.8fr .8fr 1.1fr;gap:10px;padding:13px 16px}
     .mkt-c-rank,.mkt-c-price,.mkt-c-vol,.mkt-c-liq{display:none}
     .mkt-bar{padding:14px 16px}
+    .mkt-cards{grid-template-columns:1fr;gap:10px;padding:14px 16px}
     .hist-bar{padding:14px 16px}
     .hist-detail,.hist-summary{padding-left:16px;padding-right:16px}
     /* En móvil no caben cantidades por celda: mostramos sólo los iconos
@@ -1405,9 +1411,19 @@ function renderMarket(){
   else if(marketState.sort==='volume')list.sort((a,b)=>b.vol24-a.vol24);
   else if(marketState.sort==='change')list.sort((a,b)=>(b.change24==null?-1e9:b.change24)-(a.change24==null?-1e9:a.change24));
   else list.sort((a,b)=>(b.price||0)-(a.price||0));
+  // Métricas globales del mercado.
+  const totalVol=list.reduce((s,t)=>s+(t.vol24||0),0);
+  const totalLiq=list.reduce((s,t)=>s+(t.liq||0),0);
+  const gainer=[...list].filter(t=>t.change24!=null).sort((a,b)=>b.change24-a.change24)[0];
+  const gainerHtml=gainer?`<span class="tk" style="background:${gradientFor(gainer.address)}">${gainer.logo?`<img src="${escapeHtml(gainer.logo)}" onerror="this.remove()">`:''}${escapeHtml((gainer.symbol||'?')[0].toUpperCase())}</span><span>${escapeHtml(gainer.symbol||'?')} <span class="up" style="font-size:15px">${fmtPct(gainer.change24)}</span></span>`:'—';
+  const cards=`<div class="mkt-cards">
+    <div class="mkt-card"><h5>Volumen 24h</h5><div class="v">${fmtBigUsd(totalVol)}</div></div>
+    <div class="mkt-card"><h5>Liquidez total</h5><div class="v">${fmtBigUsd(totalLiq)}</div></div>
+    <div class="mkt-card"><h5>Mayor subida 24h</h5><div class="v">${gainerHtml}</div></div>
+  </div>`;
   const head=`<div class="mkt-head"><div class="mkt-c-rank">#</div><div>Token</div><div class="r mkt-c-price">Precio</div><div class="r">24h</div><div class="r mkt-c-vol">Volumen 24h</div><div class="r mkt-c-liq">Liquidez</div><div class="r">Market cap</div></div>`;
   const body=list.map((t,i)=>mktRowHtml(t,i+1)).join('');
-  rows.innerHTML=bar+head+body+`<div class="hist-note">Datos de mercado vía GeckoTerminal · el market cap usa FDV cuando no hay circulante. Toca un token para ver su gráfico.</div>`;
+  rows.innerHTML=bar+cards+head+body+`<div class="hist-note">Datos de mercado vía GeckoTerminal · el market cap usa FDV cuando no hay circulante. Toca un token para ver su gráfico.</div>`;
 }
 
 /* ============================================================
@@ -1443,6 +1459,27 @@ function fmtCompactUsd(n){
 // polvo/comisiones/spam y se omiten para que el calendario quede limpio.
 const HIST_MIN_USD = 1;
 
+// Pagina un endpoint de Blockscout v2 siguiendo next_page_params.
+async function bsFetchPages(path,maxPages){
+  const out=[];
+  let params=null,okAny=false;
+  for(let p=0;p<maxPages;p++){
+    let u;
+    try{u=new URL(BLOCKSCOUT_API+path);}catch(e){break;}
+    if(params)for(const k in params){if(params[k]!=null)u.searchParams.set(k,params[k]);}
+    let r;
+    try{r=await fetch(u.toString());}catch(e){break;}
+    if(!r.ok)break;
+    okAny=true;
+    let j;try{j=await r.json();}catch(e){break;}
+    if(Array.isArray(j.items))out.push(...j.items);
+    if(!j.next_page_params)break;
+    params=j.next_page_params;
+  }
+  out._ok=okAny;
+  return out;
+}
+
 async function loadHistory(){
   if(!state.wallets.length){historyState.transfers=[];historyState.loadedSig=null;renderHistory();return;}
   const sig=JSON.stringify({w:state.wallets.map(w=>lc(w.address)),f:historyState.wallet});
@@ -1453,54 +1490,61 @@ async function loadHistory(){
   try{
     const targets=historyState.wallet==='all'?state.wallets.map(w=>lc(w.address)):[historyState.wallet];
     const raw=[]; // receipts crudos: {ts,date,key,priceAddr,symbol,name,logo,amount}
+    let anyOk=false;
     for(const addr of targets){
-      // a) Tokens PRC-20 entrantes
-      try{
-        const r=await fetch(`${BLOCKSCOUT_API}/addresses/${addr}/token-transfers?type=ERC-20&filter=to`);
-        if(r.ok){
-          const j=await r.json();
-          for(const it of (Array.isArray(j.items)?j.items:[])){
-            const to=lc(it.to?.hash||it.to||'');
-            if(to!==addr)continue;                            // sólo entrantes
-            const tok=it.token||{};
-            const tokenAddr=lc(tok.address||tok.address_hash||'');
-            if(!isAddr(tokenAddr))continue;
-            let dec=parseInt(tok.decimals!=null?tok.decimals:(it.total&&it.total.decimals));
-            if(isNaN(dec))dec=18;
-            const rawVal=(it.total&&(it.total.value!=null?it.total.value:it.total))||it.value||'0';
-            let amount=0;try{amount=bigToNum(BigInt(rawVal),dec);}catch(e){continue;}
-            if(amount<=0)continue;
-            const ts=new Date(it.timestamp||it.block_timestamp||Date.now());
-            raw.push({ts,date:dayKey(ts),key:tokenAddr,priceAddr:tokenAddr,
-              symbol:tok.symbol||'?',name:tok.name||'Token',logo:tok.icon_url||null,amount});
-          }
-        }
-      }catch(e){}
-      // b) PLS nativo entrante (transferencias directas; las comisiones de gas
-      //    las paga el emisor y no aparecen aquí, así que quedan obviadas).
-      //    Ampliable: /internal-transactions para PLS recibido vía swaps.
-      try{
-        const r=await fetch(`${BLOCKSCOUT_API}/addresses/${addr}/transactions?filter=to`);
-        if(r.ok){
-          const j=await r.json();
-          for(const it of (Array.isArray(j.items)?j.items:[])){
-            const to=lc(it.to?.hash||it.to||'');
-            if(to!==addr)continue;
-            let amount=0;try{amount=bigToNum(BigInt(it.value||'0'),18);}catch(e){continue;}
-            if(amount<=0)continue;                            // ignora llamadas sin valor
-            const ts=new Date(it.timestamp||Date.now());
-            raw.push({ts,date:dayKey(ts),key:'native',priceAddr:WPLS,
-              symbol:'PLS',name:'Pulse',logo:null,amount});
-          }
-        }
-      }catch(e){}
+      // a) Tokens entrantes. No forzamos 'type' (algunas instancias de
+      //    Blockscout lo ignoran o devuelven vacío): filtramos a fungibles
+      //    en cliente. Paginado para cubrir meses, no solo lo más reciente.
+      const tt=await bsFetchPages(`/addresses/${addr}/token-transfers?filter=to`,5);
+      if(tt._ok)anyOk=true;
+      for(const it of tt){
+        const to=lc(it.to?.hash||it.to||'');
+        if(to!==addr)continue;                                // sólo entrantes
+        const tok=it.token||{};
+        const ttype=(tok.type||'').toUpperCase();
+        if(ttype&&ttype!=='ERC-20')continue;                  // ignora NFTs (721/1155)
+        const tokenAddr=lc(tok.address||tok.address_hash||'');
+        if(!isAddr(tokenAddr))continue;
+        let dec=parseInt(tok.decimals!=null?tok.decimals:(it.total&&it.total.decimals));
+        if(isNaN(dec))dec=18;
+        const rawVal=(it.total&&(it.total.value!=null?it.total.value:it.total))||it.value||'0';
+        let amount=0;try{amount=bigToNum(BigInt(rawVal),dec);}catch(e){continue;}
+        if(amount<=0)continue;
+        const ts=new Date(it.timestamp||it.block_timestamp||Date.now());
+        raw.push({ts,date:dayKey(ts),key:tokenAddr,priceAddr:tokenAddr,
+          symbol:tok.symbol||'?',name:tok.name||'Token',logo:tok.icon_url||null,amount});
+      }
+      // b) PLS nativo entrante: transacciones directas + internas (swaps,
+      //    payouts de contratos). Las comisiones de gas las paga el emisor
+      //    y no aparecen como entrantes, así que quedan obviadas.
+      const txs=await bsFetchPages(`/addresses/${addr}/transactions?filter=to`,2);
+      const itx=await bsFetchPages(`/addresses/${addr}/internal-transactions?filter=to`,2);
+      if(txs._ok||itx._ok)anyOk=true;
+      for(const it of [...txs,...itx]){
+        const to=lc(it.to?.hash||it.to||'');
+        if(to!==addr)continue;
+        if(!it.timestamp)continue;                            // sin fecha no se puede ubicar
+        let amount=0;try{amount=bigToNum(BigInt(it.value||'0'),18);}catch(e){continue;}
+        if(amount<=0)continue;                                // ignora llamadas sin valor
+        const ts=new Date(it.timestamp);
+        raw.push({ts,date:dayKey(ts),key:'native',priceAddr:WPLS,
+          symbol:'PLS',name:'Pulse',logo:null,amount});
+      }
     }
+    // Si ningún endpoint respondió, es un error de red, no "sin actividad".
+    if(!anyOk&&!raw.length){historyState.error=true;historyState.loadedSig=null;return;}
 
     // Precios actuales para valorar en USD.
     const uniq=[...new Set(raw.map(t=>t.priceAddr).filter(isAddr))];
     if(uniq.length)await fetchPrices(uniq);
 
-    // Agrupar por día + token → una línea limpia y redonda por token y día.
+    // Tokens "conocidos": los que tienes en cartera o añadiste como custom.
+    // Nunca se descartan como spam aunque no tengan precio en DexScreener.
+    const known=new Set(tokensCombined.map(t=>t.key));
+    for(const ct of state.customTokens)known.add(ct);
+    known.add('native');
+
+    // Agrupar por día + token → una línea limpia por token y día.
     const agg=new Map(); // 'YYYY-MM-DD|key' -> {date,ts,key,symbol,name,logo,amount,usd}
     for(const t of raw){
       const pc=priceCache.get(t.priceAddr)||{};
@@ -1517,8 +1561,9 @@ async function loadHistory(){
       if(!a.logo&&pc.logo)a.logo=pc.logo;
     }
 
-    // Filtrar polvo/spam: nos quedamos con receipts con precio y >= mínimo.
-    const clean=[...agg.values()].filter(a=>a.usd!=null&&a.usd>=HIST_MIN_USD);
+    // Filtro: tokens conocidos siempre; el resto, sólo si superan el mínimo
+    // en USD (quita polvo y spam de airdrops sin precio).
+    const clean=[...agg.values()].filter(a=>known.has(a.key)||(a.usd!=null&&a.usd>=HIST_MIN_USD));
     clean.sort((x,y)=>y.ts-x.ts);
     historyState.transfers=clean;
     historyState.loadedSig=sig;
@@ -1611,17 +1656,17 @@ function histMonthSummary(monthTx,monthLbl){
   if(!monthTx.length)return '';
   const byTok=new Map();
   for(const t of monthTx){
-    if(!byTok.has(t.key))byTok.set(t.key,{key:t.key,symbol:t.symbol,name:t.name,logo:t.logo,amount:0,usd:0});
-    const a=byTok.get(t.key);a.amount+=t.amount;a.usd+=(t.usd||0);if(!a.logo&&t.logo)a.logo=t.logo;
+    if(!byTok.has(t.key))byTok.set(t.key,{key:t.key,symbol:t.symbol,name:t.name,logo:t.logo,amount:0,usd:0,hasPrice:false});
+    const a=byTok.get(t.key);a.amount+=t.amount;if(t.usd!=null){a.usd+=t.usd;a.hasPrice=true;}if(!a.logo&&t.logo)a.logo=t.logo;
   }
   const list=[...byTok.values()].sort((a,b)=>b.usd-a.usd);
-  const total=list.reduce((s,t)=>s+t.usd,0);
+  const total=list.reduce((s,t)=>s+(t.hasPrice?t.usd:0),0);
   const rows=list.map(t=>{
     const grad=gradientFor(t.key==='native'?'native-pls':(t.key||t.symbol));
     const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
     return `<div class="hs-row"><div class="logo" style="width:30px;height:30px;font-size:11px;background:${grad}">${img}<span class="ini">${escapeHtml((t.symbol||'?')[0].toUpperCase())}</span></div>
       <div class="hs-i"><b>+${escapeHtml(fmtAmount(t.amount))} ${escapeHtml(t.symbol||'')}</b><span>${escapeHtml(t.name||'')}</span></div>
-      <div class="hs-v">${escapeHtml(fmtUsd(t.usd))}</div></div>`;
+      <div class="hs-v">${t.hasPrice?escapeHtml(fmtUsd(t.usd)):'—'}</div></div>`;
   }).join('');
   return `<div class="hist-summary"><div class="hs-head"><b>Tokens incorporados · ${escapeHtml(monthLbl)}</b><span>${list.length} ${list.length===1?'token':'tokens'} · ${escapeHtml(fmtUsd(total))}</span></div>${rows}</div>`;
 }
