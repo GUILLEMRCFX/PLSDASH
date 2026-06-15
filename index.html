@@ -240,6 +240,24 @@
   .htx-v{font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--mint);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
   .hist-note{padding:14px 22px;text-align:center;font-size:11px;color:var(--faint);font-family:var(--mono);border-top:1px solid var(--line)}
 
+  /* ---------- TIMEFRAME + GRÁFICO ---------- */
+  .tf-seg{display:flex;gap:3px;background:var(--bg-2);border:1px solid var(--line);padding:3px;border-radius:10px}
+  .tf-seg button{font-family:var(--body);font-weight:600;font-size:11.5px;color:var(--dim);background:none;border:none;padding:6px 10px;border-radius:7px;cursor:pointer;transition:.15s}
+  .tf-seg button.on{background:var(--surface-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
+  .tf-seg button:hover:not(.on){color:var(--text)}
+  .tf-seg button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+  .chartbtn{margin-left:auto;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:none;border:1px solid transparent;color:var(--faint);cursor:pointer;flex-shrink:0;transition:.15s}
+  .chartbtn:hover{background:var(--bg-2);border-color:var(--line);color:var(--cyan)}
+  .chartbtn:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
+  .chartbtn svg{width:16px;height:16px}
+  .modal.modal-wide{max-width:960px}
+  .chart-wrap{margin-top:8px;border-radius:14px;overflow:hidden;background:var(--bg-2);border:1px solid var(--line)}
+  .chart-wrap iframe{display:block;width:100%;height:min(68vh,560px);border:0}
+  .chart-empty{padding:50px 20px;text-align:center;color:var(--faint);font-size:13px}
+  .chart-foot{margin-top:14px;display:flex;justify-content:flex-end}
+  .chart-foot a{color:var(--violet);text-decoration:none;font-size:12.5px;font-weight:600}
+  .chart-foot a:hover{text-decoration:underline}
+
   /* toast */
   .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw}
   .toast.show{transform:translateX(-50%) translateY(0)}
@@ -402,6 +420,11 @@
         <button class="tab" onclick="setView('history',this)">Historial</button>
       </div>
       <div class="head-tools">
+        <div class="tf-seg" id="tfSeg" role="group" aria-label="Periodo del cambio de precio">
+          <button class="on" onclick="setTimeframe('24h',this)">24H</button>
+          <button onclick="setTimeframe('7d',this)">7D</button>
+          <button onclick="setTimeframe('30d',this)">30D</button>
+        </div>
         <button class="tool" id="hideTool" onclick="toggleShowHidden(this)">
           <svg viewBox="0 0 24 24" fill="none"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="2"/></svg>
           <span id="hideLbl">Ocultos (0)</span>
@@ -530,6 +553,16 @@
   </div>
 </div>
 
+<div class="modal-bg" id="chartModal">
+  <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="chTitle">
+    <button class="modal-close" onclick="closeChart()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="chTitle">Gráfico</h2>
+    <p class="lead" style="margin-bottom:8px">Gráfico en vivo de DexScreener.</p>
+    <div class="chart-wrap" id="chartWrap"></div>
+    <div class="chart-foot"><a id="chOpen" href="#" target="_blank" rel="noopener">Abrir en DexScreener ↗</a></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -542,12 +575,14 @@
    verdad) vía la Pages Function /api/portfolio/[code].
    ============================================================ */
 
-const DEXSCREENER_API = 'https://api.dexscreener.com';
-const PULSECHAIN_RPC   = 'https://rpc.pulsechain.com';
-const PULSECHAIN_SCAN  = 'https://api.scan.pulsechain.com';
-const BLOCKSCOUT_API   = 'https://api.scan.pulsechain.com/api/v2';
-const CHAIN_ID         = 'pulsechain';
-const REFRESH_MS       = 30000;
+const DEXSCREENER_API  = 'https://api.dexscreener.com';
+const PULSECHAIN_RPC    = 'https://rpc.pulsechain.com';
+const PULSECHAIN_SCAN   = 'https://api.scan.pulsechain.com';
+const BLOCKSCOUT_API    = 'https://api.scan.pulsechain.com/api/v2';
+// GeckoTerminal: velas diarias para el cambio a 7d/30d (DexScreener solo da 24h).
+const GECKOTERMINAL_API = 'https://api.geckoterminal.com/api/v2';
+const CHAIN_ID          = 'pulsechain';
+const REFRESH_MS        = 30000;
 
 // WPLS — usado para precio del PLS nativo (PLS no es PRC-20).
 const WPLS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27';
@@ -561,8 +596,14 @@ const state = {
   hidden: [],            // [tokenKey] — tokenKey = 'native' o address lowercase
   view: 'combined',
   sort: 'value',         // value | change | name
+  timeframe: '24h',      // 24h | 7d | 30d (periodo del cambio de precio)
   showHidden: false,
 };
+
+// Cambio extendido (7d/30d) por token, calculado con velas de GeckoTerminal.
+const extCache = new Map();   // priceAddr -> {pct7, pct30, ts}
+const EXT_TTL = 600000;       // 10 min
+let extLoading = false;
 
 // Datos vivos calculados en cada refresh.
 let tokensCombined = [];     // [{key,address,name,symbol,decimals,balance,price,change24,logo,value,custom,perWallet:{}}]
@@ -749,11 +790,12 @@ async function fetchPrices(addresses){
             logo:p.info?.imageUrl||null,
             name:p.baseToken?.name||null,
             symbol:p.baseToken?.symbol||null,
+            pair:p.pairAddress||null,            // para el gráfico y el cambio 7d/30d
             ts:Date.now()
           });
         }else{
           // Sin par → sin precio (se mostrará "—").
-          priceCache.set(a,{price:null,change24:null,logo:null,name:null,symbol:null,ts:Date.now()});
+          priceCache.set(a,{price:null,change24:null,logo:null,name:null,symbol:null,pair:null,ts:Date.now()});
         }
       }
     }catch(e){/* red caída → reintenta en el próximo ciclo */}
@@ -823,6 +865,7 @@ async function refresh(){
       const pk=t.key==='native'?WPLS:t.key;
       const pc=priceCache.get(pk)||{};
       t.price=pc.price; t.change24=pc.change24; t.logo=pc.logo;
+      t.priceAddr=pk; t.pair=pc.pair||null;   // para gráfico y cambio 7d/30d
       if(t.key==='native'){t.logo=pc.logo||t.logo;}
       // Completar metadatos desde DexScreener si seguían genéricos.
       if((t.symbol==='?'||!t.symbol)&&pc.symbol)t.symbol=pc.symbol;
@@ -853,7 +896,7 @@ function visibleTokens(){
 function sortTokens(list){
   const s=[...list];
   if(state.sort==='value')s.sort((a,b)=>b.value-a.value);
-  else if(state.sort==='change')s.sort((a,b)=>(b.change24||-999)-(a.change24||-999));
+  else if(state.sort==='change')s.sort((a,b)=>{const ca=tokenChange(a),cb=tokenChange(b);return (cb==null?-1e9:cb)-(ca==null?-1e9:ca);});
   else s.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
   return s;
 }
@@ -868,17 +911,23 @@ function logoHtml(t,size){
   return `<div class="logo" style="background:${grad}">${img}<span class="ini">${initial}</span></div>`;
 }
 
+function chartBtnHtml(t){
+  if(!t.pair)return '';
+  return `<button class="chartbtn" data-pair="${escapeHtml(t.pair)}" data-sym="${escapeHtml(t.symbol||'')}" title="Ver gráfico" aria-label="Ver gráfico de ${escapeHtml(t.symbol||'token')}"><svg viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 14l3-4 3 3 4-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
+}
 function rowHtml(t){
   const hidden=state.hidden.includes(t.key);
-  const chgCls=t.change24==null?'':(t.change24>=0?'up':'down');
-  const chgStyle=t.change24==null?'style="color:var(--faint)"':'';
-  const chgTxt=t.change24==null?'—':fmtPct(t.change24);
+  const chg=tokenChange(t);
+  const chgCls=chg==null?'':(chg>=0?'up':'down');
+  const chgStyle=chg==null?'style="color:var(--faint)"':'';
+  const chgTxt=chg==null?'—':fmtPct(chg);
   const priceTxt=t.price==null?'—':fmtPrice(t.price);
   const valTxt=t.price==null?'—':fmtUsd(t.value);
   const custom=t.custom?'<span class="custom-tag">custom</span>':'';
   return `<div class="row ${hidden?'hidden-tok':''}" data-key="${escapeHtml(t.key)}">
     <div class="asset">${logoHtml(t)}
       <div class="nm"><b>${escapeHtml(t.name||'Token')}</b><span>${escapeHtml(t.symbol||'?')}${custom}</span></div>
+      ${chartBtnHtml(t)}
     </div>
     <div class="num bal">${fmtAmount(t.balance)} <span class="q">${escapeHtml(t.symbol||'')}</span></div>
     <div class="num price">${priceTxt}</div>
@@ -946,6 +995,7 @@ function render(){
   renderStats();
   renderWalletBar();
   updateHideLabel();
+  if(state.timeframe!=='24h')ensureExtendedChanges();   // carga 7d/30d en segundo plano
 }
 
 function updateHeader(){
@@ -1127,6 +1177,71 @@ function toggleShowHidden(){
   state.showHidden=!state.showHidden;
   render();
 }
+
+/* ============================================================
+   PERIODO DEL CAMBIO DE PRECIO (24h / 7d / 30d)
+   24h viene de DexScreener (tiempo real). 7d/30d se calculan con
+   velas diarias de GeckoTerminal: precio actual vs cierre de hace
+   N días. Sin dato → se muestra "—".
+   ============================================================ */
+function setTimeframe(tf,el){
+  state.timeframe=tf;
+  if(el){el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
+  render();
+}
+function tokenChange(t){
+  if(state.timeframe==='24h')return t.change24!=null?t.change24:null;
+  const c=extCache.get(t.priceAddr);
+  if(!c)return null;                                  // aún cargando o sin histórico
+  return state.timeframe==='7d'?c.pct7:c.pct30;
+}
+async function fetchExtendedChange(priceAddr,pair,livePrice){
+  const cached=extCache.get(priceAddr);
+  if(cached&&Date.now()-cached.ts<EXT_TTL)return cached;
+  if(!pair||livePrice==null){const r={pct7:null,pct30:null,ts:Date.now()};extCache.set(priceAddr,r);return r;}
+  try{
+    const res=await fetch(`${GECKOTERMINAL_API}/networks/${CHAIN_ID}/pools/${pair}/ohlcv/day?aggregate=1&limit=31&currency=usd`);
+    if(!res.ok)throw 0;
+    const j=await res.json();
+    const list=j&&j.data&&j.data.attributes&&j.data.attributes.ohlcv_list;
+    if(!Array.isArray(list)||!list.length)throw 0;
+    // [ts(s),o,h,l,c,v] → ascendente por tiempo, sólo cierres válidos.
+    const rows=list.map(x=>({ts:x[0]*1000,close:parseFloat(x[4])})).filter(r=>r.close>0).sort((a,b)=>a.ts-b.ts);
+    if(!rows.length)throw 0;
+    const now=Date.now();
+    const closeAgo=days=>{const target=now-days*86400000;let best=rows[0];for(const r of rows){if(r.ts<=target)best=r;}return best.close;};
+    const c7=closeAgo(7),c30=closeAgo(30);
+    const out={pct7:c7>0?(livePrice-c7)/c7*100:null,pct30:c30>0?(livePrice-c30)/c30*100:null,ts:Date.now()};
+    extCache.set(priceAddr,out);return out;
+  }catch(e){
+    const r={pct7:null,pct30:null,ts:Date.now()};extCache.set(priceAddr,r);return r;
+  }
+}
+async function ensureExtendedChanges(){
+  if(state.timeframe==='24h'||extLoading)return;
+  const need=visibleTokens().filter(t=>t.pair&&t.price!=null).filter(t=>{
+    const c=extCache.get(t.priceAddr);return !c||Date.now()-c.ts>EXT_TTL;
+  });
+  if(!need.length)return;
+  extLoading=true;
+  try{
+    // Secuencial: respeta el rate limit de GeckoTerminal (~30/min).
+    for(const t of need)await fetchExtendedChange(t.priceAddr,t.pair,t.price);
+  }finally{extLoading=false;}
+  render();
+}
+
+/* ---------- gráfico en vivo (DexScreener embed) ---------- */
+function openChart(pair,sym){
+  if(!pair)return;
+  closeModals();
+  $('chTitle').textContent='Gráfico'+(sym?' · '+sym:'');
+  const url=`https://dexscreener.com/${CHAIN_ID}/${pair}`;
+  $('chOpen').href=url;
+  $('chartWrap').innerHTML=`<iframe src="${url}?embed=1&theme=dark&info=0&trades=0" title="Gráfico DexScreener" loading="lazy"></iframe>`;
+  $('chartModal').classList.add('show');
+}
+function closeChart(){$('chartModal').classList.remove('show');$('chartWrap').innerHTML='';}
 
 /* ============================================================
    HISTORIAL — calendario de transacciones (Blockscout v2)
@@ -1522,7 +1637,7 @@ function disconnectCloud(){
 function copyCode(){navigator.clipboard.writeText(state.code).then(()=>toast('Código copiado'));}
 function copyUrl(){navigator.clipboard.writeText(`${location.origin}/p/${state.code}`).then(()=>toast('URL copiada'));}
 
-function closeModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('show'));}
+function closeModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('show'));const cw=$('chartWrap');if(cw)cw.innerHTML='';}
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals();}));
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape')closeModals();
@@ -1543,7 +1658,9 @@ function goHome(){if(location.pathname!=='/'){location.href='/';}}
 /* ---------- eventos de fila (ojo) por delegación ---------- */
 $('rows').addEventListener('click',e=>{
   const eye=e.target.closest('.eye');
-  if(eye){toggleTokenVisibility(eye.dataset.key);}
+  if(eye){toggleTokenVisibility(eye.dataset.key);return;}
+  const cb=e.target.closest('.chartbtn');
+  if(cb){openChart(cb.dataset.pair,cb.dataset.sym);}
 });
 
 /* ============================================================
