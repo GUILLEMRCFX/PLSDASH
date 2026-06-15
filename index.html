@@ -219,14 +219,32 @@
   .hist-wallet{width:auto;min-width:170px;padding:9px 12px;font-family:var(--body);font-size:13px;cursor:pointer;letter-spacing:0}
   .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;padding:18px 22px}
   .cal-wd{text-align:center;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--faint);padding-bottom:2px}
-  .cal-pad{aspect-ratio:1}
-  .cal-cell{position:relative;aspect-ratio:1;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;padding:7px 8px;text-align:left;font-family:inherit}
+  .cal-pad{min-height:98px}
+  .cal-cell{position:relative;min-height:98px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);overflow:hidden;display:flex;flex-direction:column;gap:4px;padding:6px 7px;text-align:left;font-family:inherit}
   .cal-cell.active{cursor:pointer;border-color:var(--line-2)}
   .cal-cell.active:hover{border-color:var(--violet)}
   .cal-cell.sel{border-color:var(--cyan);box-shadow:0 0 0 1px var(--cyan)}
   .cal-fill{position:absolute;inset:0;background:var(--pulse);z-index:0}
-  .cal-d{position:relative;z-index:1;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
-  .cal-v{position:relative;z-index:1;font-size:9px;font-weight:600;color:var(--text);font-family:var(--mono);letter-spacing:-.02em;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+  .cal-d{position:relative;z-index:1;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--text);font-variant-numeric:tabular-nums;opacity:.92}
+  .cal-toks{position:relative;z-index:1;display:flex;flex-direction:column;gap:3px;flex:1;min-height:0}
+  .cal-tok{display:flex;align-items:center;gap:5px;background:rgba(10,6,14,.46);border-radius:6px;padding:2px 5px}
+  .ctk-logo{width:15px;height:15px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:8px;color:#0C0710;overflow:hidden;position:relative}
+  .ctk-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .ctk-amt{font-family:var(--mono);font-size:10px;font-weight:600;color:var(--text);letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ctk-usd{margin-left:auto;font-family:var(--mono);font-size:9.5px;font-weight:600;color:var(--mint);letter-spacing:-.02em;white-space:nowrap}
+  .cal-more{position:relative;z-index:1;font-family:var(--mono);font-size:9px;color:var(--dim);padding-left:2px}
+  .cal-tot{position:relative;z-index:1;font-family:var(--mono);font-size:10.5px;font-weight:700;color:var(--text);letter-spacing:-.02em;text-shadow:0 1px 2px rgba(0,0,0,.55)}
+  /* resumen del mes */
+  .hist-summary{padding:6px 22px 18px;border-top:1px solid var(--line)}
+  .hs-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:14px 0 10px;flex-wrap:wrap}
+  .hs-head b{font-family:var(--display);font-size:15px;font-weight:600}
+  .hs-head span{font-family:var(--mono);font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .hs-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+  .hs-row:last-child{border-bottom:none}
+  .hs-i{flex:1;min-width:0}
+  .hs-i b{display:block;font-size:13px;font-weight:600;font-family:var(--mono);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .hs-i span{display:block;font-family:var(--body);font-size:11px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hs-v{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--mint);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
   .hist-detail{padding:6px 22px 18px;border-top:1px solid var(--line)}
   .hd-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:14px 0 10px;flex-wrap:wrap}
   .hd-head b{font-family:var(--display);font-size:15px;font-weight:600;text-transform:capitalize}
@@ -318,14 +336,22 @@
     .btn-primary .bt-txt,.btn-ghost .bt-txt{display:none}
     .btn-primary,.btn-ghost{padding:11px 13px}
     .hist-bar{padding:14px 16px}
-    .cal-grid{padding:14px 16px;gap:5px}
-    .hist-detail{padding:6px 16px 16px}
+    .hist-detail,.hist-summary{padding-left:16px;padding-right:16px}
+    /* En móvil no caben cantidades por celda: mostramos sólo los iconos
+       (solapados) y el total del día; el detalle completo al tocar. */
+    .cal-grid{padding:14px 10px;gap:5px}
+    .cal-cell,.cal-pad{min-height:72px}
+    .cal-toks{flex-direction:row;flex-wrap:wrap;gap:0;align-items:center}
+    .cal-tok{background:none;padding:0}
+    .cal-tok:not(:first-child){margin-left:-6px}
+    .ctk-amt,.ctk-usd{display:none}
+    .ctk-logo{box-shadow:0 0 0 2px var(--surface-2)}
+    .cal-more{font-size:8.5px;padding-left:4px}
   }
   @media(max-width:420px){
     .brand span{display:none}
     .wrap{padding-left:calc(14px + var(--sal));padding-right:calc(14px + var(--sar))}
     .cal-grid{gap:4px}
-    .cal-v{display:none}
     .hist-wallet{flex:1;min-width:0}
   }
   @media(prefers-reduced-motion:reduce){
@@ -1413,11 +1439,17 @@ function renderHistory(){
     const key=`${y}-${String(mo+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
     const tot=dayTotals[key];
     if(tot!=null){
-      const i=maxTotal>0?(0.18+0.82*(tot/maxTotal)):0.5;
+      // Intensidad sutil (los chips ya marcan el día); texto legible encima.
+      const i=maxTotal>0?(0.10+0.24*(tot/maxTotal)):0.16;
       const sel=historyState.selectedDay===key?' sel':'';
-      html+=`<button class="cal-cell active${sel}" onclick="histSelectDay('${key}')" aria-label="${day}: ${escapeHtml(fmtUsd(tot))}, ${byDay[key].length} token(s)"><span class="cal-fill" style="opacity:${i.toFixed(2)}"></span><span class="cal-d">${day}</span><span class="cal-v">${fmtCompactUsd(tot)}</span></button>`;
+      const toks=byDay[key].slice().sort((a,b)=>(b.usd||0)-(a.usd||0));
+      const shown=toks.slice(0,3);
+      const moreN=toks.length-shown.length;
+      const chips=shown.map(t=>`<span class="cal-tok">${miniLogo(t)}<span class="ctk-amt">${escapeHtml(fmtAmount(t.amount))}</span><span class="ctk-usd">${t.usd!=null?escapeHtml(fmtCompactUsd(t.usd)):'—'}</span></span>`).join('');
+      const more=moreN>0?`<span class="cal-more">+${moreN} más</span>`:'';
+      html+=`<button class="cal-cell active${sel}" onclick="histSelectDay('${key}')" aria-label="${day}: ${escapeHtml(fmtUsd(tot))}, ${toks.length} token(s)"><span class="cal-fill" style="opacity:${i.toFixed(2)}"></span><span class="cal-d">${day}</span><span class="cal-toks">${chips}${more}</span><span class="cal-tot">${escapeHtml(fmtCompactUsd(tot))}</span></button>`;
     }else{
-      html+=`<div class="cal-cell"><span class="cal-d" style="color:var(--faint);font-weight:400">${day}</span></div>`;
+      html+=`<div class="cal-cell"><span class="cal-d" style="opacity:.5;font-weight:400">${day}</span></div>`;
     }
   }
   html+=`</div>`;
@@ -1426,8 +1458,37 @@ function renderHistory(){
   if(historyState.selectedDay&&byDay[historyState.selectedDay]){
     html+=histDayDetail(historyState.selectedDay,byDay[historyState.selectedDay]);
   }
+  // Resumen de todo el mes (tokens incorporados + valor).
+  html+=histMonthSummary(monthTx,monthLbl);
   html+=histDisclaimer();
   rows.innerHTML=html;
+}
+
+// Logo mini (15px) para los chips del calendario.
+function miniLogo(t){
+  const grad=gradientFor(t.key==='native'?'native-pls':(t.key||t.symbol));
+  const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
+  return `<span class="ctk-logo" style="background:${grad}">${img}${escapeHtml((t.symbol||'?')[0].toUpperCase())}</span>`;
+}
+
+// Tokens incorporados durante todo el mes (agrupados), con su valor USD.
+function histMonthSummary(monthTx,monthLbl){
+  if(!monthTx.length)return '';
+  const byTok=new Map();
+  for(const t of monthTx){
+    if(!byTok.has(t.key))byTok.set(t.key,{key:t.key,symbol:t.symbol,name:t.name,logo:t.logo,amount:0,usd:0});
+    const a=byTok.get(t.key);a.amount+=t.amount;a.usd+=(t.usd||0);if(!a.logo&&t.logo)a.logo=t.logo;
+  }
+  const list=[...byTok.values()].sort((a,b)=>b.usd-a.usd);
+  const total=list.reduce((s,t)=>s+t.usd,0);
+  const rows=list.map(t=>{
+    const grad=gradientFor(t.key==='native'?'native-pls':(t.key||t.symbol));
+    const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
+    return `<div class="hs-row"><div class="logo" style="width:30px;height:30px;font-size:11px;background:${grad}">${img}<span class="ini">${escapeHtml((t.symbol||'?')[0].toUpperCase())}</span></div>
+      <div class="hs-i"><b>+${escapeHtml(fmtAmount(t.amount))} ${escapeHtml(t.symbol||'')}</b><span>${escapeHtml(t.name||'')}</span></div>
+      <div class="hs-v">${escapeHtml(fmtUsd(t.usd))}</div></div>`;
+  }).join('');
+  return `<div class="hist-summary"><div class="hs-head"><b>Tokens incorporados · ${escapeHtml(monthLbl)}</b><span>${list.length} ${list.length===1?'token':'tokens'} · ${escapeHtml(fmtUsd(total))}</span></div>${rows}</div>`;
 }
 
 function histDayDetail(key,transfers){
