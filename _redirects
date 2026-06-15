@@ -1,3 +1,0 @@
-# Las URLs de portfolio /p/<code> sirven la SPA (index.html) con 200.
-# El código se lee en el cliente desde location.pathname.
-/p/*  /index.html  200
