@@ -1261,6 +1261,14 @@ function startTimers(){
 }
 
 async function init(){
+  // Restaurar la ruta original si venimos del fallback 404.html.
+  // Cloudflare Pages no enruta /p/<code> a la SPA, así que 404.html guarda
+  // el path y redirige a /; aquí lo reponemos para que el router lo lea y la
+  // barra de direcciones vuelva a mostrar /p/<code>.
+  try{
+    const saved=sessionStorage.getItem('plsdash:path');
+    if(saved){sessionStorage.removeItem('plsdash:path');history.replaceState(null,'',saved);}
+  }catch(e){}
   // ¿URL /p/<code>?
   const m=location.pathname.match(/^\/p\/([A-Za-z0-9_-]{3,32})$/);
   if(m){
