@@ -236,7 +236,7 @@
   .htx .logo{box-shadow:0 0 0 1px rgba(255,255,255,.06)}
   .htx-i{flex:1;min-width:0}
   .htx-i b{display:block;font-size:13.5px;font-weight:600;font-family:var(--mono);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
-  .htx-i span{font-family:var(--tech);font-size:11px;color:var(--faint)}
+  .htx-i span{font-family:var(--body);font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .htx-v{font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--mint);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
   .hist-note{padding:14px 22px;text-align:center;font-size:11px;color:var(--faint);font-family:var(--mono);border-top:1px solid var(--line)}
 
@@ -1157,6 +1157,10 @@ function fmtCompactUsd(n){
   return '$'+n.toFixed(2);
 }
 
+// Receipts por debajo de este valor (USD, a precio actual) se consideran
+// polvo/comisiones/spam y se omiten para que el calendario quede limpio.
+const HIST_MIN_USD = 1;
+
 async function loadHistory(){
   if(!state.wallets.length){historyState.transfers=[];historyState.loadedSig=null;renderHistory();return;}
   const sig=JSON.stringify({w:state.wallets.map(w=>lc(w.address)),f:historyState.wallet});
@@ -1166,38 +1170,75 @@ async function loadHistory(){
   renderHistory();                                            // muestra spinner
   try{
     const targets=historyState.wallet==='all'?state.wallets.map(w=>lc(w.address)):[historyState.wallet];
-    const all=[];
+    const raw=[]; // receipts crudos: {ts,date,key,priceAddr,symbol,name,logo,amount}
     for(const addr of targets){
-      // Blockscout v2: transfers de tokens, filtradas a entrantes.
-      const r=await fetch(`${BLOCKSCOUT_API}/addresses/${addr}/token-transfers?type=ERC-20&filter=to`);
-      if(!r.ok)continue;
-      const j=await r.json();
-      const items=Array.isArray(j.items)?j.items:[];
-      for(const it of items){
-        const to=lc(it.to?.hash||it.to||'');
-        if(to!==addr)continue;                                // sólo entrantes
-        const tok=it.token||{};
-        const tokenAddr=lc(tok.address||tok.address_hash||'');
-        let dec=parseInt(tok.decimals!=null?tok.decimals:(it.total&&it.total.decimals));
-        if(isNaN(dec))dec=18;
-        const rawVal=(it.total&&(it.total.value!=null?it.total.value:it.total))||it.value||'0';
-        let amount=0;try{amount=bigToNum(BigInt(rawVal),dec);}catch(e){continue;}
-        if(amount<=0)continue;
-        const ts=new Date(it.timestamp||it.block_timestamp||Date.now());
-        all.push({ts,date:dayKey(ts),tokenAddr,symbol:tok.symbol||'?',name:tok.name||'Token',
-          amount,from:lc(it.from?.hash||it.from||''),logo:tok.icon_url||null,wallet:addr,usd:null});
-      }
+      // a) Tokens PRC-20 entrantes
+      try{
+        const r=await fetch(`${BLOCKSCOUT_API}/addresses/${addr}/token-transfers?type=ERC-20&filter=to`);
+        if(r.ok){
+          const j=await r.json();
+          for(const it of (Array.isArray(j.items)?j.items:[])){
+            const to=lc(it.to?.hash||it.to||'');
+            if(to!==addr)continue;                            // sólo entrantes
+            const tok=it.token||{};
+            const tokenAddr=lc(tok.address||tok.address_hash||'');
+            if(!isAddr(tokenAddr))continue;
+            let dec=parseInt(tok.decimals!=null?tok.decimals:(it.total&&it.total.decimals));
+            if(isNaN(dec))dec=18;
+            const rawVal=(it.total&&(it.total.value!=null?it.total.value:it.total))||it.value||'0';
+            let amount=0;try{amount=bigToNum(BigInt(rawVal),dec);}catch(e){continue;}
+            if(amount<=0)continue;
+            const ts=new Date(it.timestamp||it.block_timestamp||Date.now());
+            raw.push({ts,date:dayKey(ts),key:tokenAddr,priceAddr:tokenAddr,
+              symbol:tok.symbol||'?',name:tok.name||'Token',logo:tok.icon_url||null,amount});
+          }
+        }
+      }catch(e){}
+      // b) PLS nativo entrante (transferencias directas; las comisiones de gas
+      //    las paga el emisor y no aparecen aquí, así que quedan obviadas).
+      //    Ampliable: /internal-transactions para PLS recibido vía swaps.
+      try{
+        const r=await fetch(`${BLOCKSCOUT_API}/addresses/${addr}/transactions?filter=to`);
+        if(r.ok){
+          const j=await r.json();
+          for(const it of (Array.isArray(j.items)?j.items:[])){
+            const to=lc(it.to?.hash||it.to||'');
+            if(to!==addr)continue;
+            let amount=0;try{amount=bigToNum(BigInt(it.value||'0'),18);}catch(e){continue;}
+            if(amount<=0)continue;                            // ignora llamadas sin valor
+            const ts=new Date(it.timestamp||Date.now());
+            raw.push({ts,date:dayKey(ts),key:'native',priceAddr:WPLS,
+              symbol:'PLS',name:'Pulse',logo:null,amount});
+          }
+        }
+      }catch(e){}
     }
-    // Valor USD aproximado con el precio actual (DexScreener, cacheado).
-    const uniq=[...new Set(all.map(t=>t.tokenAddr).filter(isAddr))];
+
+    // Precios actuales para valorar en USD.
+    const uniq=[...new Set(raw.map(t=>t.priceAddr).filter(isAddr))];
     if(uniq.length)await fetchPrices(uniq);
-    for(const t of all){
-      const pc=priceCache.get(t.tokenAddr)||{};
-      t.usd=pc.price!=null?t.amount*pc.price:null;
-      if(!t.logo&&pc.logo)t.logo=pc.logo;
+
+    // Agrupar por día + token → una línea limpia y redonda por token y día.
+    const agg=new Map(); // 'YYYY-MM-DD|key' -> {date,ts,key,symbol,name,logo,amount,usd}
+    for(const t of raw){
+      const pc=priceCache.get(t.priceAddr)||{};
+      const usd=pc.price!=null?t.amount*pc.price:null;
+      const gk=t.date+'|'+t.key;
+      if(!agg.has(gk)){
+        agg.set(gk,{date:t.date,ts:t.ts,key:t.key,symbol:t.symbol,name:t.name,
+          logo:t.logo||pc.logo||null,amount:0,usd:null});
+      }
+      const a=agg.get(gk);
+      a.amount+=t.amount;
+      if(usd!=null)a.usd=(a.usd||0)+usd;
+      if(t.ts<a.ts)a.ts=t.ts;
+      if(!a.logo&&pc.logo)a.logo=pc.logo;
     }
-    all.sort((a,b)=>b.ts-a.ts);
-    historyState.transfers=all;
+
+    // Filtrar polvo/spam: nos quedamos con receipts con precio y >= mínimo.
+    const clean=[...agg.values()].filter(a=>a.usd!=null&&a.usd>=HIST_MIN_USD);
+    clean.sort((x,y)=>y.ts-x.ts);
+    historyState.transfers=clean;
     historyState.loadedSig=sig;
   }catch(e){console.error(e);historyState.error=true;}
   finally{historyState.loading=false;renderHistory();}
@@ -1237,7 +1278,7 @@ function renderHistory(){
   for(const d in byDay){const s=byDay[d].reduce((a,t)=>a+(t.usd||0),0);dayTotals[d]=s;if(s>maxTotal)maxTotal=s;}
 
   if(!monthTx.length){
-    rows.innerHTML=html+`<div class="state-block"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>Sin actividad este mes</h3><p>No hay transferencias entrantes en ${escapeHtml(monthLbl)}. Prueba otro mes o cambia de wallet.</p></div>`+histDisclaimer();
+    rows.innerHTML=html+`<div class="state-block"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>Sin actividad este mes</h3><p>No hay tokens recibidos en ${escapeHtml(monthLbl)} (se omiten importes mínimos y spam). Prueba otro mes o cambia de wallet.</p></div>`+histDisclaimer();
     return;
   }
 
@@ -1253,7 +1294,7 @@ function renderHistory(){
     if(tot!=null){
       const i=maxTotal>0?(0.18+0.82*(tot/maxTotal)):0.5;
       const sel=historyState.selectedDay===key?' sel':'';
-      html+=`<button class="cal-cell active${sel}" onclick="histSelectDay('${key}')" aria-label="${day}: ${escapeHtml(fmtUsd(tot))}, ${byDay[key].length} transfer(s)"><span class="cal-fill" style="opacity:${i.toFixed(2)}"></span><span class="cal-d">${day}</span><span class="cal-v">${fmtCompactUsd(tot)}</span></button>`;
+      html+=`<button class="cal-cell active${sel}" onclick="histSelectDay('${key}')" aria-label="${day}: ${escapeHtml(fmtUsd(tot))}, ${byDay[key].length} token(s)"><span class="cal-fill" style="opacity:${i.toFixed(2)}"></span><span class="cal-d">${day}</span><span class="cal-v">${fmtCompactUsd(tot)}</span></button>`;
     }else{
       html+=`<div class="cal-cell"><span class="cal-d" style="color:var(--faint);font-weight:400">${day}</span></div>`;
     }
@@ -1274,14 +1315,15 @@ function histDayDetail(key,transfers){
   const total=transfers.reduce((a,t)=>a+(t.usd||0),0);
   const sorted=[...transfers].sort((a,b)=>(b.usd||0)-(a.usd||0));
   const items=sorted.map(t=>{
-    const grad=gradientFor(t.tokenAddr||t.symbol);
+    const grad=gradientFor(t.key==='native'?'native-pls':(t.key||t.symbol));
     const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
     const usd=t.usd!=null?fmtUsd(t.usd):'—';
     return `<div class="htx"><div class="logo" style="width:34px;height:34px;font-size:12px;background:${grad}">${img}<span class="ini">${escapeHtml((t.symbol||'?')[0].toUpperCase())}</span></div>
-      <div class="htx-i"><b>+${escapeHtml(fmtAmount(t.amount))} ${escapeHtml(t.symbol||'')}</b><span>de ${shortAddr(t.from||'0x000000')}</span></div>
+      <div class="htx-i"><b>+${escapeHtml(fmtAmount(t.amount))} ${escapeHtml(t.symbol||'')}</b><span>${escapeHtml(t.name||'')}</span></div>
       <div class="htx-v">${usd}</div></div>`;
   }).join('');
-  return `<div class="hist-detail"><div class="hd-head"><b>${escapeHtml(fdate)}</b><span>${transfers.length} transfer${transfers.length>1?'s':''} · ${escapeHtml(fmtUsd(total))}</span></div>${items}</div>`;
+  const n=transfers.length;
+  return `<div class="hist-detail"><div class="hd-head"><b>${escapeHtml(fdate)}</b><span>${n} ${n===1?'token recibido':'tokens recibidos'} · ${escapeHtml(fmtUsd(total))}</span></div>${items}</div>`;
 }
 function histDisclaimer(){
   return `<div class="hist-note">Valores calculados con precios actuales (no históricos)</div>`;
