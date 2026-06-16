@@ -13,12 +13,12 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   :root{
-    --bg:#0C0710;
-    --bg-2:#100A16;
-    --surface:#17101F;
-    --surface-2:#1E1529;
-    --line:rgba(255,255,255,.07);
-    --line-2:rgba(255,255,255,.12);
+    --bg:#030208;
+    --bg-2:#080612;
+    --surface:#0B0814;
+    --surface-2:#13101D;
+    --line:rgba(255,255,255,.08);
+    --line-2:rgba(255,255,255,.14);
     --text:#F4EFFA;
     --dim:#A99FB8;
     --faint:#6E6480;
@@ -53,9 +53,10 @@
   body::before{
     content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
     background:
-      radial-gradient(900px 500px at 15% -5%,rgba(255,61,154,.10),transparent 60%),
-      radial-gradient(800px 600px at 95% 0%,rgba(40,224,230,.08),transparent 55%),
-      radial-gradient(700px 500px at 50% 110%,rgba(155,93,229,.10),transparent 60%);
+      radial-gradient(680px 380px at 50% -6%,rgba(43,227,167,.11),transparent 60%),
+      radial-gradient(760px 520px at 92% 4%,rgba(40,224,230,.07),transparent 56%),
+      radial-gradient(680px 520px at 8% 26%,rgba(255,61,154,.07),transparent 60%),
+      radial-gradient(720px 560px at 70% 108%,rgba(155,93,229,.10),transparent 60%);
   }
   .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:max(0px,var(--sat)) calc(22px + var(--sar)) calc(80px + var(--sab)) calc(22px + var(--sal))}
 
@@ -81,7 +82,10 @@
   .btn:focus-visible,.tool:focus-visible,.tab:focus-visible,.eye:focus-visible,.code-badge:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
   /* ---------- HERO ---------- */
-  .hero{position:relative;background:linear-gradient(180deg,var(--surface) 0%,var(--bg-2) 100%);border:1px solid var(--line);border-radius:24px;padding:34px 34px 0;overflow:hidden;margin-bottom:16px}
+  .hero{position:relative;border:1px solid rgba(255,255,255,.10);border-radius:24px;padding:34px 34px 0;overflow:hidden;margin-bottom:16px;
+    background:radial-gradient(120% 80% at 18% 0%,rgba(255,255,255,.085),transparent 58%),linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.012));
+    backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.18),inset 0 -16px 36px rgba(0,0,0,.42),0 26px 54px -26px rgba(0,0,0,.85)}
   .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--faint);display:flex;align-items:center;gap:9px}
   .eyebrow .live{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 0 rgba(43,227,167,.6);animation:beat 2.4s infinite}
   .eyebrow .live.stale{background:var(--faint);animation:none}
@@ -101,6 +105,15 @@
   @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
   .enddot{animation:pop 2.4s ease-in-out infinite}
   @keyframes pop{0%,100%{r:4}50%{r:6}}
+  /* Latido reactivo: verde si la cartera sube, rojo si baja. */
+  .hero.up .ecg-g1{stop-color:#2BE3A7}.hero.up .ecg-g2{stop-color:#28E0E6}.hero.up .ecg-g3{stop-color:#7CF5C0}
+  .hero.up .ecg-f1{stop-color:#2BE3A7}.hero.up .enddot{fill:#7CF5C0}
+  .hero.up .pulse-wrap{filter:drop-shadow(0 0 13px rgba(43,227,167,.42))}
+  .hero.up .total{text-shadow:0 0 46px rgba(43,227,167,.20)}
+  .hero.down .ecg-g1{stop-color:#FF5C7A}.hero.down .ecg-g2{stop-color:#FF3D9A}.hero.down .ecg-g3{stop-color:#FF8FA8}
+  .hero.down .ecg-f1{stop-color:#FF5C7A}.hero.down .enddot{fill:#FF8FA8}
+  .hero.down .pulse-wrap{filter:drop-shadow(0 0 13px rgba(255,92,122,.42))}
+  .hero.down .total{text-shadow:0 0 46px rgba(255,92,122,.20)}
 
   /* ---------- WALLET BAR ---------- */
   .wallet-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center}
@@ -121,7 +134,10 @@
 
   /* ---------- STAT STRIP ---------- */
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
-  .stat{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:20px}
+  .stat{position:relative;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:20px;
+    background:radial-gradient(120% 90% at 18% 0%,rgba(255,255,255,.08),transparent 60%),linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.012));
+    backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 20px 44px -26px rgba(0,0,0,.8)}
   .stat h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:500;margin-bottom:12px}
   .stat .v{font-family:var(--display);font-size:25px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
   .stat .sub{font-size:12.5px;color:var(--dim);margin-top:5px;font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
@@ -135,7 +151,10 @@
   .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px}
 
   /* ---------- HOLDINGS ---------- */
-  .panel{background:var(--surface);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+  .panel{position:relative;border:1px solid rgba(255,255,255,.10);border-radius:22px;overflow:hidden;
+    background:radial-gradient(90% 40% at 15% 0%,rgba(255,255,255,.06),transparent 55%),linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.012));
+    backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 26px 54px -28px rgba(0,0,0,.85)}
   .panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
   .tabs{display:flex;gap:4px;background:var(--bg-2);padding:4px;border-radius:12px;border:1px solid var(--line)}
   .tab{font-family:var(--body);font-weight:600;font-size:13px;color:var(--dim);background:none;border:none;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.16s}
@@ -150,7 +169,7 @@
   .thead .r{text-align:right}
   .row{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr 44px;gap:14px;padding:15px 22px;align-items:center;border-bottom:1px solid var(--line);transition:.15s}
   .row:last-child{border-bottom:none}
-  .row:hover{background:var(--surface-2)}
+  .row:hover{background:rgba(255,255,255,.045)}
   .row.hidden-tok{opacity:.38}
   .asset{display:flex;align-items:center;gap:13px;min-width:0}
   .logo{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:14px;color:#0C0710;flex-shrink:0;position:relative;box-shadow:0 0 0 1px rgba(255,255,255,.06);overflow:hidden}
@@ -431,12 +450,12 @@
       <svg viewBox="0 0 1100 120" preserveAspectRatio="none" aria-hidden="true">
         <defs>
           <linearGradient id="pg" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#FF3D9A"/>
-            <stop offset="50%" stop-color="#9B5DE5"/>
-            <stop offset="100%" stop-color="#28E0E6"/>
+            <stop class="ecg-g1" offset="0%" stop-color="#FF3D9A"/>
+            <stop class="ecg-g2" offset="50%" stop-color="#9B5DE5"/>
+            <stop class="ecg-g3" offset="100%" stop-color="#28E0E6"/>
           </linearGradient>
           <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#9B5DE5" stop-opacity=".22"/>
+            <stop class="ecg-f1" offset="0%" stop-color="#9B5DE5" stop-opacity=".22"/>
             <stop offset="100%" stop-color="#9B5DE5" stop-opacity="0"/>
           </linearGradient>
         </defs>
@@ -1077,11 +1096,16 @@ function updateHeader(){
   const pct=prev>0?(diff/prev*100):0;
 
   const meta=$('heroMeta');
+  const heroEl=document.querySelector('.hero');
   if(!state.wallets.length){
     meta.innerHTML='<span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>';
+    heroEl.classList.remove('up','down');   // latido neutro
     return;
   }
   const up=diff>=0;
+  // Latido reactivo al P&L del periodo (verde sube / rojo baja).
+  heroEl.classList.toggle('up',has&&diff>=0);
+  heroEl.classList.toggle('down',has&&diff<0);
   const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
   meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${visibleTokens().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
