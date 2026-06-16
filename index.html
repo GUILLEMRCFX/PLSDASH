@@ -98,20 +98,6 @@
   .chip.pill{background:rgba(43,227,167,.1);color:var(--mint);padding:5px 10px;border-radius:8px;border:1px solid rgba(43,227,167,.22)}
   .chip.pill.down{background:rgba(255,92,122,.1);color:var(--red);border-color:rgba(255,92,122,.22)}
   .dot-sep{width:3px;height:3px;border-radius:50%;background:var(--faint)}
-  /* pulse line */
-  .pulse-wrap{position:relative;margin:0 -34px;height:120px}
-  .pulse-wrap svg{display:block;width:100%;height:100%}
-  .scan{animation:scan 3.4s linear infinite}
-  @keyframes scan{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
-  .enddot{animation:pop 2.4s ease-in-out infinite}
-  @keyframes pop{0%,100%{r:4}50%{r:6}}
-  /* Latido reactivo: verde si la cartera sube, rojo si baja. */
-  .hero.pos .ecg-g1{stop-color:#2BE3A7}.hero.pos .ecg-g2{stop-color:#28E0E6}.hero.pos .ecg-g3{stop-color:#7CF5C0}
-  .hero.pos .ecg-f1{stop-color:#2BE3A7}.hero.pos .enddot{fill:#7CF5C0}
-  .hero.pos .pulse-wrap{filter:drop-shadow(0 0 13px rgba(43,227,167,.42))}
-  .hero.neg .ecg-g1{stop-color:#FF5C7A}.hero.neg .ecg-g2{stop-color:#FF3D9A}.hero.neg .ecg-g3{stop-color:#FF8FA8}
-  .hero.neg .ecg-f1{stop-color:#FF5C7A}.hero.neg .enddot{fill:#FF8FA8}
-  .hero.neg .pulse-wrap{filter:drop-shadow(0 0 13px rgba(255,92,122,.42))}
 
   /* ---------- WALLET BAR ---------- */
   .wallet-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center}
@@ -367,7 +353,6 @@
     .code-badge .code-txt{display:none}
     .stats{grid-template-columns:1fr}
     .hero{padding:26px 22px 0;border-radius:20px}
-    .pulse-wrap{margin:0 -22px;height:96px}
     .thead{display:none}
     .row{grid-template-columns:1fr auto 30px;gap:6px 12px;padding:14px 16px}
     .asset{grid-row:span 2;grid-column:1}
@@ -406,7 +391,7 @@
     .hist-min,.hist-wallet{flex:1;min-width:0}
   }
   @media(prefers-reduced-motion:reduce){
-    .scan,.enddot,.eyebrow .live,.spinner,.sk,.modal{animation:none}
+    .eyebrow .live,.spinner,.sk,.modal{animation:none}
   }
 </style>
 </head>
@@ -443,25 +428,6 @@
     <div class="total" id="totalVal">$0<span class="cents">.00</span></div>
     <div class="hero-meta" id="heroMeta">
       <span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>
-    </div>
-    <div class="pulse-wrap">
-      <svg viewBox="0 0 1100 120" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="pg" x1="0" y1="0" x2="1" y2="0">
-            <stop class="ecg-g1" offset="0%" stop-color="#FF3D9A"/>
-            <stop class="ecg-g2" offset="50%" stop-color="#9B5DE5"/>
-            <stop class="ecg-g3" offset="100%" stop-color="#28E0E6"/>
-          </linearGradient>
-          <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
-            <stop class="ecg-f1" offset="0%" stop-color="#9B5DE5" stop-opacity=".22"/>
-            <stop offset="100%" stop-color="#9B5DE5" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-        <path d="M0,86 L120,84 L180,88 L240,70 L300,74 L360,40 L380,96 L400,16 L420,90 L470,72 L540,76 L600,58 L660,62 L720,66 L760,40 L780,92 L800,30 L820,80 L880,66 L940,60 L1000,52 L1060,44 L1100,40 L1100,120 L0,120 Z" fill="url(#fade)"/>
-        <path d="M0,86 L120,84 L180,88 L240,70 L300,74 L360,40 L380,96 L400,16 L420,90 L470,72 L540,76 L600,58 L660,62 L720,66 L760,40 L780,92 L800,30 L820,80 L880,66 L940,60 L1000,52 L1060,44 L1100,40" fill="none" stroke="url(#pg)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
-        <g class="scan"><rect width="120" height="120" fill="url(#pg)" opacity=".10"/></g>
-        <circle class="enddot" cx="1100" cy="40" r="4" fill="#28E0E6"/>
-      </svg>
     </div>
   </section>
 
@@ -1094,17 +1060,11 @@ function updateHeader(){
   const pct=prev>0?(diff/prev*100):0;
 
   const meta=$('heroMeta');
-  const heroEl=document.querySelector('.hero');
   if(!state.wallets.length){
     meta.innerHTML='<span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>';
-    heroEl.classList.remove('pos','neg');   // latido neutro
     return;
   }
   const up=diff>=0;
-  // Latido reactivo al P&L del periodo (verde sube / rojo baja).
-  // Usamos pos/neg (no up/down) para no chocar con las clases de color de los %.
-  heroEl.classList.toggle('pos',has&&diff>=0);
-  heroEl.classList.toggle('neg',has&&diff<0);
   const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
   meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${visibleTokens().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
