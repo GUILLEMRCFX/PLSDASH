@@ -90,7 +90,7 @@
   .eyebrow .live{width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 0 0 rgba(43,227,167,.6);animation:beat 2.4s infinite}
   .eyebrow .live.stale{background:var(--faint);animation:none}
   @keyframes beat{0%{box-shadow:0 0 0 0 rgba(43,227,167,.55)}70%{box-shadow:0 0 0 7px rgba(43,227,167,0)}100%{box-shadow:0 0 0 0 rgba(43,227,167,0)}}
-  .total{font-family:var(--display);font-weight:600;letter-spacing:-.03em;line-height:1;margin:16px 0 12px;font-size:clamp(48px,9vw,86px);font-variant-numeric:tabular-nums;text-shadow:0 0 40px rgba(255,255,255,.07)}
+  .total{font-family:var(--display);font-weight:600;color:var(--text);letter-spacing:-.03em;line-height:1;margin:16px 0 12px;font-size:clamp(48px,9vw,86px);font-variant-numeric:tabular-nums;text-shadow:0 0 40px rgba(255,255,255,.07)}
   .total .cents{color:var(--dim)}
   .hero-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:13.5px;color:var(--dim);padding-bottom:28px;min-height:20px}
   .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12.5px;font-weight:500;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
@@ -106,12 +106,12 @@
   .enddot{animation:pop 2.4s ease-in-out infinite}
   @keyframes pop{0%,100%{r:4}50%{r:6}}
   /* Latido reactivo: verde si la cartera sube, rojo si baja. */
-  .hero.up .ecg-g1{stop-color:#2BE3A7}.hero.up .ecg-g2{stop-color:#28E0E6}.hero.up .ecg-g3{stop-color:#7CF5C0}
-  .hero.up .ecg-f1{stop-color:#2BE3A7}.hero.up .enddot{fill:#7CF5C0}
-  .hero.up .pulse-wrap{filter:drop-shadow(0 0 13px rgba(43,227,167,.42))}
-  .hero.down .ecg-g1{stop-color:#FF5C7A}.hero.down .ecg-g2{stop-color:#FF3D9A}.hero.down .ecg-g3{stop-color:#FF8FA8}
-  .hero.down .ecg-f1{stop-color:#FF5C7A}.hero.down .enddot{fill:#FF8FA8}
-  .hero.down .pulse-wrap{filter:drop-shadow(0 0 13px rgba(255,92,122,.42))}
+  .hero.pos .ecg-g1{stop-color:#2BE3A7}.hero.pos .ecg-g2{stop-color:#28E0E6}.hero.pos .ecg-g3{stop-color:#7CF5C0}
+  .hero.pos .ecg-f1{stop-color:#2BE3A7}.hero.pos .enddot{fill:#7CF5C0}
+  .hero.pos .pulse-wrap{filter:drop-shadow(0 0 13px rgba(43,227,167,.42))}
+  .hero.neg .ecg-g1{stop-color:#FF5C7A}.hero.neg .ecg-g2{stop-color:#FF3D9A}.hero.neg .ecg-g3{stop-color:#FF8FA8}
+  .hero.neg .ecg-f1{stop-color:#FF5C7A}.hero.neg .enddot{fill:#FF8FA8}
+  .hero.neg .pulse-wrap{filter:drop-shadow(0 0 13px rgba(255,92,122,.42))}
 
   /* ---------- WALLET BAR ---------- */
   .wallet-bar{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;align-items:center}
@@ -1097,13 +1097,14 @@ function updateHeader(){
   const heroEl=document.querySelector('.hero');
   if(!state.wallets.length){
     meta.innerHTML='<span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>';
-    heroEl.classList.remove('up','down');   // latido neutro
+    heroEl.classList.remove('pos','neg');   // latido neutro
     return;
   }
   const up=diff>=0;
   // Latido reactivo al P&L del periodo (verde sube / rojo baja).
-  heroEl.classList.toggle('up',has&&diff>=0);
-  heroEl.classList.toggle('down',has&&diff<0);
+  // Usamos pos/neg (no up/down) para no chocar con las clases de color de los %.
+  heroEl.classList.toggle('pos',has&&diff>=0);
+  heroEl.classList.toggle('neg',has&&diff<0);
   const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
   meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${visibleTokens().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
