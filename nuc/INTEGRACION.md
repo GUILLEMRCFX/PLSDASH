@@ -14,6 +14,77 @@ CREATE TABLE meta (clave TEXT PRIMARY KEY, valor TEXT NOT NULL, actualizado INTE
 
 No hay que volver a ejecutarlas.
 
+---
+
+# Validación (`validacion.py`)
+
+Dos barreras contra datos imposibles, después de que el 8-ago a las 19:00 la
+tubería escribiera `ganado=0` con los diez validadores activos y `salud="ok"`.
+
+## A. En `collector.py`, antes de devolver el estado
+
+```python
+from validacion import validar, marcar_sin_datos
+
+motivos = validar(estado)
+if motivos:
+    for m in motivos:
+        print(f"[collector] estado descartado: {m}")
+    estado = marcar_sin_datos(estado, motivos)
+
+return estado
+```
+
+## B. En `push.py`, antes de escribir nada
+
+```python
+from validacion import admisible, ultimo_ganado_conocido
+
+if estado.get("salud") == "sin_datos":
+    print("[push] estado no fiable, no se escribe nada en esta pasada")
+    return
+```
+
+**Importante: cuando el estado no es fiable no se escribe *ni KV ni D1*.**
+
+La instrucción original era no escribir el snapshot de D1, pero escribir KV con
+`salud="sin_datos"` y `ganado=0` sería peor que no hacer nada: el panel lee KV
+para el estado actual y enseñaría **0 PLS ganados** en el número principal. Al
+no tocar KV, el panel sigue mostrando el último dato bueno y, como
+`generado_ts` deja de avanzar, a los 15 minutos salta solo el aviso de «El NUC
+no reporta desde hace X min». Esa ruta ya está construida y probada.
+
+## C. En `push.py`, antes del `INSERT INTO snapshots`
+
+```python
+ultimo = ultimo_ganado_conocido(d1)
+ok, motivo = admisible(ultimo, ganado, slashed=v.get("slashed", 0))
+if not ok:
+    print(f"[push] snapshot rechazado: {motivo}")
+else:
+    d1("INSERT INTO snapshots (...) VALUES (...)", [...])
+```
+
+Las recompensas acumuladas solo suben. Una bajada real solo puede venir de una
+penalización, y una penalización de verdad también mueve el campo `slashed`:
+si baja sin que nadie esté penalizado, el dato está mal y no entra.
+
+## Qué rechaza exactamente `validar()`
+
+Solo actúa si hay validadores `active_ongoing` y llevan más de una hora
+activos; antes de eso un `ganado` a cero es legítimo. Cumplido eso, rechaza:
+
+| Motivo | Por qué |
+|---|---|
+| `ganado_total` ausente, cero o negativo | Con validadores activos horas, imposible |
+| `balance_total` == `stake_total` exacto | Es la firma de `effective_balance` |
+| `balance` == 32.000.000 clavado en algún validador | La misma firma, uno a uno |
+| `ganado_total` ≠ suma del detalle (±0,01) | Uno de los dos está mal y no se sabe cuál |
+
+Comprobado contra la fila corrupta real (la caza por tres motivos a la vez) y
+contra las seis filas buenas del 8-ago, más los casos de validador recién
+activado y de nodo aún sincronizando, que **no** deben rechazarse.
+
 ## 1. Importar
 
 ```python
