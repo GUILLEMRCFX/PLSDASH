@@ -2,7 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0e0715">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Validadores">
+<meta name="robots" content="noindex, nofollow">
 <title>PLSDASH · Validator Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,7 +38,7 @@ body{
   color:var(--txt);
   min-height:100vh;
   -webkit-font-smoothing:antialiased;
-  padding-bottom:40px;
+  padding-bottom:calc(40px + env(safe-area-inset-bottom));
 }
 .mono{font-family:'JetBrains Mono',monospace}
 .shell{max-width:520px;margin:0 auto;padding:0 16px}
@@ -46,7 +51,7 @@ body{
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   border-bottom:1px solid var(--line-soft);
 }
-.hdr-in{max-width:520px;margin:0 auto;padding:14px 16px 0}
+.hdr-in{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px 0}
 @media(min-width:900px){ .hdr-in{max-width:1080px} }
 .hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .back{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:13px;font-weight:500;text-decoration:none;background:none;border:none;font-family:inherit;cursor:pointer}
@@ -213,10 +218,21 @@ body{
 /* ---------- tools ---------- */
 .sim-val{font-size:30px;font-weight:700;letter-spacing:-1px;margin:4px 0 2px}
 .sim-lbl{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+/* pista del simulador: el input y la marca del precio de sacrificio comparten
+   el mismo sistema de coordenadas, descontando el ancho del pulgar (20px) */
+.simtrack{position:relative;margin:26px 0 8px}
+.simtrack input[type=range]{margin:0}
+.simref{
+  position:absolute;top:-13px;bottom:-9px;width:1px;background:var(--mute);opacity:.5;
+  left:calc(10px + (100% - 20px) * var(--t));pointer-events:none;
+}
+.simref::after{
+  content:attr(data-label);position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+  font-size:9.5px;color:var(--mute);white-space:nowrap;letter-spacing:.3px;
+}
 input[type=range]{
   -webkit-appearance:none;width:100%;height:4px;border-radius:3px;
   background:var(--line);
-  margin:20px 0 8px;
 }
 input[type=range]::-webkit-slider-thumb{
   -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
@@ -477,12 +493,16 @@ input[type=text].fld{
   <div class="card">
     <div class="sim-lbl">Si PLS estuviera a</div>
     <div class="sim-val" id="simPrice" style="background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">– $</div>
-    <input type="range" min="0" max="1000" value="350" id="simSlider">
-    <div class="ticks"><span>0,00001</span><span>0,0001</span><span>0,001</span></div>
+    <div class="simtrack">
+      <div class="simref" id="simRefSac" data-label="sacrificio"></div>
+      <input type="range" min="0" max="1000" value="350" id="simSlider">
+    </div>
+    <div class="ticks"><span>0,000005</span><span>0,0001</span><span>0,002</span></div>
     <div style="margin-top:18px">
       <div class="nrow"><div class="l">Valor del stake</div><div class="r" id="simStake">–</div></div>
       <div class="nrow"><div class="l">Ganado hasta hoy</div><div class="r" id="simGanado" style="color:var(--ok)">–</div></div>
       <div class="nrow"><div class="l">Proyección 1 año</div><div class="r" id="simProy">–</div></div>
+      <div class="nrow"><div class="l">Frente al sacrificio</div><div class="r" id="simVsSac">–</div></div>
     </div>
   </div>
 
@@ -540,7 +560,13 @@ input[type=text].fld{
 
   const API = '/api/val';
   const TOTAL_RED_VALIDADORES = 109559; // aprox. red completa, ver BRIEF-CLAUDE-CODE.md
-  const SLOT_SECONDS = 12; // asunción: slot de beacon chain tipo Ethereum; ajustar si PulseChain usa otro valor
+  // 10 s/slot, derivado de los propios datos del nodo: entre la activación
+  // (epoch 319720) y el snapshot del brief (epoch 320041) pasaron 321 epochs
+  // × 32 slots en 103.013 s → 10,03 s por slot.
+  const SLOT_SECONDS = 10;
+  // Contrato de WPLS: el precio de PLS se toma de su par con más liquidez,
+  // igual que hace index.html. Buscar por texto devuelve tokens homónimos.
+  const WPLS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27';
 
   let estado = null;
   let daily = [];       // historico rango=todo (resolución diaria)
@@ -564,10 +590,19 @@ input[type=text].fld{
     return `hace ${Math.floor(s / 86400)} d`;
   };
 
+  class ApiError extends Error {
+    constructor(status, msg) { super(msg); this.status = status; }
+  }
+
   async function api(path, opts) {
-    const res = await fetch(API + path, { credentials: 'same-origin', ...opts });
-    if (res.status === 401) { showPin('Sesión caducada, introduce el PIN de nuevo.'); throw new Error('401'); }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    let res;
+    try {
+      res = await fetch(API + path, { credentials: 'same-origin', ...opts });
+    } catch {
+      throw new ApiError(0, 'sin conexión');
+    }
+    if (res.status === 401) throw new ApiError(401, 'sesión no válida');
+    if (!res.ok) throw new ApiError(res.status, 'HTTP ' + res.status);
     return res.json();
   }
 
@@ -599,9 +634,7 @@ input[type=text].fld{
         body: JSON.stringify({ pin: pinDigits }),
       });
       if (res.ok) {
-        $('pinview').classList.add('off');
-        $('appview').classList.add('on');
-        boot();
+        enterApp();
       } else {
         pinReset('PIN incorrecto, prueba otra vez.');
       }
@@ -612,10 +645,7 @@ input[type=text].fld{
     }
   }
 
-  $('pinPad').addEventListener('click', e => {
-    const btn = e.target.closest('.pk');
-    if (!btn) return;
-    const k = btn.dataset.k;
+  function pinPress(k) {
     if (k === 'back') { pinDigits = pinDigits.slice(0, -1); pinRender(); return; }
     if (k === 'exit') { pinDigits = ''; pinRender(); return; }
     if (pinDigits.length >= 4) return;
@@ -623,6 +653,18 @@ input[type=text].fld{
     pinRender();
     $('pinErr').textContent = '';
     if (pinDigits.length === 4) pinSubmit();
+  }
+
+  $('pinPad').addEventListener('click', e => {
+    const btn = e.target.closest('.pk');
+    if (btn) pinPress(btn.dataset.k);
+  });
+
+  // Teclado físico: en escritorio se espera poder teclear el PIN directamente.
+  document.addEventListener('keydown', e => {
+    if ($('pinview').classList.contains('off')) return;
+    if (e.key >= '0' && e.key <= '9') { pinPress(e.key); e.preventDefault(); }
+    else if (e.key === 'Backspace') { pinPress('back'); e.preventDefault(); }
   });
 
   function showPin(msg) {
@@ -780,11 +822,23 @@ input[type=text].fld{
       const cls = EV_BAD.has(ev.tipo) ? 'bad' : (EV_GOOD.has(ev.tipo) ? 'good' : 'warn');
       const div = document.createElement('div');
       div.className = 'ev ' + cls;
-      const plsPart = ev.pls != null
-        ? ` · <b class="${ev.pls < 0 ? 'neg' : ''}">${ev.pls >= 0 ? '+' : ''}${fmt(ev.pls)} PLS</b>`
-        : '';
-      div.innerHTML = `<div class="h"><div class="ttl">${ev.titulo}</div><div class="tm">${relTime(ev.ts)}</div></div>
-        <div class="sb">${ev.detalle || ''}${plsPart}</div>`;
+
+      const h = document.createElement('div'); h.className = 'h';
+      const ttl = document.createElement('div'); ttl.className = 'ttl'; ttl.textContent = ev.titulo;
+      const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = relTime(ev.ts);
+      h.append(ttl, tm);
+
+      const sb = document.createElement('div'); sb.className = 'sb';
+      sb.textContent = ev.detalle || '';
+      if (ev.pls != null) {
+        const b = document.createElement('b');
+        if (ev.pls < 0) b.className = 'neg';
+        b.textContent = `${ev.pls >= 0 ? '+' : ''}${fmt(ev.pls)} PLS`;
+        if (sb.textContent) sb.append(' · ');
+        sb.append(b);
+      }
+
+      div.append(h, sb);
       el.appendChild(div);
     });
   }
@@ -859,6 +913,7 @@ input[type=text].fld{
   let simPricePerUnit = 0.00007; // se ajusta al cargar via DexScreener si es posible
 
   const SIM_MIN = 0.000005, SIM_MAX = 0.002;
+  const PRECIO_SACRIFICIO = 0.0001; // referencia del sacrificio de PLS
   function priceFromSlider(val) {
     const t = val / 1000;
     return SIM_MIN * Math.pow(SIM_MAX / SIM_MIN, t);
@@ -885,6 +940,20 @@ input[type=text].fld{
     const proy = (v.ganado_total + v.pls_dia * 365) * price;
     $('simProy').textContent = `${fmt(proy, 2)} $`;
 
+    // Contexto frente al precio de sacrificio: cuánto falta (o sobra) para volver allí.
+    const ratio = price / PRECIO_SACRIFICIO;
+    const el = $('simVsSac');
+    if (ratio >= 0.995 && ratio <= 1.005) {
+      el.textContent = 'en el precio de sacrificio';
+      el.style.color = 'var(--txt)';
+    } else if (ratio < 1) {
+      el.innerHTML = `−${fmt((1 - ratio) * 100, 1)} %<small>necesita ×${fmt(1 / ratio, ratio < 0.1 ? 0 : 1)} para volver</small>`;
+      el.style.color = 'var(--dim)';
+    } else {
+      el.innerHTML = `×${fmt(ratio, ratio < 10 ? 1 : 0)}<small>por encima del sacrificio</small>`;
+      el.style.color = 'var(--ok)';
+    }
+
     // escenarios: PLS/mes aportado = (eur/precio) ; combinado con ritmo actual
     const V11 = 32_000_000;
     const restante = Math.max(0, V11 - v.ganado_total);
@@ -905,6 +974,10 @@ input[type=text].fld{
     const ganadoMostrar = ganadoYear || v.ganado_total;
     $('fiscGanado').innerHTML = `${fmt(ganadoMostrar)} PLS<small style="display:block;color:var(--mute);font-size:11px">≈ ${fmt(ganadoMostrar * fiscPrice(), 2)} $</small>`;
   }
+
+  // La marca del sacrificio se coloca desde la misma escala logarítmica que
+  // el slider, así no se descuadra si algún día cambia el rango.
+  $('simRefSac').style.setProperty('--t', sliderFromPrice(PRECIO_SACRIFICIO) / 1000);
 
   $('simSlider').addEventListener('input', e => {
     simPricePerUnit = priceFromSlider(Number(e.target.value));
@@ -945,76 +1018,120 @@ input[type=text].fld{
     }, 1000);
   }
 
+  // Dos cosas distintas pueden ir mal y ninguna debe pasar desapercibida:
+  // que el NUC deje de reportar (datos viejos en KV) o que el panel no
+  // consiga hablar con la API (red caída). Se comprueba en su propio reloj,
+  // no solo al refrescar, para que un fallo de red no silencie el aviso.
+  let lastError = null;
+
   function checkStale() {
+    const dot = $('syncDot');
+    const banner = $('staleBanner');
+
+    if (lastError) {
+      banner.style.display = 'block';
+      banner.querySelector('b').textContent = 'Sin conexión con el panel.';
+      $('staleMsg').textContent = lastError === 0
+        ? 'No se pudo contactar con el servidor. Los datos que ves pueden estar desfasados.'
+        : `El servidor respondió con un error (${lastError}). Los datos que ves pueden estar desfasados.`;
+      dot.className = 'bad';
+      return;
+    }
+
     if (!estado) return;
     const ageMin = (Date.now() / 1000 - estado.generado_ts) / 60;
-    const dot = $('syncDot');
     if (ageMin > 15) {
-      $('staleBanner').style.display = 'block';
-      $('staleMsg').textContent = `Última actualización hace ${fmt(ageMin, 0)} min — el NUC podría no estar reportando.`;
+      banner.style.display = 'block';
+      banner.querySelector('b').textContent = 'Sin datos recientes.';
+      $('staleMsg').textContent = `El NUC no reporta desde hace ${fmt(ageMin, 0)} min. Revisa que el nodo y el cron sigan vivos.`;
       dot.className = 'bad';
     } else if (ageMin > 5) {
-      $('staleBanner').style.display = 'none';
+      banner.style.display = 'none';
       dot.className = 'warn';
     } else {
-      $('staleBanner').style.display = 'none';
+      banner.style.display = 'none';
       dot.className = '';
     }
   }
 
   async function loadPrice() {
     try {
-      const res = await fetch('https://api.dexscreener.com/latest/dex/search?q=WPLS');
-      const data = await res.json();
-      const price = data?.pairs?.[0]?.priceUsd;
-      if (price) {
-        simPricePerUnit = Number(price);
+      const res = await fetch(`https://api.dexscreener.com/token-pairs/v1/pulsechain/${WPLS}`);
+      if (!res.ok) return;
+      const pairs = await res.json();
+      if (!Array.isArray(pairs) || !pairs.length) return;
+      // El par con más liquidez es el precio de referencia fiable.
+      const best = pairs.reduce((a, p) => (p.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? p : a, pairs[0]);
+      const price = parseFloat(best.priceUsd);
+      if (price > 0) {
+        simPricePerUnit = price;
         $('simSlider').value = sliderFromPrice(simPricePerUnit);
       }
     } catch { /* mantiene el valor por defecto si falla */ }
   }
 
-  async function refresh() {
-    const [est, hist24, histTodo, ev] = await Promise.all([
-      api('/estado'),
-      api('/historico?rango=24h'),
-      api('/historico?rango=todo'),
-      api('/eventos?limit=15'),
-    ]);
-    estado = est;
-    snapshots24h = hist24.datos || [];
-    daily = histTodo.datos || [];
-    lastFetch = Date.now();
+  // `daily` solo cambia una vez al día: no tiene sentido pedir el histórico
+  // completo a D1 en cada refresco de un minuto.
+  let dailyLoadedAt = 0;
+  const DAILY_TTL = 30 * 60 * 1000;
 
-    renderResumen();
-    renderValidadores();
-    renderNodo();
-    renderTools();
-    renderEventos(ev.eventos || []);
+  async function refresh() {
+    try {
+      const necesitaDaily = Date.now() - dailyLoadedAt > DAILY_TTL;
+      const peticiones = [
+        api('/estado'),
+        api('/historico?rango=24h'),
+        api('/eventos?limit=15'),
+        necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
+      ];
+      const [est, hist24, ev, histTodo] = await Promise.all(peticiones);
+
+      estado = est;
+      snapshots24h = hist24.datos || [];
+      if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
+      lastFetch = Date.now();
+      lastError = null;
+
+      renderResumen();
+      renderValidadores();
+      renderNodo();
+      renderTools();
+      renderEventos(ev.eventos || []);
+    } catch (e) {
+      if (e.status === 401) { showPin('Sesión caducada, introduce el PIN de nuevo.'); return; }
+      // 404 = KV todavía sin datos; el resto son fallos reales de red/servidor.
+      lastError = e.status;
+      console.error('Fallo al actualizar:', e);
+    }
     checkStale();
   }
 
   async function boot() {
     startSyncClock();
+    clearInterval(window.__valStale);
+    window.__valStale = setInterval(checkStale, 30000);
     await loadPrice();
-    try {
-      await refresh();
-    } catch (e) {
-      if (e.message !== '401') console.error(e);
-    }
+    await refresh();
     clearInterval(window.__valPoll);
-    window.__valPoll = setInterval(() => refresh().catch(e => { if (e.message !== '401') console.error(e); }), 60000);
+    window.__valPoll = setInterval(refresh, 60000);
   }
 
-  // arranque: comprobar si ya hay sesión válida (cookie de una visita anterior)
+  function enterApp() {
+    $('pinview').classList.add('off');
+    $('appview').classList.add('on');
+    boot();
+  }
+
+  // Arranque: comprobar si ya hay sesión válida (cookie de una visita anterior).
+  // Solo un 401 significa "no tienes sesión"; un fallo de red o un KV vacío no
+  // deben mandarte a la pantalla de PIN.
   (async function initial() {
     try {
       await api('/estado');
-      $('pinview').classList.add('off');
-      $('appview').classList.add('on');
-      boot();
-    } catch {
-      // sin sesión válida: se queda en la pantalla de PIN
+      enterApp();
+    } catch (e) {
+      if (e.status === 401) return; // se queda en la pantalla de PIN
+      enterApp();                   // sesión válida, pero algo más falla: entra y muestra el aviso
     }
   })();
 })();
