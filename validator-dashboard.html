@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLSDASH · Validator Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0715;
+  --surface:#170e22;
+  --surface-2:#1d1330;
+  --line:#2a1c3d;
+  --line-soft:#20152f;
+  --txt:#f6f1fb;
+  --dim:#9d8bb8;
+  --mute:#6b5a86;
+  --pink:#ff5ca8;
+  --violet:#a855f7;
+  --cyan:#22d3ee;
+  --ok:#38d98a;
+  --warn:#f5b544;
+  --bad:#ff5c7a;
+  --grad:linear-gradient(120deg,#ff5ca8,#a855f7 55%,#22d3ee);
+  --r:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Space Grotesk',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--txt);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:40px;
+}
+.mono{font-family:'JetBrains Mono',monospace}
+.shell{max-width:520px;margin:0 auto;padding:0 16px}
+@media(min-width:900px){ .shell{max-width:1080px} }
+
+/* ---------- header ---------- */
+.hdr{
+  position:sticky;top:0;z-index:50;
+  background:rgba(14,7,21,.82);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--line-soft);
+}
+.hdr-in{max-width:520px;margin:0 auto;padding:14px 16px 0}
+@media(min-width:900px){ .hdr-in{max-width:1080px} }
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.back{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:13px;font-weight:500;text-decoration:none}
+.back .chev{font-size:16px;line-height:1}
+.hdr-top h1{font-size:16px;font-weight:600;letter-spacing:-.2px}
+.sync{font-size:10.5px;color:var(--mute);display:flex;align-items:center;gap:6px}
+.sync i{width:5px;height:5px;border-radius:50%;background:var(--ok);display:block}
+
+/* tabs */
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  padding:11px 15px;font-size:13px;font-weight:500;color:var(--mute);
+  background:none;border:none;border-bottom:2px solid transparent;
+  cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s;
+}
+.tab.on{color:var(--txt);border-bottom-color:var(--violet)}
+
+/* ---------- shared ---------- */
+.pane{display:none;padding-top:20px}
+.pane.on{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.pane.on{animation:none}}
+
+.eyebrow{
+  font-size:10.5px;text-transform:uppercase;letter-spacing:1.3px;
+  color:var(--mute);font-weight:600;margin:26px 2px 10px;
+}
+.eyebrow:first-child{margin-top:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(min-width:900px){
+  .grid2{grid-template-columns:repeat(4,1fr)}
+  .grid3{grid-template-columns:repeat(6,1fr)}
+}
+
+/* ---------- status hero ---------- */
+.status{
+  border:1px solid #38d98a2e;background:linear-gradient(160deg,#38d98a12,#38d98a05);
+  border-radius:var(--r);padding:16px;display:flex;align-items:center;gap:13px;margin-bottom:10px;
+}
+.status .ring{
+  width:38px;height:38px;border-radius:50%;flex:none;
+  border:2px solid var(--ok);display:flex;align-items:center;justify-content:center;
+  color:var(--ok);font-size:15px;
+}
+.status .t{font-size:14.5px;font-weight:600;letter-spacing:-.1px}
+.status .s{font-size:11.5px;color:var(--dim);margin-top:2px}
+
+.headline{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px 18px;margin-bottom:10px;
+}
+.headline .lbl{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1.2px;font-weight:600}
+.headline .num{
+  font-size:38px;font-weight:700;letter-spacing:-1.5px;margin:8px 0 4px;line-height:1;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.headline .num span{font-size:17px;-webkit-text-fill-color:var(--dim);letter-spacing:0}
+.headline .meta{font-size:12px;color:var(--dim)}
+.headline .meta b{color:var(--ok);font-weight:600}
+
+.stat .k{font-size:10.5px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.stat .v{font-size:22px;font-weight:600;letter-spacing:-.6px;margin-top:7px}
+.stat .v small{font-size:12px;color:var(--dim);font-weight:500;letter-spacing:0}
+.stat .d{font-size:11px;color:var(--mute);margin-top:5px}
+.stat .d.pos{color:var(--ok)}
+
+/* ---------- milestone line (SIGNATURE) ---------- */
+.journey{
+  background:linear-gradient(165deg,var(--surface-2),var(--surface));
+  border:1px solid var(--line);border-radius:var(--r);padding:20px 18px 16px;
+}
+.journey .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:22px}
+.journey .top .t{font-size:14px;font-weight:600}
+.journey .top .n{font-size:11.5px;color:var(--mute)}
+.track{position:relative;height:3px;background:var(--line);border-radius:2px;margin:0 4px 4px}
+.track .fill{position:absolute;left:0;top:0;height:100%;border-radius:2px;background:var(--grad);width:37%}
+.track .now{
+  position:absolute;top:50%;left:37%;transform:translate(-50%,-50%);
+  width:11px;height:11px;border-radius:50%;background:var(--txt);
+  box-shadow:0 0 0 4px var(--bg),0 0 14px #a855f7aa;
+}
+.mk{position:absolute;top:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:var(--line);border:1.5px solid var(--mute)}
+.mk.m1{left:68%}
+.mk.m2{left:100%}
+.marks{display:flex;justify-content:space-between;margin-top:16px;gap:8px}
+.mark{flex:1}
+.mark .mt{font-size:11px;color:var(--dim);font-weight:500;margin-bottom:3px}
+.mark .mv{font-size:13px;font-weight:600}
+.mark .md{font-size:10.5px;color:var(--mute);margin-top:2px}
+.mark:nth-child(2){text-align:center}
+.mark:nth-child(3){text-align:right}
+
+/* ---------- 30-day strip ---------- */
+.strip{display:flex;gap:3px;margin-top:4px}
+.sq{flex:1;height:26px;border-radius:3px;background:var(--ok);opacity:.75}
+.sq.w{background:var(--warn)}
+.sq.b{background:var(--bad)}
+.strip-x{display:flex;justify-content:space-between;font-size:10px;color:var(--mute);margin-top:8px}
+
+/* ---------- feed ---------- */
+.feed{border-left:1.5px solid var(--line);margin-left:6px;padding-left:16px}
+.ev{position:relative;padding:0 0 18px}
+.ev:last-child{padding-bottom:0}
+.ev::before{
+  content:"";position:absolute;left:-22.5px;top:4px;width:9px;height:9px;border-radius:50%;
+  background:var(--surface);border:2px solid var(--mute);
+}
+.ev.good::before{border-color:var(--ok)}
+.ev.warn::before{border-color:var(--warn)}
+.ev .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.ev .ttl{font-size:13.5px;font-weight:500}
+.ev .tm{font-size:10.5px;color:var(--mute);white-space:nowrap}
+.ev .sb{font-size:11.5px;color:var(--dim);margin-top:3px}
+.ev .sb b{color:var(--ok)}
+.ev .sb b.neg{color:var(--bad)}
+
+/* ---------- chart ---------- */
+.chart-tabs{display:flex;gap:5px}
+.ct{font-size:10.5px;padding:5px 10px;border-radius:7px;background:#ffffff08;color:var(--mute);cursor:pointer;font-weight:600;border:1px solid transparent;font-family:inherit}
+.ct.on{background:#a855f71f;color:#dcbcff;border-color:#a855f744}
+.bars{display:flex;align-items:flex-end;gap:5px;height:112px;margin-top:16px}
+.bar{flex:1;border-radius:4px 4px 0 0;background:var(--grad);opacity:.8}
+
+/* ---------- validator rows ---------- */
+.vrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.vrow:last-child{border-bottom:none}
+.vn{
+  width:30px;height:30px;border-radius:9px;flex:none;
+  background:#a855f716;border:1px solid #a855f72e;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;color:#cfa8ff;
+}
+.vinfo{flex:1;min-width:0}
+.vinfo .a{font-size:13px;font-weight:500}
+.vinfo .b{font-size:10.5px;color:var(--mute);margin-top:2px}
+.vright{text-align:right;flex:none}
+.vright .a{font-size:13px;font-weight:600;color:var(--ok)}
+.vright .b{font-size:10.5px;color:var(--mute);margin-top:2px}
+
+/* ---------- node ---------- */
+.nrow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.nrow:last-child{border-bottom:none}
+.nrow .l{font-size:13px;color:var(--dim)}
+.nrow .r{font-size:13.5px;font-weight:600}
+.nrow .r small{font-size:11px;color:var(--mute);font-weight:400;display:block;margin-top:2px;text-align:right}
+.meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px}
+.meter i{display:block;height:100%;background:var(--grad);width:60%}
+
+.note{
+  background:#f5b5440e;border:1px solid #f5b54426;border-radius:12px;
+  padding:13px 14px;font-size:11.5px;color:#f2d9a8;line-height:1.6;
+}
+.note b{color:var(--warn)}
+
+/* ---------- tools ---------- */
+.sim-val{font-size:30px;font-weight:700;letter-spacing:-1px;margin:4px 0 2px}
+.sim-lbl{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:4px;border-radius:3px;
+  background:linear-gradient(90deg,var(--violet) 0%,var(--violet) 35%,var(--line) 35%);
+  margin:20px 0 8px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--txt);cursor:pointer;box-shadow:0 0 0 3px var(--bg),0 0 12px #a855f7aa;
+}
+.ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--mute)}
+.scn{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.scn:last-child{border-bottom:none}
+.scn .l .a{font-size:13px;font-weight:500}
+.scn .l .b{font-size:10.5px;color:var(--mute);margin-top:2px}
+.scn .r{font-size:14px;font-weight:600;text-align:right}
+.scn .r small{display:block;font-size:10.5px;color:var(--mute);font-weight:400;margin-top:2px}
+.btn{
+  width:100%;padding:13px;border-radius:12px;background:var(--surface-2);
+  border:1px solid var(--line);color:var(--txt);font-family:inherit;font-size:13px;
+  font-weight:500;cursor:pointer;margin-top:4px;
+}
+.btn:hover{border-color:#a855f755}
+
+.foot{text-align:center;font-size:10.5px;color:var(--mute);margin-top:32px;line-height:1.7}
+
+/* ---------- PIN ---------- */
+#pinview{display:none;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+#pinview.on{display:flex}
+.pinbox{width:100%;max-width:300px;text-align:center}
+.pinbox .mark{width:44px;height:44px;border-radius:13px;background:var(--grad);margin:0 auto 18px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#12081c;font-size:17px}
+.pinbox h2{font-size:19px;font-weight:600;margin-bottom:5px}
+.pinbox p{font-size:12.5px;color:var(--mute);margin-bottom:26px}
+.dots{display:flex;gap:13px;justify-content:center;margin-bottom:30px}
+.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid #a855f755}
+.dot.f{background:var(--grad);border-color:transparent}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pk{aspect-ratio:1.25;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:20px;font-weight:500;color:var(--txt);font-family:inherit;cursor:pointer}
+.pk:active{background:var(--surface-2)}
+.pk.sm{font-size:13px;color:var(--mute)}
+
+.viewtoggle{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:99;display:flex;gap:6px;background:rgba(23,14,34,.9);backdrop-filter:blur(12px);padding:5px;border-radius:12px;border:1px solid var(--line)}
+.vt{font-size:11px;padding:7px 13px;border-radius:8px;background:none;border:none;color:var(--mute);font-family:inherit;font-weight:600;cursor:pointer}
+.vt.on{background:#a855f722;color:#dcbcff}
+</style>
+</head>
+<body>
+
+<!-- ===================== PIN ===================== -->
+<div id="pinview">
+  <div class="pinbox">
+    <div class="mark">P</div>
+    <h2>Validator Dashboard</h2>
+    <p>Introduce tu PIN</p>
+    <div class="dots"><div class="dot f"></div><div class="dot f"></div><div class="dot"></div><div class="dot"></div></div>
+    <div class="pad">
+      <button class="pk">1</button><button class="pk">2</button><button class="pk">3</button>
+      <button class="pk">4</button><button class="pk">5</button><button class="pk">6</button>
+      <button class="pk">7</button><button class="pk">8</button><button class="pk">9</button>
+      <button class="pk sm">Salir</button><button class="pk">0</button><button class="pk sm">⌫</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="appview">
+
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="hdr-top">
+      <a href="#" class="back"><span class="chev">‹</span> PLSDASH</a>
+      <h1>Validator Dashboard</h1>
+      <div class="sync"><i></i> 42s</div>
+    </div>
+    <nav class="tabs">
+      <button class="tab on" onclick="go(this,'resumen')">Resumen</button>
+      <button class="tab" onclick="go(this,'vals')">Validadores</button>
+      <button class="tab" onclick="go(this,'nodo')">Nodo</button>
+      <button class="tab" onclick="go(this,'tools')">Herramientas</button>
+    </nav>
+  </div>
+</header>
+
+<div class="shell">
+
+<!-- ============ RESUMEN ============ -->
+<section id="resumen" class="pane on">
+
+  <div class="status">
+    <div class="ring">✓</div>
+    <div>
+      <div class="t">10 de 10 validando</div>
+      <div class="s">Sin incidencias en 14 días</div>
+    </div>
+  </div>
+
+  <div class="headline">
+    <div class="lbl">Ganado desde el inicio</div>
+    <div class="num">94.240 <span>PLS</span></div>
+    <div class="meta">≈ 6,58 $ · <b>+2.867 PLS/h</b> ahora mismo</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">Hoy</div>
+      <div class="v">61.240 <small>PLS</small></div>
+      <div class="d pos">+2,1% vs ayer</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Efectividad</div>
+      <div class="v">99,4<small>%</small></div>
+      <div class="d">tu media: 98,9%</div>
+    </div>
+  </div>
+
+  <!-- SIGNATURE: milestone line -->
+  <div class="eyebrow">Hacia dónde vas</div>
+  <div class="journey">
+    <div class="top">
+      <div class="t">Línea de hitos</div>
+      <div class="n">a tu ritmo actual</div>
+    </div>
+    <div class="track">
+      <div class="fill"></div>
+      <div class="mk m1"></div>
+      <div class="mk m2"></div>
+      <div class="now"></div>
+    </div>
+    <div class="marks">
+      <div class="mark">
+        <div class="mt">Hoy</div>
+        <div class="mv">94K PLS</div>
+        <div class="md">14 días activo</div>
+      </div>
+      <div class="mark">
+        <div class="mt">Validador #11</div>
+        <div class="mv">32M PLS</div>
+        <div class="md">en ~143 días</div>
+      </div>
+      <div class="mark">
+        <div class="mt">Break-even</div>
+        <div class="mv">320M PLS</div>
+        <div class="md">en ~4,7 años</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Últimos 30 días</div>
+  <div class="card">
+    <div class="strip">
+      <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+      <div class="sq"></div><div class="sq w"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+      <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+      <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+      <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+      <div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div><div class="sq"></div>
+    </div>
+    <div class="strip-x"><span>hace 30 d</span><span>hoy</span></div>
+  </div>
+
+  <div class="eyebrow">Registro</div>
+  <div class="card">
+    <div class="feed">
+      <div class="ev good">
+        <div class="h"><div class="ttl">Bloque propuesto</div><div class="tm">hace 6 h</div></div>
+        <div class="sb">Validador #109552 · <b>+14.180 PLS</b></div>
+      </div>
+      <div class="ev">
+        <div class="h"><div class="ttl">Epoch finalizada</div><div class="tm">hace 8 h</div></div>
+        <div class="sb">10/10 atestaciones correctas</div>
+      </div>
+      <div class="ev warn">
+        <div class="h"><div class="ttl">Nodo reiniciado</div><div class="tm">hace 2 d</div></div>
+        <div class="sb">Caído 4 min · <b class="neg">−191 PLS</b></div>
+      </div>
+      <div class="ev good">
+        <div class="h"><div class="ttl">Bloque propuesto</div><div class="tm">hace 5 d</div></div>
+        <div class="sb">Validador #109549 · <b>+13.940 PLS</b></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Recompensas</div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:13.5px;font-weight:600">Acumulado</div>
+      <div class="chart-tabs">
+        <span class="ct">24h</span><span class="ct on">7d</span><span class="ct">30d</span>
+      </div>
+    </div>
+    <div class="bars">
+      <div class="bar" style="height:54%"></div>
+      <div class="bar" style="height:62%"></div>
+      <div class="bar" style="height:49%"></div>
+      <div class="bar" style="height:75%"></div>
+      <div class="bar" style="height:84%"></div>
+      <div class="bar" style="height:70%"></div>
+      <div class="bar" style="height:93%"></div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Propuestas de bloque</div>
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">Total</div>
+      <div class="v">3</div>
+      <div class="d">desde el inicio</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Siguiente</div>
+      <div class="v">~5 <small>días</small></div>
+      <div class="d">10 de 109.559 validadores</div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ============ VALIDADORES ============ -->
+<section id="vals" class="pane">
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">En staking</div>
+      <div class="v">320,09<small>M</small></div>
+      <div class="d">10 validadores</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Coste de fallos</div>
+      <div class="v">−340 <small>PLS</small></div>
+      <div class="d">atestaciones perdidas</div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Detalle</div>
+  <div class="card">
+    <div class="vrow">
+      <div class="vn">0</div>
+      <div class="vinfo"><div class="a">109549</div><div class="b mono">0xb31f…75cc · 99,1%</div></div>
+      <div class="vright"><div class="a">+9.420</div><div class="b">32,009M</div></div>
+    </div>
+    <div class="vrow">
+      <div class="vn">1</div>
+      <div class="vinfo"><div class="a">109550</div><div class="b mono">0xaeb9…40ea3 · 100%</div></div>
+      <div class="vright"><div class="a">+9.680</div><div class="b">32,010M</div></div>
+    </div>
+    <div class="vrow">
+      <div class="vn">2</div>
+      <div class="vinfo"><div class="a">109551</div><div class="b mono">0xb067…610c6 · 98,4%</div></div>
+      <div class="vright"><div class="a">+8.910</div><div class="b">32,008M</div></div>
+    </div>
+    <div class="vrow">
+      <div class="vn">3</div>
+      <div class="vinfo"><div class="a">109552</div><div class="b mono">0x8145…7eb64 · 100%</div></div>
+      <div class="vright"><div class="a">+9.950</div><div class="b">32,011M</div></div>
+    </div>
+    <div class="vrow">
+      <div class="vn">4</div>
+      <div class="vinfo"><div class="a">109553</div><div class="b mono">0x9046…309ab9 · 99,2%</div></div>
+      <div class="vright"><div class="a">+9.330</div><div class="b">32,009M</div></div>
+    </div>
+    <div class="vrow" style="opacity:.5">
+      <div class="vn">…</div>
+      <div class="vinfo"><div class="a">5 validadores más</div></div>
+      <div class="vright"><div class="b">ver todos</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NODO ============ -->
+<section id="nodo" class="pane">
+  <div class="status">
+    <div class="ring">✓</div>
+    <div>
+      <div class="t">Nodo sincronizado</div>
+      <div class="s">32 peers · en línea 14 d</div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Recursos</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Temperatura CPU</div><div class="r">45 °C</div></div>
+    <div class="nrow"><div class="l">Carga</div><div class="r">4 %</div></div>
+    <div class="nrow"><div class="l">Memoria</div><div class="r">18 / 64 GB</div></div>
+    <div class="nrow"><div class="l">Disco NVMe</div><div class="r">60 %<small>698 GB libres</small></div></div>
+  </div>
+  <div class="meter"><i></i></div>
+  <div style="font-size:11px;color:var(--mute);margin-top:9px;padding:0 2px">
+    Crece ~14 GB/semana · prune recomendado hacia <b style="color:var(--dim)">marzo 2027</b>
+  </div>
+
+  <div class="eyebrow">Sincronización</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Slot actual</div><div class="r mono" style="font-size:12.5px">10.235.208</div></div>
+    <div class="nrow"><div class="l">Epoch</div><div class="r mono" style="font-size:12.5px">319.850</div></div>
+    <div class="nrow"><div class="l">Estado</div><div class="r" style="color:var(--ok)">Verified</div></div>
+  </div>
+
+  <div class="eyebrow">Exposición</div>
+  <div class="note">
+    <b>Punto único de fallo.</b> Los 10 validadores dependen de una sola máquina, una conexión y un suministro eléctrico. Una caída prolongada afecta a los 10 a la vez. Coste estimado: ~2.867 PLS por hora sin servicio.
+  </div>
+</section>
+
+<!-- ============ HERRAMIENTAS ============ -->
+<section id="tools" class="pane">
+
+  <div class="eyebrow">Simulador de precio</div>
+  <div class="card">
+    <div class="sim-lbl">Si PLS estuviera a</div>
+    <div class="sim-val" style="background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">0,00007 $</div>
+    <input type="range" min="0" max="100" value="35">
+    <div class="ticks"><span>0,00001</span><span>0,0001</span><span>0,001</span></div>
+    <div style="margin-top:18px">
+      <div class="nrow"><div class="l">Valor del stake</div><div class="r">22.400 $</div></div>
+      <div class="nrow"><div class="l">Ganado hasta hoy</div><div class="r" style="color:var(--ok)">6,60 $</div></div>
+      <div class="nrow"><div class="l">Proyección 1 año</div><div class="r">1.758 $</div></div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Escenarios de crecimiento</div>
+  <div class="card">
+    <div class="scn">
+      <div class="l"><div class="a">Solo reinvertir</div><div class="b">sin aportar nada</div></div>
+      <div class="r">143 d<small>al validador #11</small></div>
+    </div>
+    <div class="scn">
+      <div class="l"><div class="a">+50 € al mes</div><div class="b">reinvirtiendo</div></div>
+      <div class="r">61 d<small>al validador #11</small></div>
+    </div>
+    <div class="scn">
+      <div class="l"><div class="a">+150 € al mes</div><div class="b">reinvirtiendo</div></div>
+      <div class="r">28 d<small>al validador #11</small></div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Fiscalidad</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Ganado en 2026</div><div class="r">94.240 PLS<small>≈ 6,58 €</small></div></div>
+    <div class="nrow"><div class="l">Valor medio de adquisición</div><div class="r mono" style="font-size:12.5px">0,0000698 $</div></div>
+    <div style="margin-top:14px">
+      <button class="btn">Exportar 2026 a CSV</button>
+    </div>
+  </div>
+
+  <div class="eyebrow">Avisos</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Validador inactivo</div><div class="r" style="color:var(--ok);font-size:12px">Activo</div></div>
+    <div class="nrow"><div class="l">Nodo desincronizado</div><div class="r" style="color:var(--ok);font-size:12px">Activo</div></div>
+    <div class="nrow"><div class="l">Disco &gt; 85 %</div><div class="r" style="color:var(--ok);font-size:12px">Activo</div></div>
+    <div class="nrow"><div class="l">Bloque propuesto</div><div class="r" style="color:var(--mute);font-size:12px">Desactivado</div></div>
+    <div style="font-size:11px;color:var(--mute);margin-top:12px;line-height:1.6">
+      Los avisos los envía el NUC directamente a Telegram, no el dashboard. Así siguen llegando aunque la web no esté abierta.
+    </div>
+  </div>
+
+</section>
+
+<div class="foot">
+  Maqueta · datos de ejemplo<br>
+  PLSDASH · Validator Dashboard
+</div>
+
+</div>
+</div>
+
+<div class="viewtoggle">
+  <button class="vt on" onclick="sw(this,'app')">Dashboard</button>
+  <button class="vt" onclick="sw(this,'pin')">Pantalla PIN</button>
+</div>
+
+<script>
+function go(el,id){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');
+  document.querySelectorAll('.pane').forEach(p=>p.classList.remove('on'));
+  document.getElementById(id).classList.add('on');
+  window.scrollTo({top:0,behavior:'instant'});
+}
+function sw(el,v){
+  document.querySelectorAll('.vt').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  document.getElementById('pinview').classList.toggle('on', v==='pin');
+  document.getElementById('appview').style.display = v==='app' ? 'block' : 'none';
+}
+document.querySelectorAll('.ct').forEach(c=>c.addEventListener('click',()=>{
+  document.querySelectorAll('.ct').forEach(x=>x.classList.remove('on'));c.classList.add('on');
+}));
+</script>
+</body>
+</html>
