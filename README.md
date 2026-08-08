@@ -85,6 +85,14 @@ Contexto completo en `BRIEF-CLAUDE-CODE.md`.
 - **`snapshots.ganado` es acumulado y solo puede subir.** Se han observado
   filas con `0` escritas cuando falla la lectura del nodo; el frontend las
   descarta para que no generen picos falsos en la gráfica.
+- **`snapshots.precio_pls`** guarda el precio de PLS en cada snapshot horario.
+  Es el único dato del conjunto que no se puede reconstruir después: sin él no
+  hay fiscalidad correcta ni ganancia en euros. `NULL` significa que
+  DexScreener no respondió en esa hora — un hueco honesto, nunca un cero.
+- **`meta`** guarda la última epoch revisada en busca de bloques propuestos.
+
+El código del NUC que alimenta ambas cosas está en `nuc/`, con las
+instrucciones de integración en `nuc/INTEGRACION.md`.
 
 Todas menos `/auth` pasan por `functions/api/val/_middleware.js`, que exige
 cookie de sesión válida antes de ejecutar la Function.
@@ -103,6 +111,28 @@ nunca en el repo):
 |---|---|
 | `PLSDASH_KV` | KV namespace (el mismo que usa `portfolio`) |
 | `VALIDATOR_DB` | D1 database `validator-dashboard` |
+
+### Subdominio `val.plsdash.com`
+
+`functions/_middleware.js` reparte por hostname, así que un solo proyecto de
+Pages sirve los dos sitios:
+
+| Petición | Resultado |
+|---|---|
+| `val.plsdash.com/` | el panel (`/val/index.html`) |
+| `val.plsdash.com/val/` | redirige a `/` |
+| `val.plsdash.com/api/val/*` | pasa |
+| `plsdash.com/val/*` | **404** |
+| `plsdash.com/api/val/*` | **404** |
+| `*.pages.dev` | todo pasa, para poder probar |
+
+**Se activa con la variable de entorno `VAL_HOST`** (valor:
+`val.plsdash.com`). Mientras no exista, el middleware no cambia nada y el
+panel sigue en `plsdash.com/val/`. Así el bloqueo y el subdominio entran en
+vigor a la vez y no hay una ventana sin acceso por ningún sitio.
+
+Las rutas que pasan por Functions están en `_routes.json`; una ruta nueva del
+panel hay que añadirla ahí o se servirá sin pasar por el filtro.
 
 ## Deploy en Cloudflare Pages
 
