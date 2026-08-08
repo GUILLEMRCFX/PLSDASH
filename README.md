@@ -58,6 +58,38 @@ direcciones públicas).
 - `PUT /api/portfolio/<code>` → guarda `{ wallets, customTokens, hidden, ... }`.
   Valida que sea JSON con forma razonable y < 100KB. Maneja CORS.
 
+## Validator Dashboard (`/api/val/*`)
+
+Panel privado de monitorización de validadores, servido en `val.plsdash.com`.
+Contexto completo en `BRIEF-CLAUDE-CODE.md`.
+
+- `POST /api/val/auth` → `{ pin }`. Si coincide con el secret `VAL_PIN`, emite
+  cookie de sesión firmada (HMAC-SHA256, 30 días). Sin bloqueo por intentos
+  fallidos (decisión explícita: subdominio no enlazado, panel de solo lectura).
+- `GET /api/val/estado` → JSON de KV (`validator:estado`) tal cual.
+- `GET /api/val/historico?rango=24h|7d|30d|todo` → series de D1 (`snapshots`
+  para 24h, `daily` para el resto).
+- `GET /api/val/eventos?limit=N` → últimos N eventos de D1 (`eventos`,
+  por defecto 15, máx 100).
+
+Todas menos `/auth` pasan por `functions/api/val/_middleware.js`, que exige
+cookie de sesión válida antes de ejecutar la Function.
+
+**Secrets necesarios en Cloudflare** (Settings → Environment variables → *Secret*,
+nunca en el repo):
+
+| Variable | Uso |
+|---|---|
+| `VAL_PIN` | PIN de acceso al panel |
+| `VAL_SESSION_SECRET` | Firma HMAC de la cookie de sesión |
+
+**Bindings necesarios** (Settings → Functions):
+
+| Variable | Recurso |
+|---|---|
+| `PLSDASH_KV` | KV namespace (el mismo que usa `portfolio`) |
+| `PLSDASH_DB` | D1 database `validator-dashboard` |
+
 ## Deploy en Cloudflare Pages
 
 ### 1. Crear el KV namespace
