@@ -1,2 +1,6 @@
 # Mockups y artefactos de diseño (locales, no forman parte del producto)
 .mock/
+
+# Python
+__pycache__/
+*.pyc
