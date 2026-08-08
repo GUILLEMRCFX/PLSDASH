@@ -18,7 +18,7 @@ const err = (msg, status) =>
   });
 
 export async function onRequestGet({ request, env }) {
-  if (!env.PLSDASH_DB) return err('D1 no configurado (binding PLSDASH_DB)', 500);
+  if (!env.VALIDATOR_DB) return err('D1 no configurado (binding VALIDATOR_DB)', 500);
 
   const url = new URL(request.url);
   const rango = url.searchParams.get('rango') || '24h';
@@ -27,13 +27,13 @@ export async function onRequestGet({ request, env }) {
   let stmt;
   if (rango === '24h') {
     const desde = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
-    stmt = env.PLSDASH_DB.prepare('SELECT * FROM snapshots WHERE ts >= ? ORDER BY ts ASC').bind(desde);
+    stmt = env.VALIDATOR_DB.prepare('SELECT * FROM snapshots WHERE ts >= ? ORDER BY ts ASC').bind(desde);
   } else if (rango === 'todo') {
-    stmt = env.PLSDASH_DB.prepare('SELECT * FROM daily ORDER BY fecha ASC');
+    stmt = env.VALIDATOR_DB.prepare('SELECT * FROM daily ORDER BY fecha ASC');
   } else {
     const dias = rango === '7d' ? 7 : 30;
     const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    stmt = env.PLSDASH_DB.prepare('SELECT * FROM daily WHERE fecha >= ? ORDER BY fecha ASC').bind(desde);
+    stmt = env.VALIDATOR_DB.prepare('SELECT * FROM daily WHERE fecha >= ? ORDER BY fecha ASC').bind(desde);
   }
 
   const { results } = await stmt.all();

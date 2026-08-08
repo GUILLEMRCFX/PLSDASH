@@ -88,7 +88,7 @@ nunca en el repo):
 | Variable | Recurso |
 |---|---|
 | `PLSDASH_KV` | KV namespace (el mismo que usa `portfolio`) |
-| `PLSDASH_DB` | D1 database `validator-dashboard` |
+| `VALIDATOR_DB` | D1 database `validator-dashboard` |
 
 ## Deploy en Cloudflare Pages
 

@@ -15,14 +15,14 @@ const err = (msg, status) =>
   });
 
 export async function onRequestGet({ request, env }) {
-  if (!env.PLSDASH_DB) return err('D1 no configurado (binding PLSDASH_DB)', 500);
+  if (!env.VALIDATOR_DB) return err('D1 no configurado (binding VALIDATOR_DB)', 500);
 
   const url = new URL(request.url);
   let limit = Number(url.searchParams.get('limit') || DEFAULT_LIMIT);
   if (!Number.isInteger(limit) || limit <= 0) limit = DEFAULT_LIMIT;
   limit = Math.min(limit, MAX_LIMIT);
 
-  const { results } = await env.PLSDASH_DB
+  const { results } = await env.VALIDATOR_DB
     .prepare('SELECT id, ts, tipo, titulo, detalle, pls, validador FROM eventos ORDER BY ts DESC LIMIT ?')
     .bind(limit)
     .all();
