@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLSDASH · Validator Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0715;
+  --surface:#170e22;
+  --surface-2:#1d1330;
+  --line:#2a1c3d;
+  --line-soft:#20152f;
+  --txt:#f6f1fb;
+  --dim:#9d8bb8;
+  --mute:#6b5a86;
+  --pink:#ff5ca8;
+  --violet:#a855f7;
+  --cyan:#22d3ee;
+  --ok:#38d98a;
+  --warn:#f5b544;
+  --bad:#ff5c7a;
+  --grad:linear-gradient(120deg,#ff5ca8,#a855f7 55%,#22d3ee);
+  --r:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Space Grotesk',system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--txt);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:40px;
+}
+.mono{font-family:'JetBrains Mono',monospace}
+.shell{max-width:520px;margin:0 auto;padding:0 16px}
+@media(min-width:900px){ .shell{max-width:1080px} }
+
+/* ---------- header ---------- */
+.hdr{
+  position:sticky;top:0;z-index:50;
+  background:rgba(14,7,21,.82);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--line-soft);
+}
+.hdr-in{max-width:520px;margin:0 auto;padding:14px 16px 0}
+@media(min-width:900px){ .hdr-in{max-width:1080px} }
+.hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.back{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:13px;font-weight:500;text-decoration:none;background:none;border:none;font-family:inherit;cursor:pointer}
+.back .chev{font-size:16px;line-height:1}
+.hdr-top h1{font-size:16px;font-weight:600;letter-spacing:-.2px}
+.sync{font-size:10.5px;color:var(--mute);display:flex;align-items:center;gap:6px}
+.sync i{width:5px;height:5px;border-radius:50%;background:var(--ok);display:block}
+.sync i.warn{background:var(--warn)}
+.sync i.bad{background:var(--bad)}
+
+/* tabs */
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  padding:11px 15px;font-size:13px;font-weight:500;color:var(--mute);
+  background:none;border:none;border-bottom:2px solid transparent;
+  cursor:pointer;font-family:inherit;white-space:nowrap;transition:color .15s;
+}
+.tab.on{color:var(--txt);border-bottom-color:var(--violet)}
+
+/* ---------- shared ---------- */
+.pane{display:none;padding-top:20px}
+.pane.on{display:block;animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.pane.on{animation:none}}
+
+.eyebrow{
+  font-size:10.5px;text-transform:uppercase;letter-spacing:1.3px;
+  color:var(--mute);font-weight:600;margin:26px 2px 10px;
+}
+.eyebrow:first-child{margin-top:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(min-width:900px){
+  .grid2{grid-template-columns:repeat(4,1fr)}
+  .grid3{grid-template-columns:repeat(6,1fr)}
+}
+
+/* ---------- status hero ---------- */
+.status{
+  border:1px solid #38d98a2e;background:linear-gradient(160deg,#38d98a12,#38d98a05);
+  border-radius:var(--r);padding:16px;display:flex;align-items:center;gap:13px;margin-bottom:10px;
+}
+.status .ring{
+  width:38px;height:38px;border-radius:50%;flex:none;
+  border:2px solid var(--ok);display:flex;align-items:center;justify-content:center;
+  color:var(--ok);font-size:15px;
+}
+.status .t{font-size:14.5px;font-weight:600;letter-spacing:-.1px}
+.status .s{font-size:11.5px;color:var(--dim);margin-top:2px}
+
+.headline{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:20px 18px;margin-bottom:10px;
+}
+.headline .lbl{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1.2px;font-weight:600}
+.headline .num{
+  font-size:38px;font-weight:700;letter-spacing:-1.5px;margin:8px 0 4px;line-height:1;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.headline .num span{font-size:17px;-webkit-text-fill-color:var(--dim);letter-spacing:0}
+.headline .meta{font-size:12px;color:var(--dim)}
+.headline .meta b{color:var(--ok);font-weight:600}
+
+.stat .k{font-size:10.5px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.stat .v{font-size:22px;font-weight:600;letter-spacing:-.6px;margin-top:7px}
+.stat .v small{font-size:12px;color:var(--dim);font-weight:500;letter-spacing:0}
+.stat .d{font-size:11px;color:var(--mute);margin-top:5px}
+.stat .d.pos{color:var(--ok)}
+.stat .d.neg{color:var(--bad)}
+
+/* ---------- milestone line (SIGNATURE) ---------- */
+.journey{
+  background:linear-gradient(165deg,var(--surface-2),var(--surface));
+  border:1px solid var(--line);border-radius:var(--r);padding:20px 18px 16px;
+}
+.journey .top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:22px}
+.journey .top .t{font-size:14px;font-weight:600}
+.journey .top .n{font-size:11.5px;color:var(--mute)}
+.track{position:relative;height:3px;background:var(--line);border-radius:2px;margin:0 4px 4px}
+.track .fill{position:absolute;left:0;top:0;height:100%;border-radius:2px;background:var(--grad);width:0%}
+.track .now{
+  position:absolute;top:50%;left:0%;transform:translate(-50%,-50%);
+  width:11px;height:11px;border-radius:50%;background:var(--txt);
+  box-shadow:0 0 0 4px var(--bg),0 0 14px #a855f7aa;
+}
+.mk{position:absolute;top:50%;transform:translate(-50%,-50%);width:7px;height:7px;border-radius:50%;background:var(--line);border:1.5px solid var(--mute)}
+.marks{display:flex;justify-content:space-between;margin-top:16px;gap:8px}
+.mark{flex:1}
+.mark .mt{font-size:11px;color:var(--dim);font-weight:500;margin-bottom:3px}
+.mark .mv{font-size:13px;font-weight:600}
+.mark .md{font-size:10.5px;color:var(--mute);margin-top:2px}
+.mark:nth-child(2){text-align:center}
+.mark:nth-child(3){text-align:right}
+
+/* ---------- 30-day strip ---------- */
+.strip{display:flex;gap:3px;margin-top:4px}
+.sq{flex:1;height:26px;border-radius:3px;background:var(--ok);opacity:.75}
+.sq.w{background:var(--warn)}
+.sq.b{background:var(--bad)}
+.sq.empty{background:var(--line);opacity:.4}
+.strip-x{display:flex;justify-content:space-between;font-size:10px;color:var(--mute);margin-top:8px}
+
+/* ---------- feed ---------- */
+.feed{border-left:1.5px solid var(--line);margin-left:6px;padding-left:16px}
+.ev{position:relative;padding:0 0 18px}
+.ev:last-child{padding-bottom:0}
+.ev::before{
+  content:"";position:absolute;left:-22.5px;top:4px;width:9px;height:9px;border-radius:50%;
+  background:var(--surface);border:2px solid var(--mute);
+}
+.ev.good::before{border-color:var(--ok)}
+.ev.warn::before{border-color:var(--warn)}
+.ev.bad::before{border-color:var(--bad)}
+.ev .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.ev .ttl{font-size:13.5px;font-weight:500}
+.ev .tm{font-size:10.5px;color:var(--mute);white-space:nowrap}
+.ev .sb{font-size:11.5px;color:var(--dim);margin-top:3px}
+.ev .sb b{color:var(--ok)}
+.ev .sb b.neg{color:var(--bad)}
+.empty-msg{font-size:12px;color:var(--mute);padding:6px 2px}
+
+/* ---------- chart ---------- */
+.chart-tabs{display:flex;gap:5px}
+.ct{font-size:10.5px;padding:5px 10px;border-radius:7px;background:#ffffff08;color:var(--mute);cursor:pointer;font-weight:600;border:1px solid transparent;font-family:inherit}
+.ct.on{background:#a855f71f;color:#dcbcff;border-color:#a855f744}
+.bars{display:flex;align-items:flex-end;gap:5px;height:112px;margin-top:16px}
+.bar{flex:1;border-radius:4px 4px 0 0;background:var(--grad);opacity:.8;min-height:2px}
+
+/* ---------- validator rows ---------- */
+.vrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.vrow:last-child{border-bottom:none}
+.vn{
+  width:30px;height:30px;border-radius:9px;flex:none;
+  background:#a855f716;border:1px solid #a855f72e;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:600;color:#cfa8ff;
+}
+.vinfo{flex:1;min-width:0}
+.vinfo .a{font-size:13px;font-weight:500}
+.vinfo .b{font-size:10.5px;color:var(--mute);margin-top:2px}
+.vright{text-align:right;flex:none}
+.vright .a{font-size:13px;font-weight:600;color:var(--ok)}
+.vright .b{font-size:10.5px;color:var(--mute);margin-top:2px}
+
+/* ---------- node ---------- */
+.nrow{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.nrow:last-child{border-bottom:none}
+.nrow .l{font-size:13px;color:var(--dim)}
+.nrow .r{font-size:13.5px;font-weight:600}
+.nrow .r small{font-size:11px;color:var(--mute);font-weight:400;display:block;margin-top:2px;text-align:right}
+.meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px}
+.meter i{display:block;height:100%;background:var(--grad);width:0%}
+
+.note{
+  background:#f5b5440e;border:1px solid #f5b54426;border-radius:12px;
+  padding:13px 14px;font-size:11.5px;color:#f2d9a8;line-height:1.6;
+}
+.note b{color:var(--warn)}
+.note.stale{background:#ff5c7a0e;border-color:#ff5c7a33;color:#ffc3ce;margin-bottom:10px;display:none}
+.note.stale b{color:var(--bad)}
+
+/* ---------- tools ---------- */
+.sim-val{font-size:30px;font-weight:700;letter-spacing:-1px;margin:4px 0 2px}
+.sim-lbl{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+input[type=range]{
+  -webkit-appearance:none;width:100%;height:4px;border-radius:3px;
+  background:var(--line);
+  margin:20px 0 8px;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+  background:var(--txt);cursor:pointer;box-shadow:0 0 0 3px var(--bg),0 0 12px #a855f7aa;
+}
+input[type=text].fld{
+  width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;
+  color:var(--txt);font-family:inherit;font-size:13px;padding:11px 12px;margin-top:6px;
+}
+.ticks{display:flex;justify-content:space-between;font-size:10px;color:var(--mute)}
+.scn{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.scn:last-child{border-bottom:none}
+.scn .l .a{font-size:13px;font-weight:500}
+.scn .l .b{font-size:10.5px;color:var(--mute);margin-top:2px}
+.scn .r{font-size:14px;font-weight:600;text-align:right}
+.scn .r small{display:block;font-size:10.5px;color:var(--mute);font-weight:400;margin-top:2px}
+.btn{
+  width:100%;padding:13px;border-radius:12px;background:var(--surface-2);
+  border:1px solid var(--line);color:var(--txt);font-family:inherit;font-size:13px;
+  font-weight:500;cursor:pointer;margin-top:4px;
+}
+.btn:hover{border-color:#a855f755}
+.toggle{width:38px;height:22px;border-radius:12px;background:var(--line);border:none;position:relative;cursor:pointer;flex:none}
+.toggle.on{background:#38d98a44}
+.toggle i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--mute);transition:transform .15s}
+.toggle.on i{background:var(--ok);transform:translateX(16px)}
+
+.foot{text-align:center;font-size:10.5px;color:var(--mute);margin-top:32px;line-height:1.7}
+
+/* ---------- PIN ---------- */
+#pinview{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
+#pinview.off{display:none}
+.pinbox{width:100%;max-width:300px;text-align:center}
+.pinbox .mark{width:44px;height:44px;border-radius:13px;background:var(--grad);margin:0 auto 18px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#12081c;font-size:17px}
+.pinbox h2{font-size:19px;font-weight:600;margin-bottom:5px}
+.pinbox p{font-size:12.5px;color:var(--mute);margin-bottom:18px}
+.pinerr{font-size:12px;color:var(--bad);min-height:16px;margin-bottom:8px}
+.dots{display:flex;gap:13px;justify-content:center;margin-bottom:30px}
+.dot{width:12px;height:12px;border-radius:50%;border:1.5px solid #a855f755}
+.dot.f{background:var(--grad);border-color:transparent}
+.dots.shake{animation:shake .3s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@media(prefers-reduced-motion:reduce){.dots.shake{animation:none}}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pk{aspect-ratio:1.25;border-radius:14px;background:var(--surface);border:1px solid var(--line);font-size:20px;font-weight:500;color:var(--txt);font-family:inherit;cursor:pointer}
+.pk:active{background:var(--surface-2)}
+.pk.sm{font-size:13px;color:var(--mute)}
+.pk:disabled{opacity:.4}
+
+#appview{display:none}
+#appview.on{display:block}
+</style>
+</head>
+<body>
+
+<!-- ===================== PIN ===================== -->
+<div id="pinview">
+  <div class="pinbox">
+    <div class="mark">P</div>
+    <h2>Validator Dashboard</h2>
+    <p>Introduce tu PIN</p>
+    <div class="pinerr" id="pinErr"></div>
+    <div class="dots" id="pinDots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div class="pad" id="pinPad">
+      <button class="pk" data-k="1">1</button><button class="pk" data-k="2">2</button><button class="pk" data-k="3">3</button>
+      <button class="pk" data-k="4">4</button><button class="pk" data-k="5">5</button><button class="pk" data-k="6">6</button>
+      <button class="pk" data-k="7">7</button><button class="pk" data-k="8">8</button><button class="pk" data-k="9">9</button>
+      <button class="pk sm" data-k="exit">Salir</button><button class="pk" data-k="0">0</button><button class="pk sm" data-k="back">⌫</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="appview">
+
+<header class="hdr">
+  <div class="hdr-in">
+    <div class="hdr-top">
+      <button class="back" id="btnLogout"><span class="chev">‹</span> Salir</button>
+      <h1>Validator Dashboard</h1>
+      <div class="sync"><i id="syncDot"></i> <span id="syncTime">–</span></div>
+    </div>
+    <nav class="tabs">
+      <button class="tab on" data-tab="resumen">Resumen</button>
+      <button class="tab" data-tab="vals">Validadores</button>
+      <button class="tab" data-tab="nodo">Nodo</button>
+      <button class="tab" data-tab="tools">Herramientas</button>
+    </nav>
+  </div>
+</header>
+
+<div class="shell">
+
+<div class="note stale" id="staleBanner"><b>Sin datos recientes.</b> <span id="staleMsg"></span></div>
+
+<!-- ============ RESUMEN ============ -->
+<section id="resumen" class="pane on">
+
+  <div class="status" id="statusBox">
+    <div class="ring" id="statusRing">✓</div>
+    <div>
+      <div class="t" id="statusTitle">Cargando…</div>
+      <div class="s" id="statusSub">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="headline">
+    <div class="lbl">Ganado desde el inicio</div>
+    <div class="num" id="hlNum">– <span>PLS</span></div>
+    <div class="meta" id="hlMeta">&nbsp;</div>
+  </div>
+
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">Hoy</div>
+      <div class="v" id="statHoyV">–</div>
+      <div class="d" id="statHoyD">&nbsp;</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Efectividad</div>
+      <div class="v" id="statEfecV">–</div>
+      <div class="d" id="statEfecD">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- SIGNATURE: milestone line -->
+  <div class="eyebrow">Hacia dónde vas</div>
+  <div class="journey">
+    <div class="top">
+      <div class="t">Línea de hitos</div>
+      <div class="n">a tu ritmo actual</div>
+    </div>
+    <div class="track">
+      <div class="fill" id="jFill"></div>
+      <div class="mk" id="jMk1" style="left:10%"></div>
+      <div class="mk" id="jMk2" style="left:100%"></div>
+      <div class="now" id="jNow"></div>
+    </div>
+    <div class="marks">
+      <div class="mark">
+        <div class="mt">Hoy</div>
+        <div class="mv" id="jHoyV">–</div>
+        <div class="md" id="jHoyD">&nbsp;</div>
+      </div>
+      <div class="mark">
+        <div class="mt">Validador #11</div>
+        <div class="mv">32M PLS</div>
+        <div class="md" id="jV11D">&nbsp;</div>
+      </div>
+      <div class="mark">
+        <div class="mt">Break-even</div>
+        <div class="mv">320M PLS</div>
+        <div class="md" id="jBeD">&nbsp;</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Últimos 30 días</div>
+  <div class="card">
+    <div class="strip" id="strip30"></div>
+    <div class="strip-x"><span>hace 30 d</span><span>hoy</span></div>
+  </div>
+
+  <div class="eyebrow">Registro</div>
+  <div class="card">
+    <div class="feed" id="feedList"><div class="empty-msg">Cargando…</div></div>
+  </div>
+
+  <div class="eyebrow">Recompensas</div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:13.5px;font-weight:600">Acumulado</div>
+      <div class="chart-tabs" id="chartTabs">
+        <span class="ct" data-r="24h">24h</span><span class="ct on" data-r="7d">7d</span><span class="ct" data-r="30d">30d</span>
+      </div>
+    </div>
+    <div class="bars" id="rewardsBars"></div>
+  </div>
+
+  <div class="eyebrow">Propuestas de bloque</div>
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">Total</div>
+      <div class="v" id="blocksTotal">–</div>
+      <div class="d">desde el inicio</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Siguiente</div>
+      <div class="v" id="blocksNext">–</div>
+      <div class="d" id="blocksNextD">&nbsp;</div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ============ VALIDADORES ============ -->
+<section id="vals" class="pane">
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">En staking</div>
+      <div class="v" id="valStaking">–</div>
+      <div class="d" id="valStakingD">&nbsp;</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Coste de fallos</div>
+      <div class="v" id="valCoste">–</div>
+      <div class="d">estimado, atestaciones perdidas</div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Detalle</div>
+  <div class="card">
+    <div id="valRows"><div class="empty-msg">Cargando…</div></div>
+  </div>
+</section>
+
+<!-- ============ NODO ============ -->
+<section id="nodo" class="pane">
+  <div class="status" id="nodoStatusBox">
+    <div class="ring" id="nodoRing">✓</div>
+    <div>
+      <div class="t" id="nodoTitle">Cargando…</div>
+      <div class="s" id="nodoSub">&nbsp;</div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Recursos</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Temperatura CPU</div><div class="r" id="nCpu">–</div></div>
+    <div class="nrow"><div class="l">Carga</div><div class="r" id="nCarga">–</div></div>
+    <div class="nrow"><div class="l">Memoria</div><div class="r" id="nRam">–</div></div>
+    <div class="nrow"><div class="l">Disco NVMe</div><div class="r" id="nDisco">–</div></div>
+  </div>
+  <div class="meter"><i id="nDiscoBar"></i></div>
+  <div style="font-size:11px;color:var(--mute);margin-top:9px;padding:0 2px" id="nRunway">
+    Calculando runway de disco…
+  </div>
+
+  <div class="eyebrow">Sincronización</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Slot actual</div><div class="r mono" style="font-size:12.5px" id="nSlot">–</div></div>
+    <div class="nrow"><div class="l">Epoch</div><div class="r mono" style="font-size:12.5px" id="nEpoch">–</div></div>
+    <div class="nrow"><div class="l">Estado</div><div class="r" id="nSync">–</div></div>
+  </div>
+
+  <div class="eyebrow">Exposición</div>
+  <div class="note">
+    <b>Punto único de fallo.</b> Los 10 validadores dependen de una sola máquina, una conexión y un suministro eléctrico. Una caída prolongada afecta a los 10 a la vez. Coste estimado: <b id="nExpCost">–</b> por hora sin servicio.
+  </div>
+</section>
+
+<!-- ============ HERRAMIENTAS ============ -->
+<section id="tools" class="pane">
+
+  <div class="eyebrow">Simulador de precio</div>
+  <div class="card">
+    <div class="sim-lbl">Si PLS estuviera a</div>
+    <div class="sim-val" id="simPrice" style="background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">– $</div>
+    <input type="range" min="0" max="1000" value="350" id="simSlider">
+    <div class="ticks"><span>0,00001</span><span>0,0001</span><span>0,001</span></div>
+    <div style="margin-top:18px">
+      <div class="nrow"><div class="l">Valor del stake</div><div class="r" id="simStake">–</div></div>
+      <div class="nrow"><div class="l">Ganado hasta hoy</div><div class="r" id="simGanado" style="color:var(--ok)">–</div></div>
+      <div class="nrow"><div class="l">Proyección 1 año</div><div class="r" id="simProy">–</div></div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Escenarios de crecimiento</div>
+  <div class="card" id="scnCard">
+    <div class="scn">
+      <div class="l"><div class="a">Solo reinvertir</div><div class="b">sin aportar nada</div></div>
+      <div class="r" id="scn0">–<small>al validador #11</small></div>
+    </div>
+    <div class="scn">
+      <div class="l"><div class="a">+50 € al mes</div><div class="b">reinvirtiendo</div></div>
+      <div class="r" id="scn50">–<small>al validador #11</small></div>
+    </div>
+    <div class="scn">
+      <div class="l"><div class="a">+150 € al mes</div><div class="b">reinvirtiendo</div></div>
+      <div class="r" id="scn150">–<small>al validador #11</small></div>
+    </div>
+  </div>
+
+  <div class="eyebrow">Fiscalidad</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Ganado en <span id="fiscYear">–</span></div><div class="r" id="fiscGanado">–</div></div>
+    <div style="margin-top:10px">
+      <div class="sim-lbl">Precio medio de compra ($/PLS, opcional)</div>
+      <input type="text" class="fld mono" id="fiscCosto" placeholder="ej. 0.00006" inputmode="decimal">
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn" id="btnCsv">Exportar <span id="fiscYear2">–</span> a CSV</button>
+    </div>
+  </div>
+
+  <div class="eyebrow">Avisos</div>
+  <div class="card">
+    <div class="nrow"><div class="l">Validador inactivo</div><button class="toggle on" data-alert="inactivo"><i></i></button></div>
+    <div class="nrow"><div class="l">Nodo desincronizado</div><button class="toggle on" data-alert="desync"><i></i></button></div>
+    <div class="nrow"><div class="l">Disco &gt; 85 %</div><button class="toggle on" data-alert="disco"><i></i></button></div>
+    <div class="nrow"><div class="l">Bloque propuesto</div><button class="toggle" data-alert="bloque"><i></i></button></div>
+    <div style="font-size:11px;color:var(--mute);margin-top:12px;line-height:1.6">
+      Los avisos los envía el NUC directamente a Telegram, no el dashboard. Estos interruptores se guardan solo en este dispositivo, como recordatorio de qué tienes activado allí.
+    </div>
+  </div>
+
+</section>
+
+<div class="foot">
+  PLSDASH · Validator Dashboard
+</div>
+
+</div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  const API = '/api/val';
+  const TOTAL_RED_VALIDADORES = 109559; // aprox. red completa, ver BRIEF-CLAUDE-CODE.md
+  const SLOT_SECONDS = 12; // asunción: slot de beacon chain tipo Ethereum; ajustar si PulseChain usa otro valor
+
+  let estado = null;
+  let daily = [];       // historico rango=todo (resolución diaria)
+  let snapshots24h = []; // historico rango=24h (resolución horaria)
+  let lastFetch = 0;
+  let currentChartRange = '7d';
+
+  // ---------- utilidades ----------
+  const $ = id => document.getElementById(id);
+  const fmt = (n, d = 0) => Number(n ?? 0).toLocaleString('es-ES', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmtCompact = n => {
+    n = Number(n ?? 0);
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toLocaleString('es-ES', { maximumFractionDigits: 2 }) + 'M';
+    if (Math.abs(n) >= 1e3) return (n / 1e3).toLocaleString('es-ES', { maximumFractionDigits: 1 }) + 'K';
+    return fmt(n);
+  };
+  const relTime = ts => {
+    const s = Math.floor(Date.now() / 1000) - ts;
+    if (s < 3600) return `hace ${Math.max(1, Math.floor(s / 60))} min`;
+    if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+    return `hace ${Math.floor(s / 86400)} d`;
+  };
+
+  async function api(path, opts) {
+    const res = await fetch(API + path, { credentials: 'same-origin', ...opts });
+    if (res.status === 401) { showPin('Sesión caducada, introduce el PIN de nuevo.'); throw new Error('401'); }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  // ---------- PIN ----------
+  let pinDigits = '';
+  const pinDots = () => $('pinDots').children;
+
+  function pinRender() {
+    const dots = pinDots();
+    for (let i = 0; i < dots.length; i++) dots[i].classList.toggle('f', i < pinDigits.length);
+  }
+
+  function pinReset(msg) {
+    pinDigits = '';
+    pinRender();
+    $('pinErr').textContent = msg || '';
+    if (msg) {
+      const d = $('pinDots');
+      d.classList.remove('shake'); void d.offsetWidth; d.classList.add('shake');
+    }
+  }
+
+  async function pinSubmit() {
+    document.querySelectorAll('#pinPad .pk').forEach(b => b.disabled = true);
+    try {
+      const res = await fetch(API + '/auth', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ pin: pinDigits }),
+      });
+      if (res.ok) {
+        $('pinview').classList.add('off');
+        $('appview').classList.add('on');
+        boot();
+      } else {
+        pinReset('PIN incorrecto, prueba otra vez.');
+      }
+    } catch {
+      pinReset('No se pudo conectar. Revisa tu conexión.');
+    } finally {
+      document.querySelectorAll('#pinPad .pk').forEach(b => b.disabled = false);
+    }
+  }
+
+  $('pinPad').addEventListener('click', e => {
+    const btn = e.target.closest('.pk');
+    if (!btn) return;
+    const k = btn.dataset.k;
+    if (k === 'back') { pinDigits = pinDigits.slice(0, -1); pinRender(); return; }
+    if (k === 'exit') { pinDigits = ''; pinRender(); return; }
+    if (pinDigits.length >= 4) return;
+    pinDigits += k;
+    pinRender();
+    $('pinErr').textContent = '';
+    if (pinDigits.length === 4) pinSubmit();
+  });
+
+  function showPin(msg) {
+    $('appview').classList.remove('on');
+    $('pinview').classList.remove('off');
+    pinReset(msg || '');
+  }
+
+  $('btnLogout').addEventListener('click', async () => {
+    try { await fetch(API + '/logout', { method: 'POST', credentials: 'same-origin' }); } catch {}
+    showPin('');
+  });
+
+  // ---------- tabs ----------
+  document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
+    t.classList.add('on');
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('on'));
+    $(t.dataset.tab).classList.add('on');
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }));
+
+  // ---------- render: estado global / resumen ----------
+  const SALUD_MAP = {
+    ok:       { color: '#38d98a', icon: '✓', label: 'Todo bien' },
+    aviso:    { color: '#f5b544', icon: '!', label: 'Aviso' },
+    critico:  { color: '#ff5c7a', icon: '✕', label: 'Crítico' },
+    sin_datos:{ color: '#6b5a86', icon: '?', label: 'Sin datos' },
+  };
+
+  function paintStatus(boxEl, ringEl, salud) {
+    const s = SALUD_MAP[salud] || SALUD_MAP.sin_datos;
+    ringEl.style.borderColor = s.color;
+    ringEl.style.color = s.color;
+    ringEl.textContent = s.icon;
+    boxEl.style.borderColor = s.color + '2e';
+    boxEl.style.background = `linear-gradient(160deg, ${s.color}12, ${s.color}05)`;
+    return s;
+  }
+
+  function renderResumen() {
+    const v = estado.validadores, n = estado.nodo;
+
+    const s = paintStatus($('statusBox'), $('statusRing'), estado.salud);
+    $('statusTitle').textContent = `${v.activos} de ${v.total} validando`;
+    $('statusSub').textContent = s.label === 'Todo bien' ? 'Sin incidencias detectadas' : s.label;
+
+    $('hlNum').innerHTML = `${fmt(v.ganado_total)} <span>PLS</span>`;
+    const usdTotal = fiscPrice() ? v.ganado_total * fiscPrice() : null;
+    $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '') + `<b>+${fmt(v.pls_hora)} PLS/h</b> ahora mismo`;
+
+    // "Hoy": usamos el último día de `daily` si coincide con hoy, si no el ritmo actual * 24h como estimación
+    const today = new Date().toISOString().slice(0, 10);
+    const hoyRow = daily.find(d => d.fecha === today);
+    const hoyGanado = hoyRow ? hoyRow.ganado_dia : v.pls_dia;
+    $('statHoyV').innerHTML = `${fmt(hoyGanado)} <small>PLS</small>`;
+    $('statHoyD').textContent = hoyRow ? 'confirmado' : 'estimado al ritmo actual';
+
+    const efecs = (v.detalle || []).map(d => d.ganado);
+    const maxEfec = Math.max(1, ...efecs);
+    const efecPct = v.detalle && v.detalle.length
+      ? v.detalle.reduce((acc, d) => acc + (d.ganado / maxEfec) * 100, 0) / v.detalle.length
+      : null;
+    $('statEfecV').innerHTML = efecPct !== null ? `${fmt(efecPct, 1)}<small>%</small>` : '–';
+    $('statEfecD').textContent = 'validador líder = 100%';
+
+    // línea de hitos: dominio 0 → 320M (break-even), hito intermedio a 32M (validador #11)
+    const BE = 320_000_000, V11 = 32_000_000;
+    const progressPct = Math.min(100, (v.ganado_total / BE) * 100);
+    $('jFill').style.width = progressPct + '%';
+    $('jNow').style.left = progressPct + '%';
+    $('jHoyV').textContent = `${fmtCompact(v.ganado_total)} PLS`;
+    $('jHoyD').textContent = `${fmt(v.horas_activo, 1)} h activo`;
+
+    if (v.pls_dia > 0) {
+      const diasV11 = Math.max(0, (V11 - v.ganado_total) / v.pls_dia);
+      const diasBE = Math.max(0, (BE - v.ganado_total) / v.pls_dia);
+      $('jV11D').textContent = v.ganado_total >= V11 ? 'alcanzado' : `en ~${fmt(diasV11)} días`;
+      $('jBeD').textContent = v.ganado_total >= BE ? 'alcanzado' : `en ~${fmt(diasBE / 365, 1)} años`;
+    } else {
+      $('jV11D').textContent = 'ritmo actual: 0';
+      $('jBeD').textContent = 'ritmo actual: 0';
+    }
+
+    // franja 30 días
+    const stripEl = $('strip30');
+    stripEl.innerHTML = '';
+    const last30 = daily.slice(-30);
+    const pad = 30 - last30.length;
+    for (let i = 0; i < pad; i++) {
+      const sq = document.createElement('div'); sq.className = 'sq empty'; stripEl.appendChild(sq);
+    }
+    last30.forEach(d => {
+      const sq = document.createElement('div');
+      sq.className = 'sq' + (d.salud === 'aviso' ? ' w' : (d.salud === 'critico' ? ' b' : ''));
+      sq.title = d.fecha;
+      stripEl.appendChild(sq);
+    });
+
+    // propuestas de bloque
+    const totalBloques = daily.reduce((acc, d) => acc + (d.bloques || 0), 0);
+    $('blocksTotal').textContent = totalBloques;
+    if (v.total > 0) {
+      const probPorSlot = v.total / TOTAL_RED_VALIDADORES;
+      const slotsPorDia = 86400 / SLOT_SECONDS;
+      const diasSiguiente = 1 / (probPorSlot * slotsPorDia);
+      $('blocksNext').innerHTML = `~${fmt(diasSiguiente, diasSiguiente < 2 ? 1 : 0)} <small>días</small>`;
+      $('blocksNextD').textContent = `${v.total} de ${fmt(TOTAL_RED_VALIDADORES)} validadores (estimado)`;
+    }
+
+    renderChart();
+  }
+
+  function renderChart() {
+    const bars = $('rewardsBars');
+    bars.innerHTML = '';
+    let values = [];
+    if (currentChartRange === '24h') {
+      // snapshots.ganado es acumulado; convertimos a producción por hora (delta)
+      for (let i = 1; i < snapshots24h.length; i++) {
+        values.push(Math.max(0, snapshots24h[i].ganado - snapshots24h[i - 1].ganado));
+      }
+    } else {
+      const n = currentChartRange === '7d' ? 7 : 30;
+      values = daily.slice(-n).map(d => d.ganado_dia || 0);
+    }
+    if (!values.length) { bars.innerHTML = '<div class="empty-msg">Todavía no hay suficiente historial.</div>'; return; }
+    const max = Math.max(1, ...values);
+    values.forEach(v => {
+      const bar = document.createElement('div');
+      bar.className = 'bar';
+      bar.style.height = Math.max(2, (v / max) * 100) + '%';
+      bars.appendChild(bar);
+    });
+  }
+
+  $('chartTabs').addEventListener('click', e => {
+    const el = e.target.closest('.ct');
+    if (!el) return;
+    document.querySelectorAll('.ct').forEach(x => x.classList.remove('on'));
+    el.classList.add('on');
+    currentChartRange = el.dataset.r;
+    renderChart();
+  });
+
+  // ---------- render: eventos ----------
+  const EV_GOOD = new Set(['activacion', 'bloque', 'recuperacion', 'resync']);
+  const EV_BAD = new Set(['slash']);
+
+  function renderEventos(eventos) {
+    const el = $('feedList');
+    if (!eventos.length) { el.innerHTML = '<div class="empty-msg">Sin eventos todavía.</div>'; return; }
+    el.innerHTML = '';
+    eventos.forEach(ev => {
+      const cls = EV_BAD.has(ev.tipo) ? 'bad' : (EV_GOOD.has(ev.tipo) ? 'good' : 'warn');
+      const div = document.createElement('div');
+      div.className = 'ev ' + cls;
+      const plsPart = ev.pls != null
+        ? ` · <b class="${ev.pls < 0 ? 'neg' : ''}">${ev.pls >= 0 ? '+' : ''}${fmt(ev.pls)} PLS</b>`
+        : '';
+      div.innerHTML = `<div class="h"><div class="ttl">${ev.titulo}</div><div class="tm">${relTime(ev.ts)}</div></div>
+        <div class="sb">${ev.detalle || ''}${plsPart}</div>`;
+      el.appendChild(div);
+    });
+  }
+
+  // ---------- render: validadores ----------
+  function renderValidadores() {
+    const v = estado.validadores;
+    $('valStaking').innerHTML = `${fmtCompact(v.stake_total)} <small>PLS</small>`;
+    $('valStakingD').textContent = `${v.total} validadores`;
+
+    const detalle = v.detalle || [];
+    const maxGanado = Math.max(1, ...detalle.map(d => d.ganado));
+    const costeFallos = detalle.reduce((acc, d) => acc + Math.max(0, maxGanado - d.ganado), 0);
+    $('valCoste').innerHTML = `−${fmt(costeFallos)} <small>PLS</small>`;
+
+    const rows = $('valRows');
+    if (!detalle.length) { rows.innerHTML = '<div class="empty-msg">Sin datos de validadores.</div>'; return; }
+    rows.innerHTML = '';
+    detalle.forEach(d => {
+      const efec = ((d.ganado / maxGanado) * 100).toFixed(1);
+      const row = document.createElement('div');
+      row.className = 'vrow';
+      row.innerHTML = `
+        <div class="vn">${String(d.indice).slice(-2)}</div>
+        <div class="vinfo"><div class="a">${d.indice}</div><div class="b mono">${d.pubkey_corta} · ${efec}%</div></div>
+        <div class="vright"><div class="a">+${fmt(d.ganado)}</div><div class="b">${fmtCompact(d.balance)}</div></div>`;
+      rows.appendChild(row);
+    });
+  }
+
+  // ---------- render: nodo ----------
+  function renderNodo() {
+    const n = estado.nodo, v = estado.validadores;
+    const salud = !n.sincronizado ? 'critico' : (n.optimistic ? 'aviso' : 'ok');
+    paintStatus($('nodoStatusBox'), $('nodoRing'), salud);
+    $('nodoTitle').textContent = n.sincronizado ? 'Nodo sincronizado' : 'Nodo desincronizado';
+    $('nodoSub').textContent = `${n.peers} peers · en línea ${fmt(n.uptime_horas, 1)} h`;
+
+    $('nCpu').textContent = `${fmt(n.temp_cpu, 1)} °C`;
+    $('nCarga').textContent = `${fmt(n.carga_pct, 1)} %`;
+    $('nRam').textContent = `${fmt(n.ram_total_gb - n.ram_libre_gb, 1)} / ${fmt(n.ram_total_gb, 1)} GB`;
+    $('nDisco').innerHTML = `${fmt(n.disco_usado_pct, 1)} %<small>${fmt(n.disco_libre_gb, 1)} GB libres</small>`;
+    $('nDiscoBar').style.width = n.disco_usado_pct + '%';
+
+    $('nSlot').textContent = fmt(n.head_slot);
+    $('nEpoch').textContent = fmt(n.epoch_actual);
+    $('nSync').textContent = n.optimistic ? 'Optimistic' : 'Verified';
+    $('nSync').style.color = n.optimistic ? 'var(--warn)' : 'var(--ok)';
+
+    // runway de disco: regresión simple sobre `daily.disco_pct`
+    if (daily.length >= 3) {
+      const first = daily[0], last = daily[daily.length - 1];
+      const dias = Math.max(1, (new Date(last.fecha) - new Date(first.fecha)) / 86400000);
+      const pctPorDia = (last.disco_pct - first.disco_pct) / dias;
+      if (pctPorDia > 0.01) {
+        const pctSemana = pctPorDia * 7;
+        const diasHasta95 = (95 - n.disco_usado_pct) / pctPorDia;
+        const fecha = new Date(Date.now() + diasHasta95 * 86400000);
+        const fechaTxt = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+        $('nRunway').innerHTML = `Crece ~${fmt(pctSemana, 1)}%/semana · prune recomendado hacia <b style="color:var(--dim)">${fechaTxt}</b>`;
+      } else {
+        $('nRunway').textContent = 'Uso de disco estable, sin crecimiento significativo detectado.';
+      }
+    } else {
+      $('nRunway').textContent = 'Necesitamos más historial (unos días) para estimar el ritmo de crecimiento del disco.';
+    }
+
+    $('nExpCost').textContent = `~${fmt(v.pls_hora)} PLS`;
+  }
+
+  // ---------- herramientas ----------
+  let simPricePerUnit = 0.00007; // se ajusta al cargar via DexScreener si es posible
+
+  const SIM_MIN = 0.000005, SIM_MAX = 0.002;
+  function priceFromSlider(val) {
+    const t = val / 1000;
+    return SIM_MIN * Math.pow(SIM_MAX / SIM_MIN, t);
+  }
+  function sliderFromPrice(price) {
+    const t = Math.log(price / SIM_MIN) / Math.log(SIM_MAX / SIM_MIN);
+    return Math.max(0, Math.min(1000, Math.round(t * 1000)));
+  }
+
+  function fiscPrice() {
+    const v = $('fiscCosto') ? $('fiscCosto').value.replace(',', '.') : '';
+    const n = Number(v);
+    return n > 0 ? n : simPricePerUnit;
+  }
+
+  function renderTools() {
+    if (!estado) return;
+    const v = estado.validadores;
+    const price = simPricePerUnit;
+
+    $('simPrice').textContent = `${price < 0.0001 ? price.toFixed(7) : price.toFixed(5)} $`;
+    $('simStake').textContent = `${fmt(v.stake_total * price, 2)} $`;
+    $('simGanado').textContent = `${fmt(v.ganado_total * price, 2)} $`;
+    const proy = (v.ganado_total + v.pls_dia * 365) * price;
+    $('simProy').textContent = `${fmt(proy, 2)} $`;
+
+    // escenarios: PLS/mes aportado = (eur/precio) ; combinado con ritmo actual
+    const V11 = 32_000_000;
+    const restante = Math.max(0, V11 - v.ganado_total);
+    [0, 50, 150].forEach(eur => {
+      const plsMes = price > 0 ? eur / price : 0;
+      const plsDiaExtra = plsMes / 30.44;
+      const ritmo = v.pls_dia + plsDiaExtra;
+      const dias = ritmo > 0 ? restante / ritmo : Infinity;
+      const el = $('scn' + eur);
+      el.innerHTML = (isFinite(dias) ? `${fmt(dias)} d` : '–') + '<small>al validador #11</small>';
+    });
+
+    // fiscalidad
+    const year = new Date().getFullYear().toString();
+    $('fiscYear').textContent = year;
+    $('fiscYear2').textContent = year;
+    const ganadoYear = daily.filter(d => d.fecha.startsWith(year)).reduce((acc, d) => acc + (d.ganado_dia || 0), 0);
+    const ganadoMostrar = ganadoYear || v.ganado_total;
+    $('fiscGanado').innerHTML = `${fmt(ganadoMostrar)} PLS<small style="display:block;color:var(--mute);font-size:11px">≈ ${fmt(ganadoMostrar * fiscPrice(), 2)} $</small>`;
+  }
+
+  $('simSlider').addEventListener('input', e => {
+    simPricePerUnit = priceFromSlider(Number(e.target.value));
+    renderTools();
+  });
+  $('fiscCosto').addEventListener('input', renderTools);
+
+  $('btnCsv').addEventListener('click', () => {
+    const year = new Date().getFullYear().toString();
+    const rows = daily.filter(d => d.fecha.startsWith(year));
+    const header = 'fecha,ganado_dia,ganado_acum,apr_medio,salud\n';
+    const body = rows.map(d => [d.fecha, d.ganado_dia, d.ganado_acum, d.apr_medio, d.salud].join(',')).join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `validadores-${year}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  document.querySelectorAll('.toggle').forEach(t => {
+    const key = 'val_alert_' + t.dataset.alert;
+    const saved = localStorage.getItem(key);
+    if (saved !== null) t.classList.toggle('on', saved === '1');
+    t.addEventListener('click', () => {
+      t.classList.toggle('on');
+      localStorage.setItem(key, t.classList.contains('on') ? '1' : '0');
+    });
+  });
+
+  // ---------- ciclo de vida ----------
+  let syncTimer = null;
+  function startSyncClock() {
+    clearInterval(syncTimer);
+    syncTimer = setInterval(() => {
+      const secs = Math.floor((Date.now() - lastFetch) / 1000);
+      $('syncTime').textContent = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m`;
+    }, 1000);
+  }
+
+  function checkStale() {
+    if (!estado) return;
+    const ageMin = (Date.now() / 1000 - estado.generado_ts) / 60;
+    const dot = $('syncDot');
+    if (ageMin > 15) {
+      $('staleBanner').style.display = 'block';
+      $('staleMsg').textContent = `Última actualización hace ${fmt(ageMin, 0)} min — el NUC podría no estar reportando.`;
+      dot.className = 'bad';
+    } else if (ageMin > 5) {
+      $('staleBanner').style.display = 'none';
+      dot.className = 'warn';
+    } else {
+      $('staleBanner').style.display = 'none';
+      dot.className = '';
+    }
+  }
+
+  async function loadPrice() {
+    try {
+      const res = await fetch('https://api.dexscreener.com/latest/dex/search?q=WPLS');
+      const data = await res.json();
+      const price = data?.pairs?.[0]?.priceUsd;
+      if (price) {
+        simPricePerUnit = Number(price);
+        $('simSlider').value = sliderFromPrice(simPricePerUnit);
+      }
+    } catch { /* mantiene el valor por defecto si falla */ }
+  }
+
+  async function refresh() {
+    const [est, hist24, histTodo, ev] = await Promise.all([
+      api('/estado'),
+      api('/historico?rango=24h'),
+      api('/historico?rango=todo'),
+      api('/eventos?limit=15'),
+    ]);
+    estado = est;
+    snapshots24h = hist24.datos || [];
+    daily = histTodo.datos || [];
+    lastFetch = Date.now();
+
+    renderResumen();
+    renderValidadores();
+    renderNodo();
+    renderTools();
+    renderEventos(ev.eventos || []);
+    checkStale();
+  }
+
+  async function boot() {
+    startSyncClock();
+    await loadPrice();
+    try {
+      await refresh();
+    } catch (e) {
+      if (e.message !== '401') console.error(e);
+    }
+    clearInterval(window.__valPoll);
+    window.__valPoll = setInterval(() => refresh().catch(e => { if (e.message !== '401') console.error(e); }), 60000);
+  }
+
+  // arranque: comprobar si ya hay sesión válida (cookie de una visita anterior)
+  (async function initial() {
+    try {
+      await api('/estado');
+      $('pinview').classList.add('off');
+      $('appview').classList.add('on');
+      boot();
+    } catch {
+      // sin sesión válida: se queda en la pantalla de PIN
+    }
+  })();
+})();
+</script>
+</body>
+</html>
