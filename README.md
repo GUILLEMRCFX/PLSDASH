@@ -69,8 +69,22 @@ Contexto completo en `BRIEF-CLAUDE-CODE.md`.
 - `GET /api/val/estado` → JSON de KV (`validator:estado`) tal cual.
 - `GET /api/val/historico?rango=24h|7d|30d|todo` → series de D1 (`snapshots`
   para 24h, `daily` para el resto).
-- `GET /api/val/eventos?limit=N` → últimos N eventos de D1 (`eventos`,
-  por defecto 15, máx 100).
+- `GET /api/val/eventos?limit=N&tipos=caida,slash` → últimos N eventos de D1
+  (`eventos`, por defecto 15, máx 100). `tipos` filtra por tipo de evento y se
+  usa para localizar el último incidente sin traerse todo el registro.
+- `GET /api/val/validadores` → histórico de `validador_diario` agregado por
+  fecha y por validador. Es la base de la media histórica de efectividad.
+
+### Notas sobre los datos
+
+- **El ritmo de recompensas no se toma de `pls_dia`.** Ese campo es la media
+  desde la activación e incluye el periodo en que los validadores aún estaban
+  en cola, así que subestima el ritmo real hasta 10× durante las primeras
+  semanas. El panel lo mide sobre días cerrados de `daily` y, mientras no los
+  haya, sobre `snapshots`, marcándolo como provisional.
+- **`snapshots.ganado` es acumulado y solo puede subir.** Se han observado
+  filas con `0` escritas cuando falla la lectura del nodo; el frontend las
+  descarta para que no generen picos falsos en la gráfica.
 
 Todas menos `/auth` pasan por `functions/api/val/_middleware.js`, que exige
 cookie de sesión válida antes de ejecutar la Function.

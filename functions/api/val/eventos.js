@@ -3,10 +3,19 @@
  *
  * Requiere sesión válida (ver _middleware.js).
  * ?limit= número de eventos a devolver, orden descendente (por defecto 15, máx 100)
+ * ?tipos= lista separada por comas para filtrar (ej. `caida,slash`). Se usa
+ *         para localizar el último incidente sin arrastrar todo el registro.
  */
 
 const DEFAULT_LIMIT = 15;
 const MAX_LIMIT = 100;
+
+// Los tipos que escribe push.py; filtrar contra esta lista evita construir
+// SQL con texto arbitrario de la query string.
+const TIPOS_VALIDOS = new Set([
+  'activacion', 'bloque', 'caida', 'recuperacion', 'reinicio',
+  'desync', 'resync', 'slash', 'aviso',
+]);
 
 const err = (msg, status) =>
   new Response(JSON.stringify({ error: msg }), {
@@ -22,10 +31,17 @@ export async function onRequestGet({ request, env }) {
   if (!Number.isInteger(limit) || limit <= 0) limit = DEFAULT_LIMIT;
   limit = Math.min(limit, MAX_LIMIT);
 
-  const { results } = await env.VALIDATOR_DB
-    .prepare('SELECT id, ts, tipo, titulo, detalle, pls, validador FROM eventos ORDER BY ts DESC LIMIT ?')
-    .bind(limit)
-    .all();
+  const tipos = (url.searchParams.get('tipos') || '')
+    .split(',').map(t => t.trim()).filter(t => TIPOS_VALIDOS.has(t));
+
+  const campos = 'SELECT id, ts, tipo, titulo, detalle, pls, validador FROM eventos';
+  const stmt = tipos.length
+    ? env.VALIDATOR_DB
+        .prepare(`${campos} WHERE tipo IN (${tipos.map(() => '?').join(',')}) ORDER BY ts DESC LIMIT ?`)
+        .bind(...tipos, limit)
+    : env.VALIDATOR_DB.prepare(`${campos} ORDER BY ts DESC LIMIT ?`).bind(limit);
+
+  const { results } = await stmt.all();
 
   return new Response(JSON.stringify({ eventos: results }), {
     status: 200,

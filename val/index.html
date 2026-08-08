@@ -365,7 +365,7 @@ input[type=text].fld{
   <div class="journey">
     <div class="top">
       <div class="t">Línea de hitos</div>
-      <div class="n">a tu ritmo actual</div>
+      <div class="n" id="jBase">a tu ritmo actual</div>
     </div>
     <div class="track">
       <div class="fill" id="jFill"></div>
@@ -480,6 +480,20 @@ input[type=text].fld{
     <div class="nrow"><div class="l">Estado</div><div class="r" id="nSync">–</div></div>
   </div>
 
+  <div class="eyebrow">Disponibilidad</div>
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">Tiempo caído</div>
+      <div class="v" id="nDownTime">–</div>
+      <div class="d" id="nDownCost">&nbsp;</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Disponibilidad</div>
+      <div class="v" id="nUptimePct">–</div>
+      <div class="d" id="nUptimeD">&nbsp;</div>
+    </div>
+  </div>
+
   <div class="eyebrow">Exposición</div>
   <div class="note">
     <b>Punto único de fallo.</b> Los 10 validadores dependen de una sola máquina, una conexión y un suministro eléctrico. Una caída prolongada afecta a los 10 a la vez. Coste estimado: <b id="nExpCost">–</b> por hora sin servicio.
@@ -569,10 +583,16 @@ input[type=text].fld{
   const WPLS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27';
 
   let estado = null;
-  let daily = [];       // historico rango=todo (resolución diaria)
+  let daily = [];        // historico rango=todo (resolución diaria)
   let snapshots24h = []; // historico rango=24h (resolución horaria)
+  let valHistorico = { por_dia: [], por_validador: [] }; // validador_diario
+  let ultimoIncidente = null; // evento más reciente que cuenta como incidencia
   let lastFetch = 0;
   let currentChartRange = '7d';
+
+  // Lo que rompe la racha de "sin incidencias": caídas, slashes, desincronizaciones
+  // y reinicios. Un bloque propuesto o una activación no son incidencias.
+  const TIPOS_INCIDENCIA = ['caida', 'slash', 'desync', 'reinicio', 'aviso'];
 
   // ---------- utilidades ----------
   const $ = id => document.getElementById(id);
@@ -695,6 +715,73 @@ input[type=text].fld{
     sin_datos:{ color: '#6b5a86', icon: '?', label: 'Sin datos' },
   };
 
+  // Efectividad = lo que ha ganado cada validador frente al mejor del grupo.
+  // No es la efectividad de atestación real (el collector no la expone), sino
+  // rendimiento relativo dentro de tu propio grupo, que es lo que el brief pide.
+  function efectividadActual() {
+    const detalle = estado?.validadores?.detalle || [];
+    if (!detalle.length) return null;
+    const max = Math.max(...detalle.map(d => d.ganado));
+    if (!(max > 0)) return null;
+    return detalle.reduce((acc, d) => acc + (d.ganado / max) * 100, 0) / detalle.length;
+  }
+
+  function efectividadMediaHistorica() {
+    // Se descarta el día en curso: aún está a medias y hundiría la media.
+    const hoy = new Date().toISOString().slice(0, 10);
+    const dias = valHistorico.por_dia.filter(d => d.fecha !== hoy && d.maximo > 0);
+    if (!dias.length) return null;
+    return dias.reduce((acc, d) => acc + (d.media / d.maximo) * 100, 0) / dias.length;
+  }
+
+  // "Sin incidencias en 14 días" tiene que ser un dato, no una frase fija:
+  // se mide desde el último incidente real, o desde la activación si no ha
+  // habido ninguno todavía.
+  function textoIncidencias() {
+    const ref = ultimoIncidente
+      ? ultimoIncidente.ts
+      : (estado.validadores.activacion_utc ? Date.parse(estado.validadores.activacion_utc) / 1000 : null);
+    if (!ref) return 'Sin incidencias detectadas';
+
+    const horas = (Date.now() / 1000 - ref) / 3600;
+    const periodo = horas < 48 ? `${fmt(horas, 0)} h` : `${fmt(horas / 24, 0)} días`;
+    return ultimoIncidente
+      ? `Sin incidencias desde hace ${periodo}`
+      : `Sin incidencias en ${periodo} activo`;
+  }
+
+  // Ritmo de recompensas. `pls_dia` de KV es la media desde la activación, y
+  // durante las primeras semanas está dominada por el periodo en que los
+  // validadores aún entraban en cola ganando casi nada: subestima el ritmo
+  // real hasta 10 veces, y de ahí cuelgan los hitos y las proyecciones. Se
+  // mide sobre datos recientes y solo se usa KV como último recurso.
+  //
+  // Las propuestas de bloque son esporádicas y grandes: una ventana corta que
+  // pille una infla el ritmo, y una que no la pille lo desinfla. Por eso se
+  // marca como provisional mientras la ventana sea de horas y no de días.
+  function ritmoDiario() {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const cerrados = daily.filter(d => d.fecha !== hoy && d.ganado_dia > 0).slice(-7);
+    if (cerrados.length >= 2) {
+      return {
+        pls_dia: cerrados.reduce((a, d) => a + d.ganado_dia, 0) / cerrados.length,
+        base: `media de ${cerrados.length} días`,
+        provisional: false,
+      };
+    }
+
+    const s = snapshotsLimpios();
+    if (s.length >= 2) {
+      const horas = (s[s.length - 1].ts - s[0].ts) / 3600;
+      const delta = s[s.length - 1].ganado - s[0].ganado;
+      if (horas >= 2 && delta > 0) {
+        return { pls_dia: (delta / horas) * 24, base: `medido en ${fmt(horas, 0)} h`, provisional: true };
+      }
+    }
+
+    return { pls_dia: estado.validadores.pls_dia, base: 'media desde la activación', provisional: true };
+  }
+
   function paintStatus(boxEl, ringEl, salud) {
     const s = SALUD_MAP[salud] || SALUD_MAP.sin_datos;
     ringEl.style.borderColor = s.color;
@@ -710,26 +797,48 @@ input[type=text].fld{
 
     const s = paintStatus($('statusBox'), $('statusRing'), estado.salud);
     $('statusTitle').textContent = `${v.activos} de ${v.total} validando`;
-    $('statusSub').textContent = s.label === 'Todo bien' ? 'Sin incidencias detectadas' : s.label;
+    $('statusSub').textContent = estado.salud === 'ok' ? textoIncidencias() : s.label;
+
+    const ritmo = ritmoDiario();
 
     $('hlNum').innerHTML = `${fmt(v.ganado_total)} <span>PLS</span>`;
     const usdTotal = fiscPrice() ? v.ganado_total * fiscPrice() : null;
-    $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '') + `<b>+${fmt(v.pls_hora)} PLS/h</b> ahora mismo`;
+    $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '')
+      + `<b>+${fmt(ritmo.pls_dia / 24)} PLS/h</b> ${ritmo.base}`;
 
-    // "Hoy": usamos el último día de `daily` si coincide con hoy, si no el ritmo actual * 24h como estimación
+    // "Hoy": el día cerrado de `daily` si existe; si no, proyección al ritmo medido.
     const today = new Date().toISOString().slice(0, 10);
+    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
     const hoyRow = daily.find(d => d.fecha === today);
-    const hoyGanado = hoyRow ? hoyRow.ganado_dia : v.pls_dia;
+    const ayerRow = daily.find(d => d.fecha === ayer);
+    const hoyGanado = hoyRow ? hoyRow.ganado_dia : ritmo.pls_dia;
     $('statHoyV').innerHTML = `${fmt(hoyGanado)} <small>PLS</small>`;
-    $('statHoyD').textContent = hoyRow ? 'confirmado' : 'estimado al ritmo actual';
 
-    const efecs = (v.detalle || []).map(d => d.ganado);
-    const maxEfec = Math.max(1, ...efecs);
-    const efecPct = v.detalle && v.detalle.length
-      ? v.detalle.reduce((acc, d) => acc + (d.ganado / maxEfec) * 100, 0) / v.detalle.length
-      : null;
+    // Comparar contra ayer solo tiene sentido con el día cerrado; si el de hoy
+    // va a medias, la caída sería un artefacto de la hora que sea.
+    const dEl = $('statHoyD');
+    if (hoyRow && ayerRow && ayerRow.ganado_dia > 0) {
+      const pct = ((hoyRow.ganado_dia - ayerRow.ganado_dia) / ayerRow.ganado_dia) * 100;
+      dEl.textContent = `${pct >= 0 ? '+' : ''}${fmt(pct, 1)}% vs ayer`;
+      dEl.className = 'd' + (pct >= 0 ? ' pos' : ' neg');
+    } else {
+      dEl.textContent = hoyRow ? 'día en curso' : 'estimado al ritmo actual';
+      dEl.className = 'd';
+    }
+
+    const efecPct = efectividadActual();
     $('statEfecV').innerHTML = efecPct !== null ? `${fmt(efecPct, 1)}<small>%</small>` : '–';
-    $('statEfecD').textContent = 'validador líder = 100%';
+
+    // El brief pide la media histórica propia al lado como contexto, no la red.
+    const media = efectividadMediaHistorica();
+    if (media === null) {
+      $('statEfecD').textContent = 'aún sin media histórica';
+      $('statEfecD').className = 'd';
+    } else {
+      const delta = efecPct - media;
+      $('statEfecD').textContent = `tu media: ${fmt(media, 1)}%`;
+      $('statEfecD').className = 'd' + (Math.abs(delta) < 0.2 ? '' : (delta > 0 ? ' pos' : ' neg'));
+    }
 
     // línea de hitos: dominio 0 → 320M (break-even), hito intermedio a 32M (validador #11)
     const BE = 320_000_000, V11 = 32_000_000;
@@ -739,15 +848,16 @@ input[type=text].fld{
     $('jHoyV').textContent = `${fmtCompact(v.ganado_total)} PLS`;
     $('jHoyD').textContent = `${fmt(v.horas_activo, 1)} h activo`;
 
-    if (v.pls_dia > 0) {
-      const diasV11 = Math.max(0, (V11 - v.ganado_total) / v.pls_dia);
-      const diasBE = Math.max(0, (BE - v.ganado_total) / v.pls_dia);
+    if (ritmo.pls_dia > 0) {
+      const diasV11 = Math.max(0, (V11 - v.ganado_total) / ritmo.pls_dia);
+      const diasBE = Math.max(0, (BE - v.ganado_total) / ritmo.pls_dia);
       $('jV11D').textContent = v.ganado_total >= V11 ? 'alcanzado' : `en ~${fmt(diasV11)} días`;
       $('jBeD').textContent = v.ganado_total >= BE ? 'alcanzado' : `en ~${fmt(diasBE / 365, 1)} años`;
     } else {
-      $('jV11D').textContent = 'ritmo actual: 0';
-      $('jBeD').textContent = 'ritmo actual: 0';
+      $('jV11D').textContent = 'sin ritmo medible';
+      $('jBeD').textContent = 'sin ritmo medible';
     }
+    $('jBase').textContent = ritmo.provisional ? `${ritmo.base} · provisional` : ritmo.base;
 
     // franja 30 días
     const stripEl = $('strip30');
@@ -760,7 +870,9 @@ input[type=text].fld{
     last30.forEach(d => {
       const sq = document.createElement('div');
       sq.className = 'sq' + (d.salud === 'aviso' ? ' w' : (d.salud === 'critico' ? ' b' : ''));
-      sq.title = d.fecha;
+      const partes = [d.fecha, `${fmt(d.ganado_dia || 0)} PLS`];
+      if (d.minutos_caido) partes.push(`caído ${fmt(d.minutos_caido)} min`);
+      sq.title = partes.join(' · ');
       stripEl.appendChild(sq);
     });
 
@@ -775,22 +887,53 @@ input[type=text].fld{
       $('blocksNextD').textContent = `${v.total} de ${fmt(TOTAL_RED_VALIDADORES)} validadores (estimado)`;
     }
 
+    ajustarRangoChart();
     renderChart();
+  }
+
+  // `snapshots.ganado` es acumulado, así que solo puede subir. Se han visto
+  // filas con 0 escritas por el collector cuando falla la lectura del nodo;
+  // colarlas convierte el siguiente punto en un pico falso enorme. Se
+  // descartan las que rompen la monotonía en vez de recortarlas a cero.
+  function snapshotsLimpios() {
+    const out = [];
+    let ultimo = -Infinity;
+    for (const s of snapshots24h) {
+      const g = Number(s.ganado);
+      if (!Number.isFinite(g) || g < ultimo) continue;
+      out.push(s);
+      ultimo = g;
+    }
+    return out;
+  }
+
+  function valoresChart(rango) {
+    if (rango === '24h') {
+      const limpios = snapshotsLimpios();
+      const out = [];
+      for (let i = 1; i < limpios.length; i++) {
+        out.push(limpios[i].ganado - limpios[i - 1].ganado);
+      }
+      return out;
+    }
+    const n = rango === '7d' ? 7 : 30;
+    return daily.slice(-n).map(d => d.ganado_dia || 0);
+  }
+
+  // Abrir en un rango vacío hace pensar que algo está roto. Si el rango por
+  // defecto no tiene datos todavía, se cae al que sí los tenga.
+  function ajustarRangoChart() {
+    if (valoresChart(currentChartRange).length) return;
+    const alternativo = ['24h', '7d', '30d'].find(r => valoresChart(r).length);
+    if (!alternativo) return;
+    currentChartRange = alternativo;
+    document.querySelectorAll('.ct').forEach(x => x.classList.toggle('on', x.dataset.r === alternativo));
   }
 
   function renderChart() {
     const bars = $('rewardsBars');
     bars.innerHTML = '';
-    let values = [];
-    if (currentChartRange === '24h') {
-      // snapshots.ganado es acumulado; convertimos a producción por hora (delta)
-      for (let i = 1; i < snapshots24h.length; i++) {
-        values.push(Math.max(0, snapshots24h[i].ganado - snapshots24h[i - 1].ganado));
-      }
-    } else {
-      const n = currentChartRange === '7d' ? 7 : 30;
-      values = daily.slice(-n).map(d => d.ganado_dia || 0);
-    }
+    const values = valoresChart(currentChartRange);
     if (!values.length) { bars.innerHTML = '<div class="empty-msg">Todavía no hay suficiente historial.</div>'; return; }
     const max = Math.max(1, ...values);
     values.forEach(v => {
@@ -857,14 +1000,19 @@ input[type=text].fld{
     const rows = $('valRows');
     if (!detalle.length) { rows.innerHTML = '<div class="empty-msg">Sin datos de validadores.</div>'; return; }
     rows.innerHTML = '';
-    detalle.forEach(d => {
-      const efec = ((d.ganado / maxGanado) * 100).toFixed(1);
+    // Orden por efectividad: el que va rezagado es el que interesa mirar.
+    [...detalle].sort((a, b) => b.ganado - a.ganado).forEach(d => {
+      const efec = (d.ganado / maxGanado) * 100;
       const row = document.createElement('div');
       row.className = 'vrow';
       row.innerHTML = `
         <div class="vn">${String(d.indice).slice(-2)}</div>
-        <div class="vinfo"><div class="a">${d.indice}</div><div class="b mono">${d.pubkey_corta} · ${efec}%</div></div>
+        <div class="vinfo"><div class="a">${d.indice}${d.slashed ? ' ⚠︎' : ''}</div><div class="b mono">${d.pubkey_corta} · ${efec.toFixed(1)}%</div></div>
         <div class="vright"><div class="a">+${fmt(d.ganado)}</div><div class="b">${fmtCompact(d.balance)}</div></div>`;
+      if (d.slashed || d.estado !== 'active_ongoing') {
+        row.querySelector('.vinfo .a').style.color = 'var(--bad)';
+        row.querySelector('.vinfo .b').textContent = `${d.pubkey_corta} · ${d.estado}`;
+      }
       rows.appendChild(row);
     });
   }
@@ -888,25 +1036,75 @@ input[type=text].fld{
     $('nSync').textContent = n.optimistic ? 'Optimistic' : 'Verified';
     $('nSync').style.color = n.optimistic ? 'var(--warn)' : 'var(--ok)';
 
-    // runway de disco: regresión simple sobre `daily.disco_pct`
-    if (daily.length >= 3) {
-      const first = daily[0], last = daily[daily.length - 1];
-      const dias = Math.max(1, (new Date(last.fecha) - new Date(first.fecha)) / 86400000);
-      const pctPorDia = (last.disco_pct - first.disco_pct) / dias;
-      if (pctPorDia > 0.01) {
-        const pctSemana = pctPorDia * 7;
-        const diasHasta95 = (95 - n.disco_usado_pct) / pctPorDia;
-        const fecha = new Date(Date.now() + diasHasta95 * 86400000);
-        const fechaTxt = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-        $('nRunway').innerHTML = `Crece ~${fmt(pctSemana, 1)}%/semana · prune recomendado hacia <b style="color:var(--dim)">${fechaTxt}</b>`;
-      } else {
-        $('nRunway').textContent = 'Uso de disco estable, sin crecimiento significativo detectado.';
-      }
+    renderRunway(n);
+
+    // El coste de estar caído se valora al ritmo medido, no a la media desde
+    // la activación: si no, infravalora la pérdida real por un factor de 10.
+    const plsHora = ritmoDiario().pls_dia / 24;
+    $('nExpCost').textContent = `~${fmt(plsHora)} PLS`;
+
+    // Disponibilidad real a partir de `daily.minutos_caido`, con el coste
+    // valorado al ritmo actual de recompensas.
+    const minCaido = daily.reduce((acc, d) => acc + (d.minutos_caido || 0), 0);
+    const minTotales = daily.length * 1440;
+    if (minCaido > 0) {
+      $('nDownTime').innerHTML = minCaido >= 120
+        ? `${fmt(minCaido / 60, 1)} <small>h</small>`
+        : `${fmt(minCaido)} <small>min</small>`;
+      $('nDownCost').textContent = `≈ −${fmt((minCaido / 60) * plsHora)} PLS perdidos`;
+      $('nDownCost').className = 'd neg';
     } else {
-      $('nRunway').textContent = 'Necesitamos más historial (unos días) para estimar el ritmo de crecimiento del disco.';
+      $('nDownTime').innerHTML = '0 <small>min</small>';
+      $('nDownCost').textContent = daily.length ? 'sin caídas registradas' : 'sin historial aún';
+      $('nDownCost').className = 'd pos';
     }
 
-    $('nExpCost').textContent = `~${fmt(v.pls_hora)} PLS`;
+    if (minTotales > 0) {
+      const pct = ((minTotales - minCaido) / minTotales) * 100;
+      $('nUptimePct').innerHTML = `${fmt(pct, pct >= 99.95 ? 2 : 1)}<small>%</small>`;
+      $('nUptimeD').textContent = `sobre ${daily.length} día${daily.length === 1 ? '' : 's'} registrados`;
+    } else {
+      $('nUptimePct').textContent = '–';
+      $('nUptimeD').textContent = 'sin historial aún';
+    }
+  }
+
+  // Runway de disco. `daily` es la fuente buena (tendencia larga, poco ruido),
+  // pero mientras no haya días cerrados se cae a `snapshots` y se dice
+  // claramente que la estimación es provisional: extrapolar años desde unas
+  // horas de datos merece una advertencia, no un número con aires de certeza.
+  function renderRunway(n) {
+    const el = $('nRunway');
+    let pctPorDia = null, provisional = false;
+
+    if (daily.length >= 3) {
+      const a = daily[0], b = daily[daily.length - 1];
+      const dias = (new Date(b.fecha) - new Date(a.fecha)) / 86400000;
+      if (dias >= 1) pctPorDia = (b.disco_pct - a.disco_pct) / dias;
+    }
+
+    const snaps = snapshotsLimpios();
+    if (pctPorDia === null && snaps.length >= 3) {
+      const a = snaps[0], b = snaps[snaps.length - 1];
+      const dias = (b.ts - a.ts) / 86400;
+      if (dias >= 0.2) { pctPorDia = (b.disco_pct - a.disco_pct) / dias; provisional = true; }
+    }
+
+    if (pctPorDia === null) {
+      el.textContent = 'Necesitamos algunas horas más de historial para estimar el crecimiento del disco.';
+      return;
+    }
+    if (pctPorDia <= 0.01) {
+      el.textContent = 'Uso de disco estable, sin crecimiento apreciable por ahora.';
+      return;
+    }
+
+    const diasHasta95 = (95 - n.disco_usado_pct) / pctPorDia;
+    const fecha = new Date(Date.now() + diasHasta95 * 86400000);
+    const fechaTxt = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    el.innerHTML = `Crece ~${fmt(pctPorDia * 7, 1)} %/semana · prune hacia `
+      + `<b style="color:var(--dim)">${fechaTxt}</b>`
+      + (provisional ? ' <span style="opacity:.7">(estimación provisional, pocas horas de datos)</span>' : '');
   }
 
   // ---------- herramientas ----------
@@ -937,7 +1135,7 @@ input[type=text].fld{
     $('simPrice').textContent = `${price < 0.0001 ? price.toFixed(7) : price.toFixed(5)} $`;
     $('simStake').textContent = `${fmt(v.stake_total * price, 2)} $`;
     $('simGanado').textContent = `${fmt(v.ganado_total * price, 2)} $`;
-    const proy = (v.ganado_total + v.pls_dia * 365) * price;
+    const proy = (v.ganado_total + ritmoDiario().pls_dia * 365) * price;
     $('simProy').textContent = `${fmt(proy, 2)} $`;
 
     // Contexto frente al precio de sacrificio: cuánto falta (o sobra) para volver allí.
@@ -957,10 +1155,11 @@ input[type=text].fld{
     // escenarios: PLS/mes aportado = (eur/precio) ; combinado con ritmo actual
     const V11 = 32_000_000;
     const restante = Math.max(0, V11 - v.ganado_total);
+    const base = ritmoDiario().pls_dia;
     [0, 50, 150].forEach(eur => {
       const plsMes = price > 0 ? eur / price : 0;
       const plsDiaExtra = plsMes / 30.44;
-      const ritmo = v.pls_dia + plsDiaExtra;
+      const ritmo = base + plsDiaExtra;
       const dias = ritmo > 0 ? restante / ritmo : Infinity;
       const el = $('scn' + eur);
       el.innerHTML = (isFinite(dias) ? `${fmt(dias)} d` : '–') + '<small>al validador #11</small>';
@@ -988,9 +1187,23 @@ input[type=text].fld{
   $('btnCsv').addEventListener('click', () => {
     const year = new Date().getFullYear().toString();
     const rows = daily.filter(d => d.fecha.startsWith(year));
-    const header = 'fecha,ganado_dia,ganado_acum,apr_medio,salud\n';
-    const body = rows.map(d => [d.fecha, d.ganado_dia, d.ganado_acum, d.apr_medio, d.salud].join(',')).join('\n');
-    const blob = new Blob([header + body], { type: 'text/csv' });
+    const precio = fiscPrice();
+    // El valor se calcula a un precio único, no al precio de cada día: no
+    // guardamos el histórico de cotización. La cabecera lo deja por escrito
+    // para que nadie lo confunda con una valoración fiscal exacta.
+    const header = `# Recompensas de staking ${year} — PLSDASH\n`
+      + `# valor_usd calculado a un precio fijo de ${precio} $/PLS, no al precio de cada día\n`
+      + 'fecha,ganado_dia_pls,ganado_acum_pls,valor_usd,apr_medio,salud,minutos_caido\n';
+    const body = rows.map(d => [
+      d.fecha,
+      d.ganado_dia ?? 0,
+      d.ganado_acum ?? 0,
+      ((d.ganado_dia || 0) * precio).toFixed(6),
+      d.apr_medio ?? '',
+      d.salud ?? '',
+      d.minutos_caido ?? 0,
+    ].join(',')).join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `validadores-${year}.csv`;
@@ -1082,13 +1295,17 @@ input[type=text].fld{
         api('/estado'),
         api('/historico?rango=24h'),
         api('/eventos?limit=15'),
+        api(`/eventos?limit=1&tipos=${TIPOS_INCIDENCIA.join(',')}`),
         necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
+        necesitaDaily ? api('/validadores') : Promise.resolve(null),
       ];
-      const [est, hist24, ev, histTodo] = await Promise.all(peticiones);
+      const [est, hist24, ev, inc, histTodo, valHist] = await Promise.all(peticiones);
 
       estado = est;
       snapshots24h = hist24.datos || [];
+      ultimoIncidente = (inc.eventos || [])[0] || null;
       if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
+      if (valHist) { valHistorico = valHist; }
       lastFetch = Date.now();
       lastError = null;
 
