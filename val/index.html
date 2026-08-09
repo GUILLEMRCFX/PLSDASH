@@ -630,6 +630,11 @@ input[type=text].fld{
   let ganancia = null;   // retiradas reconciliadas contra la cadena
   let ultimoIncidente = null; // evento más reciente que cuenta como incidencia
   let ultimoDescarte = null;  // última vez que la tubería rechazó una lectura
+  let endpointsCaidos = [];   // los que no respondieron en la última pasada
+
+  // Mismo orden que `peticiones` en refresh(): sirve para decir cuál falló.
+  const ENDPOINTS = ['estado', 'historico 24h', 'serie', 'ganancia', 'eventos',
+                     'incidencias', 'descartes', 'historico completo', 'validadores'];
   let lastFetch = 0;
   let currentChartRange = '7d';
 
@@ -1456,8 +1461,10 @@ input[type=text].fld{
   function startSyncClock() {
     clearInterval(syncTimer);
     syncTimer = setInterval(() => {
+      if (!lastFetch) { $('syncTime').textContent = '–'; return; }
       const secs = Math.floor((Date.now() - lastFetch) / 1000);
-      $('syncTime').textContent = secs < 60 ? `${secs}s` : `${Math.floor(secs / 60)}m`;
+      $('syncTime').textContent = secs < 60 ? `${secs}s`
+        : (secs < 3600 ? `${Math.floor(secs / 60)}m` : `${Math.floor(secs / 3600)}h`);
     }, 1000);
   }
 
@@ -1482,6 +1489,18 @@ input[type=text].fld{
     }
 
     if (!estado) return;
+
+    // Un endpoint secundario caído no es «datos viejos»: el panel funciona,
+    // pero conviene saber qué falta y no callárselo.
+    if (endpointsCaidos.length) {
+      banner.style.display = 'block';
+      banner.querySelector('b').textContent = 'Panel incompleto.';
+      $('staleMsg').textContent =
+        `Sin respuesta de: ${endpointsCaidos.join(', ')}. El resto es correcto.`;
+      dot.className = 'warn';
+      return;
+    }
+
     const ageMin = (Date.now() / 1000 - estado.generado_ts) / 60;
     if (ageMin > 15) {
       banner.style.display = 'block';
@@ -1584,28 +1603,53 @@ input[type=text].fld{
         necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
         necesitaDaily ? api('/validadores') : Promise.resolve(null),
       ];
-      const [est, hist24, hSerie, gan, ev, inc, desc, histTodo, valHist] = await Promise.all(peticiones);
+      // allSettled y no all: solo `/estado` es imprescindible. Con `all`, que
+      // fallara cualquier petición secundaria dejaba el panel entero en
+      // «Cargando…» aunque el estado hubiera llegado perfecto — un endpoint
+      // auxiliar roto no puede tumbar la pantalla completa.
+      const res = await Promise.allSettled(peticiones);
+      const [est, hist24, hSerie, gan, ev, inc, desc, histTodo, valHist] =
+        res.map(r => r.status === 'fulfilled' ? r.value : null);
 
-      estado = est;
-      snapshots24h = hist24.datos || [];
-      serie = hSerie.datos || [];
-      ganancia = gan && !gan.error ? gan : (gan && gan.total ? gan : null);
-      ultimoIncidente = (inc.eventos || [])[0] || null;
-      ultimoDescarte = (desc.eventos || [])[0] || null;
-      if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
-      if (valHist) { valHistorico = valHist; }
-      lastFetch = Date.now();
-      lastError = null;
+      const sesionCaducada = res.some(r => r.status === 'rejected' && r.reason?.status === 401);
+      if (sesionCaducada) { showPin('Sesión caducada, introduce el PIN de nuevo.'); return; }
 
-      renderResumen();
-      renderValidadores();
-      renderNodo();
-      renderTools();
-      renderEventos(ev.eventos || []);
+      if (!est) {
+        // Sin estado no hay panel: es el único fallo que importa de verdad.
+        const fallo = res[0].reason;
+        lastError = fallo?.status ?? 0;
+        console.error('No se pudo leer /estado:', fallo);
+      } else {
+        estado = est;
+        if (hist24) snapshots24h = hist24.datos || [];
+        if (hSerie) serie = hSerie.datos || [];
+        ganancia = gan && gan.total > 0 ? gan : null;
+        if (inc) ultimoIncidente = (inc.eventos || [])[0] || null;
+        if (desc) ultimoDescarte = (desc.eventos || [])[0] || null;
+        if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
+        if (valHist) valHistorico = valHist;
+
+        lastFetch = Date.now();
+        lastError = null;
+
+        // Lo que no llegó se queda con el valor anterior; cada bloque se pinta
+        // por su cuenta para que un render que reviente no arrastre al resto.
+        const bloques = [
+          ['resumen', renderResumen], ['validadores', renderValidadores],
+          ['nodo', renderNodo], ['herramientas', renderTools],
+        ];
+        for (const [nombre, fn] of bloques) {
+          try { fn(); } catch (e) { console.error(`fallo al pintar ${nombre}:`, e); }
+        }
+        if (ev) renderEventos(ev.eventos || []);
+
+        // Los endpoints que fallaron se anotan, pero no bloquean nada.
+        const caidos = ENDPOINTS.filter((_, i) => res[i].status === 'rejected');
+        endpointsCaidos = caidos;
+        if (caidos.length) console.warn('endpoints sin respuesta:', caidos.join(', '));
+      }
     } catch (e) {
-      if (e.status === 401) { showPin('Sesión caducada, introduce el PIN de nuevo.'); return; }
-      // 404 = KV todavía sin datos; el resto son fallos reales de red/servidor.
-      lastError = e.status;
+      lastError = e?.status ?? 0;
       console.error('Fallo al actualizar:', e);
     }
     checkStale();
