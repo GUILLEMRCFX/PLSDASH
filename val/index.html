@@ -574,7 +574,15 @@ input[type=text].fld{
   'use strict';
 
   const API = '/api/val';
-  const TOTAL_RED_VALIDADORES = 109559; // aprox. red completa, ver BRIEF-CLAUDE-CODE.md
+  // Tamaño de la red. El respaldo es el recuento real del registro del nodo el
+  // 9-ago-2026 (109.600, medido; el brief decía 109.559). Pero la red crece, así
+  // que si el recolector lo publica en KV manda ese valor.
+  //
+  // OJO con lo que mide: el registro incluye validadores pendientes de activar y
+  // ya salidos, y las propuestas solo se reparten entre los activos. Y hay un
+  // descuadre sin resolver — en 32 h se observaron 4 bloques donde este modelo
+  // predice 1. Por eso la estimación se muestra marcada como tal.
+  const RED_VALIDADORES_RESPALDO = 109600;
   // 10 s/slot, derivado de los propios datos del nodo: entre la activación
   // (epoch 319720) y el snapshot del brief (epoch 320041) pasaron 321 epochs
   // × 32 slots en 103.013 s → 10,03 s por slot.
@@ -940,11 +948,12 @@ input[type=text].fld{
     const totalBloques = daily.reduce((acc, d) => acc + (d.bloques || 0), 0);
     $('blocksTotal').textContent = totalBloques;
     if (v.total > 0) {
-      const probPorSlot = v.total / TOTAL_RED_VALIDADORES;
+      const red = estado.red_validadores_activos || RED_VALIDADORES_RESPALDO;
       const slotsPorDia = 86400 / SLOT_SECONDS;
-      const diasSiguiente = 1 / (probPorSlot * slotsPorDia);
+      const diasSiguiente = 1 / ((v.total / red) * slotsPorDia);
       $('blocksNext').innerHTML = `~${fmt(diasSiguiente, diasSiguiente < 2 ? 1 : 0)} <small>días</small>`;
-      $('blocksNextD').textContent = `${v.total} de ${fmt(TOTAL_RED_VALIDADORES)} validadores (estimado)`;
+      $('blocksNextD').textContent = `${v.total} de ${fmt(red)}`
+        + (estado.red_validadores_activos ? '' : ' (red sin medir)');
     }
 
     ajustarRangoChart();

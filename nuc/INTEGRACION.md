@@ -140,6 +140,42 @@ deliberado: un hueco se ve y se puede rellenar desde otra fuente, mientras que
 un `0` de relleno se confunde con un precio real y contamina la fiscalidad sin
 dejar rastro.
 
+## 2b. Publicar el tamaño de la red
+
+El panel estima cada cuánto le toca proponer con `mis_validadores / red`. Ese
+número estaba a fuego en el frontend y la red crece, así que conviene medirlo.
+
+En `collector.py`, junto al resto del bloque `nodo`, y añadirlo al JSON que va
+a KV como `red_validadores_activos`:
+
+```python
+def red_validadores_activos():
+    """Validadores ACTIVOS de la red. None si el nodo no responde.
+
+    Filtrado por estado a propósito: el registro completo incluye pendientes
+    de activar y ya salidos, y las propuestas solo se reparten entre activos.
+    """
+    try:
+        r = requests.get(
+            "http://localhost:5052/eth/v1/beacon/states/head/validators",
+            params={"status": "active_ongoing"},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return len(r.json()["data"])
+    except Exception as e:
+        print(f"[red] no se pudo contar la red: {e}")
+        return None
+```
+
+Mientras no llegue, el panel usa 109.600 —el registro completo medido el
+9-ago-2026— y lo marca como «red sin medir».
+
+**Descuadre pendiente:** en la ventana del 7 al 9 de agosto se observaron 4
+bloques donde este modelo predice 1 (probabilidad del 2,3%). Puede ser que los
+activos sean bastantes menos que el registro, que las retiradas grandes no sean
+todas propuestas, o azar con una muestra de cuatro. No está resuelto.
+
 ## 3. Revisar bloques en cada ejecución
 
 Al final del ciclo, después de escribir el snapshot:
