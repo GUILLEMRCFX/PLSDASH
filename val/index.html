@@ -769,20 +769,47 @@ input[type=text].fld{
   // Efectividad = lo que ha ganado cada validador frente al mejor del grupo.
   // No es la efectividad de atestación real (el collector no la expone), sino
   // rendimiento relativo dentro de tu propio grupo, que es lo que el brief pide.
+  // La referencia es la media de los validadores **quitando al que más ha
+  // ganado**. Proponer un bloque paga unos 5.700 PLS de golpe, así que usar el
+  // máximo convertía al afortunado en el listón y hundía a los otros nueve:
+  // con nueve validadores idénticos y uno recién premiado, la efectividad
+  // salía del 25-38 % cuando todos iban perfectos.
+  //
+  // Un bloque es suerte, no rendimiento, y no puede definir el listón.
+  function referenciaGrupo(valores) {
+    if (valores.length < 3) return null;
+    const orden = [...valores].sort((a, b) => a - b);
+    const resto = orden.slice(0, -1);            // fuera el más alto
+    const ref = resto.reduce((a, x) => a + x, 0) / resto.length;
+    return ref > 0 ? ref : null;
+  }
+
+  // Efectividad = lo que gana el más rezagado frente a esa referencia. Es la
+  // forma directa de responder «¿se está quedando alguno atrás?».
   function efectividadActual() {
     const detalle = estado?.validadores?.detalle || [];
-    if (!detalle.length) return null;
-    const max = Math.max(...detalle.map(d => d.ganado));
-    if (!(max > 0)) return null;
-    return detalle.reduce((acc, d) => acc + (d.ganado / max) * 100, 0) / detalle.length;
+    if (detalle.length < 3) return null;
+    const valores = detalle.map(d => Number(d.ganado) || 0);
+    const ref = referenciaGrupo(valores);
+    if (!ref) return null;
+    return Math.min(100, (Math.min(...valores) / ref) * 100);
   }
 
   function efectividadMediaHistorica() {
     // Se descarta el día en curso: aún está a medias y hundiría la media.
     const hoy = new Date().toISOString().slice(0, 10);
-    const dias = valHistorico.por_dia.filter(d => d.fecha !== hoy && d.maximo > 0);
+    const dias = (valHistorico.por_dia || []).filter(d => d.fecha !== hoy && d.n >= 3);
     if (!dias.length) return null;
-    return dias.reduce((acc, d) => acc + (d.media / d.maximo) * 100, 0) / dias.length;
+
+    const ratios = [];
+    for (const d of dias) {
+      // Misma referencia con lo que da el agregado: la suma menos el máximo,
+      // repartida entre los demás.
+      const ref = ((d.media * d.n) - d.maximo) / (d.n - 1);
+      if (ref > 0) ratios.push(Math.min(100, (d.minimo / ref) * 100));
+    }
+    if (!ratios.length) return null;
+    return ratios.reduce((a, x) => a + x, 0) / ratios.length;
   }
 
   // "Sin incidencias en 14 días" tiene que ser un dato, no una frase fija:
@@ -1254,8 +1281,12 @@ input[type=text].fld{
     $('valStakingD').textContent = `${v.total} validadores`;
 
     const detalle = v.detalle || [];
-    const maxGanado = Math.max(1, ...detalle.map(d => d.ganado));
-    const costeFallos = detalle.reduce((acc, d) => acc + Math.max(0, maxGanado - d.ganado), 0);
+    // Contra la media sin el más alto, no contra el máximo: si uno acaba de
+    // proponer bloque, medir contra él convierte sus ~5.700 PLS de premio en
+    // «lo que han fallado» los otros nueve, que es justo lo contrario.
+    const valores = detalle.map(d => Number(d.ganado) || 0);
+    const refGrupo = referenciaGrupo(valores) || Math.max(1, ...valores);
+    const costeFallos = detalle.reduce((acc, d) => acc + Math.max(0, refGrupo - d.ganado), 0);
     $('valCoste').innerHTML = `−${fmt(costeFallos)} <small>PLS</small>`;
 
     const rows = $('valRows');
@@ -1263,7 +1294,7 @@ input[type=text].fld{
     rows.innerHTML = '';
     // Orden por efectividad: el que va rezagado es el que interesa mirar.
     [...detalle].sort((a, b) => b.ganado - a.ganado).forEach(d => {
-      const efec = (d.ganado / maxGanado) * 100;
+      const efec = Math.min(100, (d.ganado / refGrupo) * 100);
       const row = document.createElement('div');
       row.className = 'vrow';
       row.innerHTML = `
