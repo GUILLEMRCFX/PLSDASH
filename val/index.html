@@ -2,7 +2,12 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0e0715">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Validadores">
+<meta name="robots" content="noindex, nofollow">
 <title>PLSDASH · Validator Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,7 +38,7 @@ body{
   color:var(--txt);
   min-height:100vh;
   -webkit-font-smoothing:antialiased;
-  padding-bottom:40px;
+  padding-bottom:calc(40px + env(safe-area-inset-bottom));
 }
 .mono{font-family:'JetBrains Mono',monospace}
 .shell{max-width:520px;margin:0 auto;padding:0 16px}
@@ -46,7 +51,7 @@ body{
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   border-bottom:1px solid var(--line-soft);
 }
-.hdr-in{max-width:520px;margin:0 auto;padding:14px 16px 0}
+.hdr-in{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px 0}
 @media(min-width:900px){ .hdr-in{max-width:1080px} }
 .hdr-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
 .back{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:13px;font-weight:500;text-decoration:none;background:none;border:none;font-family:inherit;cursor:pointer}
@@ -213,10 +218,21 @@ body{
 /* ---------- tools ---------- */
 .sim-val{font-size:30px;font-weight:700;letter-spacing:-1px;margin:4px 0 2px}
 .sim-lbl{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+/* pista del simulador: el input y la marca del precio de sacrificio comparten
+   el mismo sistema de coordenadas, descontando el ancho del pulgar (20px) */
+.simtrack{position:relative;margin:26px 0 8px}
+.simtrack input[type=range]{margin:0}
+.simref{
+  position:absolute;top:-13px;bottom:-9px;width:1px;background:var(--mute);opacity:.5;
+  left:calc(10px + (100% - 20px) * var(--t));pointer-events:none;
+}
+.simref::after{
+  content:attr(data-label);position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+  font-size:9.5px;color:var(--mute);white-space:nowrap;letter-spacing:.3px;
+}
 input[type=range]{
   -webkit-appearance:none;width:100%;height:4px;border-radius:3px;
   background:var(--line);
-  margin:20px 0 8px;
 }
 input[type=range]::-webkit-slider-thumb{
   -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
@@ -329,6 +345,7 @@ input[type=text].fld{
     <div class="lbl">Ganado desde el inicio</div>
     <div class="num" id="hlNum">– <span>PLS</span></div>
     <div class="meta" id="hlMeta">&nbsp;</div>
+    <div class="meta" id="hlNota" style="margin-top:6px;color:var(--mute);font-size:11px">&nbsp;</div>
   </div>
 
   <div class="grid2">
@@ -349,7 +366,7 @@ input[type=text].fld{
   <div class="journey">
     <div class="top">
       <div class="t">Línea de hitos</div>
-      <div class="n">a tu ritmo actual</div>
+      <div class="n" id="jBase">a tu ritmo actual</div>
     </div>
     <div class="track">
       <div class="fill" id="jFill"></div>
@@ -464,6 +481,20 @@ input[type=text].fld{
     <div class="nrow"><div class="l">Estado</div><div class="r" id="nSync">–</div></div>
   </div>
 
+  <div class="eyebrow">Disponibilidad</div>
+  <div class="grid2">
+    <div class="card stat">
+      <div class="k">Tiempo caído</div>
+      <div class="v" id="nDownTime">–</div>
+      <div class="d" id="nDownCost">&nbsp;</div>
+    </div>
+    <div class="card stat">
+      <div class="k">Disponibilidad</div>
+      <div class="v" id="nUptimePct">–</div>
+      <div class="d" id="nUptimeD">&nbsp;</div>
+    </div>
+  </div>
+
   <div class="eyebrow">Exposición</div>
   <div class="note">
     <b>Punto único de fallo.</b> Los 10 validadores dependen de una sola máquina, una conexión y un suministro eléctrico. Una caída prolongada afecta a los 10 a la vez. Coste estimado: <b id="nExpCost">–</b> por hora sin servicio.
@@ -477,12 +508,16 @@ input[type=text].fld{
   <div class="card">
     <div class="sim-lbl">Si PLS estuviera a</div>
     <div class="sim-val" id="simPrice" style="background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">– $</div>
-    <input type="range" min="0" max="1000" value="350" id="simSlider">
-    <div class="ticks"><span>0,00001</span><span>0,0001</span><span>0,001</span></div>
+    <div class="simtrack">
+      <div class="simref" id="simRefSac" data-label="sacrificio"></div>
+      <input type="range" min="0" max="1000" value="350" id="simSlider">
+    </div>
+    <div class="ticks"><span>0,000005</span><span>0,0001</span><span>0,002</span></div>
     <div style="margin-top:18px">
       <div class="nrow"><div class="l">Valor del stake</div><div class="r" id="simStake">–</div></div>
       <div class="nrow"><div class="l">Ganado hasta hoy</div><div class="r" id="simGanado" style="color:var(--ok)">–</div></div>
       <div class="nrow"><div class="l">Proyección 1 año</div><div class="r" id="simProy">–</div></div>
+      <div class="nrow"><div class="l">Frente al sacrificio</div><div class="r" id="simVsSac">–</div></div>
     </div>
   </div>
 
@@ -539,14 +574,42 @@ input[type=text].fld{
   'use strict';
 
   const API = '/api/val';
-  const TOTAL_RED_VALIDADORES = 109559; // aprox. red completa, ver BRIEF-CLAUDE-CODE.md
-  const SLOT_SECONDS = 12; // asunción: slot de beacon chain tipo Ethereum; ajustar si PulseChain usa otro valor
+  // Validadores ACTIVOS de la red, que son los únicos que proponen. Medido en
+  // el nodo el 9-ago-2026: 46.905. El registro completo son 109.600, más del
+  // doble, porque incluye pendientes de activar y ya salidos.
+  //
+  // Esa distinción resolvió el descuadre que traíamos: con el registro entero
+  // salían 4 bloques observados donde el modelo predecía 1 (probabilidad 2,3%);
+  // con los activos se esperan 2,5, y ver 4 tiene un 24% de probabilidad. Azar
+  // normal, no un fallo del modelo.
+  //
+  // La red se mueve, así que si el recolector publica el recuento manda ese.
+  const RED_VALIDADORES_RESPALDO = 46905;
+  // 10 s/slot, derivado de los propios datos del nodo: entre la activación
+  // (epoch 319720) y el snapshot del brief (epoch 320041) pasaron 321 epochs
+  // × 32 slots en 103.013 s → 10,03 s por slot.
+  const SLOT_SECONDS = 10;
+  // Contrato de WPLS: el precio de PLS se toma de su par con más liquidez,
+  // igual que hace index.html. Buscar por texto devuelve tokens homónimos.
+  const WPLS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27';
 
   let estado = null;
-  let daily = [];       // historico rango=todo (resolución diaria)
+  let daily = [];        // historico rango=todo (resolución diaria)
   let snapshots24h = []; // historico rango=24h (resolución horaria)
+  let valHistorico = { por_dia: [], por_validador: [] }; // validador_diario
+  let serie = [];        // toda la serie de snapshots (ts, ganado)
+  let ganancia = null;   // retiradas reconciliadas contra la cadena
+  let ultimoIncidente = null; // evento más reciente que cuenta como incidencia
+  let ultimoDescarte = null;  // última vez que la tubería rechazó una lectura
   let lastFetch = 0;
   let currentChartRange = '7d';
+
+  // Lo que rompe la racha de "sin incidencias": caídas, slashes, desincronizaciones
+  // y reinicios. Un bloque propuesto o una activación no son incidencias.
+  const TIPOS_INCIDENCIA = ['caida', 'slash', 'desync', 'reinicio', 'aviso'];
+
+  // Activación de los diez validadores (evento `activacion` en D1).
+  const ACTIVACION_TS = 1786095955;
 
   // ---------- utilidades ----------
   const $ = id => document.getElementById(id);
@@ -564,10 +627,19 @@ input[type=text].fld{
     return `hace ${Math.floor(s / 86400)} d`;
   };
 
+  class ApiError extends Error {
+    constructor(status, msg) { super(msg); this.status = status; }
+  }
+
   async function api(path, opts) {
-    const res = await fetch(API + path, { credentials: 'same-origin', ...opts });
-    if (res.status === 401) { showPin('Sesión caducada, introduce el PIN de nuevo.'); throw new Error('401'); }
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    let res;
+    try {
+      res = await fetch(API + path, { credentials: 'same-origin', ...opts });
+    } catch {
+      throw new ApiError(0, 'sin conexión');
+    }
+    if (res.status === 401) throw new ApiError(401, 'sesión no válida');
+    if (!res.ok) throw new ApiError(res.status, 'HTTP ' + res.status);
     return res.json();
   }
 
@@ -599,9 +671,7 @@ input[type=text].fld{
         body: JSON.stringify({ pin: pinDigits }),
       });
       if (res.ok) {
-        $('pinview').classList.add('off');
-        $('appview').classList.add('on');
-        boot();
+        enterApp();
       } else {
         pinReset('PIN incorrecto, prueba otra vez.');
       }
@@ -612,10 +682,7 @@ input[type=text].fld{
     }
   }
 
-  $('pinPad').addEventListener('click', e => {
-    const btn = e.target.closest('.pk');
-    if (!btn) return;
-    const k = btn.dataset.k;
+  function pinPress(k) {
     if (k === 'back') { pinDigits = pinDigits.slice(0, -1); pinRender(); return; }
     if (k === 'exit') { pinDigits = ''; pinRender(); return; }
     if (pinDigits.length >= 4) return;
@@ -623,6 +690,18 @@ input[type=text].fld{
     pinRender();
     $('pinErr').textContent = '';
     if (pinDigits.length === 4) pinSubmit();
+  }
+
+  $('pinPad').addEventListener('click', e => {
+    const btn = e.target.closest('.pk');
+    if (btn) pinPress(btn.dataset.k);
+  });
+
+  // Teclado físico: en escritorio se espera poder teclear el PIN directamente.
+  document.addEventListener('keydown', e => {
+    if ($('pinview').classList.contains('off')) return;
+    if (e.key >= '0' && e.key <= '9') { pinPress(e.key); e.preventDefault(); }
+    else if (e.key === 'Backspace') { pinPress('back'); e.preventDefault(); }
   });
 
   function showPin(msg) {
@@ -653,6 +732,163 @@ input[type=text].fld{
     sin_datos:{ color: '#6b5a86', icon: '?', label: 'Sin datos' },
   };
 
+  // Efectividad = lo que ha ganado cada validador frente al mejor del grupo.
+  // No es la efectividad de atestación real (el collector no la expone), sino
+  // rendimiento relativo dentro de tu propio grupo, que es lo que el brief pide.
+  function efectividadActual() {
+    const detalle = estado?.validadores?.detalle || [];
+    if (!detalle.length) return null;
+    const max = Math.max(...detalle.map(d => d.ganado));
+    if (!(max > 0)) return null;
+    return detalle.reduce((acc, d) => acc + (d.ganado / max) * 100, 0) / detalle.length;
+  }
+
+  function efectividadMediaHistorica() {
+    // Se descarta el día en curso: aún está a medias y hundiría la media.
+    const hoy = new Date().toISOString().slice(0, 10);
+    const dias = valHistorico.por_dia.filter(d => d.fecha !== hoy && d.maximo > 0);
+    if (!dias.length) return null;
+    return dias.reduce((acc, d) => acc + (d.media / d.maximo) * 100, 0) / dias.length;
+  }
+
+  // "Sin incidencias en 14 días" tiene que ser un dato, no una frase fija:
+  // se mide desde el último incidente real, o desde la activación si no ha
+  // habido ninguno todavía.
+  function textoIncidencias() {
+    const ref = ultimoIncidente
+      ? ultimoIncidente.ts
+      : (estado.validadores.activacion_utc ? Date.parse(estado.validadores.activacion_utc) / 1000 : null);
+    if (!ref) return 'Sin incidencias detectadas';
+
+    const horas = (Date.now() / 1000 - ref) / 3600;
+    const periodo = horas < 48 ? `${fmt(horas, 0)} h` : `${fmt(horas / 24, 0)} días`;
+    return ultimoIncidente
+      ? `Sin incidencias desde hace ${periodo}`
+      : `Sin incidencias en ${periodo} activo`;
+  }
+
+  // Ganancia real acumulada.
+  //
+  // `ganado` (= balance − stake) NO es lo ganado: es solo el excedente que
+  // todavía no se ha retirado. Cada ~9 h el protocolo barre ese excedente a la
+  // wallet de retirada y el contador vuelve a cero. Verificado dos veces el 8 y
+  // 9 de ago: el balance vuelve a 320.000.000 exactos y la acumulación sigue
+  // después al mismo ritmo de siempre.
+  //
+  // La ganancia real se recompone recorriendo la serie: cada bajada es un
+  // barrido, y lo que había justo antes es lo que se llevó.
+  function gananciaAcumulada() {
+    const excedente = estado?.validadores?.ganado_total ?? 0;
+
+    // La cadena es la fuente buena: recoge también lo barrido antes de que el
+    // recolector arrancara, que la serie de snapshots no puede ver.
+    if (ganancia && ganancia.total > 0) {
+      return {
+        total: ganancia.total + excedente,
+        barrido: ganancia.total,
+        barridos: ganancia.barridos,
+        bloques: ganancia.bloques,
+        excedente,
+        fuente: ganancia.obsoleto ? 'cadena (dato en caché)' : 'cadena',
+        completo: true,
+      };
+    }
+
+    // Sin explorador se recompone de los snapshots: cada bajada es un barrido
+    // y lo que había justo antes es lo que se llevó. Solo alcanza desde que se
+    // empezó a registrar, así que es un suelo.
+    if (serie.length < 2) return null;
+
+    let barrido = 0;
+    let barridos = 0;
+    for (let i = 1; i < serie.length; i++) {
+      if (serie[i].ganado < serie[i - 1].ganado) {
+        barrido += serie[i - 1].ganado;
+        barridos++;
+      }
+    }
+
+    return {
+      total: barrido + excedente + serie[0].ganado,
+      barrido,
+      barridos,
+      excedente,
+      fuente: 'snapshots',
+      completo: serie[0].ts <= ACTIVACION_TS + 3600,
+    };
+  }
+
+  // Ganado por día, recompuesto de la serie.
+  //
+  // No se usa `daily.ganado_dia` porque guarda el excedente que había a
+  // medianoche, no lo ganado en la jornada: para el 8-ago anotó 20.728 PLS
+  // ignorando los ~26.768 que se barrieron esa tarde. Aquí cada tramo suma lo
+  // que subió, y cuando hubo barrido suma lo acumulado después de él.
+  function diarioReal() {
+    const porDia = new Map();
+    for (let i = 1; i < serie.length; i++) {
+      const anterior = serie[i - 1].ganado;
+      const actual = serie[i].ganado;
+      // Tras un barrido se pierde el tramo entre el último snapshot y el
+      // instante del barrido: queda algo por debajo, nunca por encima.
+      const ganado = actual >= anterior ? actual - anterior : actual;
+      const fecha = new Date(serie[i].ts * 1000).toISOString().slice(0, 10);
+
+      const d = porDia.get(fecha) || { fecha, ganado_dia: 0, desde: serie[i].ts, hasta: serie[i].ts };
+      d.ganado_dia += ganado;
+      d.desde = Math.min(d.desde, serie[i - 1].ts);
+      d.hasta = Math.max(d.hasta, serie[i].ts);
+      porDia.set(fecha, d);
+    }
+
+    return [...porDia.values()]
+      .map(d => ({
+        ...d,
+        // Horas de la jornada realmente cubiertas. El primer día registrado
+        // casi nunca está entero, y contarlo como completo hunde cualquier
+        // media: el 8-ago solo se midió desde las 13:53.
+        horas: (d.hasta - d.desde) / 3600,
+        completo: (d.hasta - d.desde) / 3600 >= 23,
+      }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }
+
+  // Ritmo de recompensas. `pls_dia` de KV es la media desde la activación, y
+  // durante las primeras semanas está dominada por el periodo en que los
+  // validadores aún entraban en cola ganando casi nada: subestima el ritmo
+  // real hasta 10 veces, y de ahí cuelgan los hitos y las proyecciones. Se
+  // mide sobre datos recientes y solo se usa KV como último recurso.
+  //
+  // Las propuestas de bloque son esporádicas y grandes: una ventana corta que
+  // pille una infla el ritmo, y una que no la pille lo desinfla. Por eso se
+  // marca como provisional mientras la ventana sea de horas y no de días.
+  function ritmoDiario() {
+    const hoy = new Date().toISOString().slice(0, 10);
+    const cerrados = diarioReal()
+      .filter(d => d.fecha !== hoy && d.completo && d.ganado_dia > 0).slice(-7);
+    if (cerrados.length >= 2) {
+      return {
+        pls_dia: cerrados.reduce((a, d) => a + d.ganado_dia, 0) / cerrados.length,
+        base: `media de ${cerrados.length} días`,
+        provisional: false,
+      };
+    }
+
+    // Sin días enteros se mide sobre los snapshots, sumando tramo a tramo para
+    // que los barridos no resten.
+    const s = snapshots24h;
+    if (s.length >= 2) {
+      const horas = (s[s.length - 1].ts - s[0].ts) / 3600;
+      let acumulado = 0;
+      for (let i = 1; i < s.length; i++) acumulado += ganadoEntre(s[i - 1].ganado, s[i].ganado);
+      if (horas >= 2 && acumulado > 0) {
+        return { pls_dia: (acumulado / horas) * 24, base: `medido en ${fmt(horas, 0)} h`, provisional: true };
+      }
+    }
+
+    return { pls_dia: estado.validadores.pls_dia, base: 'media desde la activación', provisional: true };
+  }
+
   function paintStatus(boxEl, ringEl, salud) {
     const s = SALUD_MAP[salud] || SALUD_MAP.sin_datos;
     ringEl.style.borderColor = s.color;
@@ -668,49 +904,102 @@ input[type=text].fld{
 
     const s = paintStatus($('statusBox'), $('statusRing'), estado.salud);
     $('statusTitle').textContent = `${v.activos} de ${v.total} validando`;
-    $('statusSub').textContent = s.label === 'Todo bien' ? 'Sin incidencias detectadas' : s.label;
+    $('statusSub').textContent = estado.salud === 'ok' ? textoIncidencias() : s.label;
 
-    $('hlNum').innerHTML = `${fmt(v.ganado_total)} <span>PLS</span>`;
-    const usdTotal = fiscPrice() ? v.ganado_total * fiscPrice() : null;
-    $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '') + `<b>+${fmt(v.pls_hora)} PLS/h</b> ahora mismo`;
+    const ritmo = ritmoDiario();
+    const acum = gananciaAcumulada();
 
-    // "Hoy": usamos el último día de `daily` si coincide con hoy, si no el ritmo actual * 24h como estimación
+    // El número principal es la ganancia real, no el excedente sin barrer.
+    const ganadoReal = acum ? acum.total : v.ganado_total;
+    $('hlNum').innerHTML = `${fmt(ganadoReal)} <span>PLS</span>`;
+
+    const usdTotal = fiscPrice() ? ganadoReal * fiscPrice() : null;
+    $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '')
+      + `<b>+${fmt(ritmo.pls_dia / 24)} PLS/h</b> ${ritmo.base}`;
+
+    // Decir de dónde sale la cifra: sin esto, un número que incluye barridos
+    // es indistinguible de uno que no, y el error de antes era invisible.
+    const nota = $('hlNota');
+    if (!acum) {
+      nota.textContent = 'Sin serie suficiente para descontar los barridos.';
+    } else {
+      const partes = [`${fmt(acum.barrido)} retirados en ${acum.barridos} barrido${acum.barridos === 1 ? '' : 's'}`,
+                      `${fmt(acum.excedente)} sin barrer`];
+      if (acum.fuente === 'snapshots' && !acum.completo) {
+        partes.push('suelo: falta lo barrido antes de registrar');
+      } else if (acum.fuente !== 'cadena') {
+        partes.push(acum.fuente);
+      }
+      nota.textContent = partes.join(' · ');
+    }
+
+    // "Hoy": el día cerrado de `daily` si existe; si no, proyección al ritmo medido.
     const today = new Date().toISOString().slice(0, 10);
-    const hoyRow = daily.find(d => d.fecha === today);
-    const hoyGanado = hoyRow ? hoyRow.ganado_dia : v.pls_dia;
+    const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    const dias = diarioReal();
+    const hoyRow = dias.find(d => d.fecha === today);
+    const ayerRow = dias.find(d => d.fecha === ayer);
+    const hoyGanado = hoyRow ? hoyRow.ganado_dia : ritmo.pls_dia;
     $('statHoyV').innerHTML = `${fmt(hoyGanado)} <small>PLS</small>`;
-    $('statHoyD').textContent = hoyRow ? 'confirmado' : 'estimado al ritmo actual';
 
-    const efecs = (v.detalle || []).map(d => d.ganado);
-    const maxEfec = Math.max(1, ...efecs);
-    const efecPct = v.detalle && v.detalle.length
-      ? v.detalle.reduce((acc, d) => acc + (d.ganado / maxEfec) * 100, 0) / v.detalle.length
-      : null;
+    // Comparar contra ayer solo tiene sentido con el día cerrado; si el de hoy
+    // va a medias, la caída sería un artefacto de la hora que sea.
+    const dEl = $('statHoyD');
+    if (hoyRow && ayerRow && ayerRow.completo && ayerRow.ganado_dia > 0) {
+      const pct = ((hoyRow.ganado_dia - ayerRow.ganado_dia) / ayerRow.ganado_dia) * 100;
+      dEl.textContent = `${pct >= 0 ? '+' : ''}${fmt(pct, 1)}% vs ayer`;
+      dEl.className = 'd' + (pct >= 0 ? ' pos' : ' neg');
+    } else {
+      dEl.textContent = hoyRow ? 'día en curso' : 'estimado al ritmo actual';
+      dEl.className = 'd';
+    }
+
+    const efecPct = efectividadActual();
     $('statEfecV').innerHTML = efecPct !== null ? `${fmt(efecPct, 1)}<small>%</small>` : '–';
-    $('statEfecD').textContent = 'validador líder = 100%';
+
+    // El brief pide la media histórica propia al lado como contexto, no la red.
+    const media = efectividadMediaHistorica();
+    if (media === null) {
+      $('statEfecD').textContent = 'aún sin media histórica';
+      $('statEfecD').className = 'd';
+    } else {
+      const delta = efecPct - media;
+      $('statEfecD').textContent = `tu media: ${fmt(media, 1)}%`;
+      $('statEfecD').className = 'd' + (Math.abs(delta) < 0.2 ? '' : (delta > 0 ? ' pos' : ' neg'));
+    }
 
     // línea de hitos: dominio 0 → 320M (break-even), hito intermedio a 32M (validador #11)
     const BE = 320_000_000, V11 = 32_000_000;
-    const progressPct = Math.min(100, (v.ganado_total / BE) * 100);
+    const progressPct = Math.min(100, (ganadoReal / BE) * 100);
     $('jFill').style.width = progressPct + '%';
     $('jNow').style.left = progressPct + '%';
-    $('jHoyV').textContent = `${fmtCompact(v.ganado_total)} PLS`;
+    $('jHoyV').textContent = `${fmtCompact(ganadoReal)} PLS`;
     $('jHoyD').textContent = `${fmt(v.horas_activo, 1)} h activo`;
 
-    if (v.pls_dia > 0) {
-      const diasV11 = Math.max(0, (V11 - v.ganado_total) / v.pls_dia);
-      const diasBE = Math.max(0, (BE - v.ganado_total) / v.pls_dia);
-      $('jV11D').textContent = v.ganado_total >= V11 ? 'alcanzado' : `en ~${fmt(diasV11)} días`;
-      $('jBeD').textContent = v.ganado_total >= BE ? 'alcanzado' : `en ~${fmt(diasBE / 365, 1)} años`;
+    if (ritmo.pls_dia > 0) {
+      const diasV11 = Math.max(0, (V11 - ganadoReal) / ritmo.pls_dia);
+      const diasBE = Math.max(0, (BE - ganadoReal) / ritmo.pls_dia);
+      $('jV11D').textContent = ganadoReal >= V11 ? 'alcanzado' : `en ~${fmt(diasV11)} días`;
+      $('jBeD').textContent = ganadoReal >= BE ? 'alcanzado' : `en ~${fmt(diasBE / 365, 1)} años`;
     } else {
-      $('jV11D').textContent = 'ritmo actual: 0';
-      $('jBeD').textContent = 'ritmo actual: 0';
+      $('jV11D').textContent = 'sin ritmo medible';
+      $('jBeD').textContent = 'sin ritmo medible';
     }
+    $('jBase').textContent = ritmo.provisional ? `${ritmo.base} · provisional` : ritmo.base;
 
     // franja 30 días
     const stripEl = $('strip30');
+    const dias30 = new Map(diarioReal().map(d => [d.fecha, d.ganado_dia]));
     stripEl.innerHTML = '';
-    const last30 = daily.slice(-30);
+    // Los días salen de la serie, que empieza antes que `daily`; la salud sí
+    // viene de `daily`, que es quien la registra.
+    const saludPorDia = new Map(daily.map(d => [d.fecha, d.salud]));
+    const last30 = diarioReal().slice(-30).map(d => ({
+      fecha: d.fecha,
+      ganado_dia: d.ganado_dia,
+      salud: saludPorDia.get(d.fecha),
+      minutos_caido: (daily.find(x => x.fecha === d.fecha) || {}).minutos_caido,
+    }));
     const pad = 30 - last30.length;
     for (let i = 0; i < pad; i++) {
       const sq = document.createElement('div'); sq.className = 'sq empty'; stripEl.appendChild(sq);
@@ -718,7 +1007,10 @@ input[type=text].fld{
     last30.forEach(d => {
       const sq = document.createElement('div');
       sq.className = 'sq' + (d.salud === 'aviso' ? ' w' : (d.salud === 'critico' ? ' b' : ''));
-      sq.title = d.fecha;
+      const real = dias30.get(d.fecha);
+      const partes = [d.fecha, `${fmt(real !== undefined ? real : (d.ganado_dia || 0))} PLS`];
+      if (d.minutos_caido) partes.push(`caído ${fmt(d.minutos_caido)} min`);
+      sq.title = partes.join(' · ');
       stripEl.appendChild(sq);
     });
 
@@ -726,29 +1018,59 @@ input[type=text].fld{
     const totalBloques = daily.reduce((acc, d) => acc + (d.bloques || 0), 0);
     $('blocksTotal').textContent = totalBloques;
     if (v.total > 0) {
-      const probPorSlot = v.total / TOTAL_RED_VALIDADORES;
+      const red = estado.red_validadores_activos || RED_VALIDADORES_RESPALDO;
       const slotsPorDia = 86400 / SLOT_SECONDS;
-      const diasSiguiente = 1 / (probPorSlot * slotsPorDia);
+      const diasSiguiente = 1 / ((v.total / red) * slotsPorDia);
       $('blocksNext').innerHTML = `~${fmt(diasSiguiente, diasSiguiente < 2 ? 1 : 0)} <small>días</small>`;
-      $('blocksNextD').textContent = `${v.total} de ${fmt(TOTAL_RED_VALIDADORES)} validadores (estimado)`;
+      $('blocksNextD').textContent = `${v.total} de ${fmt(red)}`
+        + (estado.red_validadores_activos ? '' : ' (red sin medir)');
     }
 
+    ajustarRangoChart();
     renderChart();
+  }
+
+  // Ganado entre dos lecturas consecutivas.
+  //
+  // `ganado` sube mientras se acumula y cae a cero cuando el protocolo barre
+  // el excedente, así que una bajada no es un error: es un barrido, y lo
+  // ganado en ese tramo es lo que se haya acumulado después de él.
+  //
+  // Aquí vivía un filtro que descartaba toda fila que rompiera la monotonía,
+  // escrito cuando los barridos se tomaban por datos corruptos. Descartaba
+  // cada lectura posterior a un barrido y hundía el ritmo calculado.
+  function ganadoEntre(anterior, actual) {
+    const a = Number(anterior), c = Number(actual);
+    if (!Number.isFinite(a) || !Number.isFinite(c)) return 0;
+    return c >= a ? c - a : c;
+  }
+
+  function valoresChart(rango) {
+    if (rango === '24h') {
+      const out = [];
+      for (let i = 1; i < snapshots24h.length; i++) {
+        out.push(ganadoEntre(snapshots24h[i - 1].ganado, snapshots24h[i].ganado));
+      }
+      return out;
+    }
+    const n = rango === '7d' ? 7 : 30;
+    return diarioReal().filter(d => d.completo).slice(-n).map(d => d.ganado_dia || 0);
+  }
+
+  // Abrir en un rango vacío hace pensar que algo está roto. Si el rango por
+  // defecto no tiene datos todavía, se cae al que sí los tenga.
+  function ajustarRangoChart() {
+    if (valoresChart(currentChartRange).length) return;
+    const alternativo = ['24h', '7d', '30d'].find(r => valoresChart(r).length);
+    if (!alternativo) return;
+    currentChartRange = alternativo;
+    document.querySelectorAll('.ct').forEach(x => x.classList.toggle('on', x.dataset.r === alternativo));
   }
 
   function renderChart() {
     const bars = $('rewardsBars');
     bars.innerHTML = '';
-    let values = [];
-    if (currentChartRange === '24h') {
-      // snapshots.ganado es acumulado; convertimos a producción por hora (delta)
-      for (let i = 1; i < snapshots24h.length; i++) {
-        values.push(Math.max(0, snapshots24h[i].ganado - snapshots24h[i - 1].ganado));
-      }
-    } else {
-      const n = currentChartRange === '7d' ? 7 : 30;
-      values = daily.slice(-n).map(d => d.ganado_dia || 0);
-    }
+    const values = valoresChart(currentChartRange);
     if (!values.length) { bars.innerHTML = '<div class="empty-msg">Todavía no hay suficiente historial.</div>'; return; }
     const max = Math.max(1, ...values);
     values.forEach(v => {
@@ -780,11 +1102,23 @@ input[type=text].fld{
       const cls = EV_BAD.has(ev.tipo) ? 'bad' : (EV_GOOD.has(ev.tipo) ? 'good' : 'warn');
       const div = document.createElement('div');
       div.className = 'ev ' + cls;
-      const plsPart = ev.pls != null
-        ? ` · <b class="${ev.pls < 0 ? 'neg' : ''}">${ev.pls >= 0 ? '+' : ''}${fmt(ev.pls)} PLS</b>`
-        : '';
-      div.innerHTML = `<div class="h"><div class="ttl">${ev.titulo}</div><div class="tm">${relTime(ev.ts)}</div></div>
-        <div class="sb">${ev.detalle || ''}${plsPart}</div>`;
+
+      const h = document.createElement('div'); h.className = 'h';
+      const ttl = document.createElement('div'); ttl.className = 'ttl'; ttl.textContent = ev.titulo;
+      const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = relTime(ev.ts);
+      h.append(ttl, tm);
+
+      const sb = document.createElement('div'); sb.className = 'sb';
+      sb.textContent = ev.detalle || '';
+      if (ev.pls != null) {
+        const b = document.createElement('b');
+        if (ev.pls < 0) b.className = 'neg';
+        b.textContent = `${ev.pls >= 0 ? '+' : ''}${fmt(ev.pls)} PLS`;
+        if (sb.textContent) sb.append(' · ');
+        sb.append(b);
+      }
+
+      div.append(h, sb);
       el.appendChild(div);
     });
   }
@@ -803,14 +1137,19 @@ input[type=text].fld{
     const rows = $('valRows');
     if (!detalle.length) { rows.innerHTML = '<div class="empty-msg">Sin datos de validadores.</div>'; return; }
     rows.innerHTML = '';
-    detalle.forEach(d => {
-      const efec = ((d.ganado / maxGanado) * 100).toFixed(1);
+    // Orden por efectividad: el que va rezagado es el que interesa mirar.
+    [...detalle].sort((a, b) => b.ganado - a.ganado).forEach(d => {
+      const efec = (d.ganado / maxGanado) * 100;
       const row = document.createElement('div');
       row.className = 'vrow';
       row.innerHTML = `
         <div class="vn">${String(d.indice).slice(-2)}</div>
-        <div class="vinfo"><div class="a">${d.indice}</div><div class="b mono">${d.pubkey_corta} · ${efec}%</div></div>
+        <div class="vinfo"><div class="a">${d.indice}${d.slashed ? ' ⚠︎' : ''}</div><div class="b mono">${d.pubkey_corta} · ${efec.toFixed(1)}%</div></div>
         <div class="vright"><div class="a">+${fmt(d.ganado)}</div><div class="b">${fmtCompact(d.balance)}</div></div>`;
+      if (d.slashed || d.estado !== 'active_ongoing') {
+        row.querySelector('.vinfo .a').style.color = 'var(--bad)';
+        row.querySelector('.vinfo .b').textContent = `${d.pubkey_corta} · ${d.estado}`;
+      }
       rows.appendChild(row);
     });
   }
@@ -834,31 +1173,83 @@ input[type=text].fld{
     $('nSync').textContent = n.optimistic ? 'Optimistic' : 'Verified';
     $('nSync').style.color = n.optimistic ? 'var(--warn)' : 'var(--ok)';
 
-    // runway de disco: regresión simple sobre `daily.disco_pct`
-    if (daily.length >= 3) {
-      const first = daily[0], last = daily[daily.length - 1];
-      const dias = Math.max(1, (new Date(last.fecha) - new Date(first.fecha)) / 86400000);
-      const pctPorDia = (last.disco_pct - first.disco_pct) / dias;
-      if (pctPorDia > 0.01) {
-        const pctSemana = pctPorDia * 7;
-        const diasHasta95 = (95 - n.disco_usado_pct) / pctPorDia;
-        const fecha = new Date(Date.now() + diasHasta95 * 86400000);
-        const fechaTxt = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-        $('nRunway').innerHTML = `Crece ~${fmt(pctSemana, 1)}%/semana · prune recomendado hacia <b style="color:var(--dim)">${fechaTxt}</b>`;
-      } else {
-        $('nRunway').textContent = 'Uso de disco estable, sin crecimiento significativo detectado.';
-      }
+    renderRunway(n);
+
+    // El coste de estar caído se valora al ritmo medido, no a la media desde
+    // la activación: si no, infravalora la pérdida real por un factor de 10.
+    const plsHora = ritmoDiario().pls_dia / 24;
+    $('nExpCost').textContent = `~${fmt(plsHora)} PLS`;
+
+    // Disponibilidad real a partir de `daily.minutos_caido`, con el coste
+    // valorado al ritmo actual de recompensas.
+    const minCaido = daily.reduce((acc, d) => acc + (d.minutos_caido || 0), 0);
+    const minTotales = daily.length * 1440;
+    if (minCaido > 0) {
+      $('nDownTime').innerHTML = minCaido >= 120
+        ? `${fmt(minCaido / 60, 1)} <small>h</small>`
+        : `${fmt(minCaido)} <small>min</small>`;
+      $('nDownCost').textContent = `≈ −${fmt((minCaido / 60) * plsHora)} PLS perdidos`;
+      $('nDownCost').className = 'd neg';
     } else {
-      $('nRunway').textContent = 'Necesitamos más historial (unos días) para estimar el ritmo de crecimiento del disco.';
+      $('nDownTime').innerHTML = '0 <small>min</small>';
+      $('nDownCost').textContent = daily.length ? 'sin caídas registradas' : 'sin historial aún';
+      $('nDownCost').className = 'd pos';
     }
 
-    $('nExpCost').textContent = `~${fmt(v.pls_hora)} PLS`;
+    if (minTotales > 0) {
+      const pct = ((minTotales - minCaido) / minTotales) * 100;
+      $('nUptimePct').innerHTML = `${fmt(pct, pct >= 99.95 ? 2 : 1)}<small>%</small>`;
+      $('nUptimeD').textContent = `sobre ${daily.length} día${daily.length === 1 ? '' : 's'} registrados`;
+    } else {
+      $('nUptimePct').textContent = '–';
+      $('nUptimeD').textContent = 'sin historial aún';
+    }
+  }
+
+  // Runway de disco. `daily` es la fuente buena (tendencia larga, poco ruido),
+  // pero mientras no haya días cerrados se cae a `snapshots` y se dice
+  // claramente que la estimación es provisional: extrapolar años desde unas
+  // horas de datos merece una advertencia, no un número con aires de certeza.
+  function renderRunway(n) {
+    const el = $('nRunway');
+    let pctPorDia = null, provisional = false;
+
+    if (daily.length >= 3) {
+      const a = daily[0], b = daily[daily.length - 1];
+      const dias = (new Date(b.fecha) - new Date(a.fecha)) / 86400000;
+      if (dias >= 1) pctPorDia = (b.disco_pct - a.disco_pct) / dias;
+    }
+
+    // El disco no tiene nada que ver con los barridos: vale la serie tal cual.
+    const snaps = snapshots24h;
+    if (pctPorDia === null && snaps.length >= 3) {
+      const a = snaps[0], b = snaps[snaps.length - 1];
+      const dias = (b.ts - a.ts) / 86400;
+      if (dias >= 0.2) { pctPorDia = (b.disco_pct - a.disco_pct) / dias; provisional = true; }
+    }
+
+    if (pctPorDia === null) {
+      el.textContent = 'Necesitamos algunas horas más de historial para estimar el crecimiento del disco.';
+      return;
+    }
+    if (pctPorDia <= 0.01) {
+      el.textContent = 'Uso de disco estable, sin crecimiento apreciable por ahora.';
+      return;
+    }
+
+    const diasHasta95 = (95 - n.disco_usado_pct) / pctPorDia;
+    const fecha = new Date(Date.now() + diasHasta95 * 86400000);
+    const fechaTxt = fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    el.innerHTML = `Crece ~${fmt(pctPorDia * 7, 1)} %/semana · prune hacia `
+      + `<b style="color:var(--dim)">${fechaTxt}</b>`
+      + (provisional ? ' <span style="opacity:.7">(estimación provisional, pocas horas de datos)</span>' : '');
   }
 
   // ---------- herramientas ----------
   let simPricePerUnit = 0.00007; // se ajusta al cargar via DexScreener si es posible
 
   const SIM_MIN = 0.000005, SIM_MAX = 0.002;
+  const PRECIO_SACRIFICIO = 0.0001; // referencia del sacrificio de PLS
   function priceFromSlider(val) {
     const t = val / 1000;
     return SIM_MIN * Math.pow(SIM_MAX / SIM_MIN, t);
@@ -881,17 +1272,34 @@ input[type=text].fld{
 
     $('simPrice').textContent = `${price < 0.0001 ? price.toFixed(7) : price.toFixed(5)} $`;
     $('simStake').textContent = `${fmt(v.stake_total * price, 2)} $`;
-    $('simGanado').textContent = `${fmt(v.ganado_total * price, 2)} $`;
-    const proy = (v.ganado_total + v.pls_dia * 365) * price;
+    const acumT = gananciaAcumulada();
+    const ganadoRealT = acumT ? acumT.total : v.ganado_total;
+    $('simGanado').textContent = `${fmt(ganadoRealT * price, 2)} $`;
+    const proy = (ganadoRealT + ritmoDiario().pls_dia * 365) * price;
     $('simProy').textContent = `${fmt(proy, 2)} $`;
+
+    // Contexto frente al precio de sacrificio: cuánto falta (o sobra) para volver allí.
+    const ratio = price / PRECIO_SACRIFICIO;
+    const el = $('simVsSac');
+    if (ratio >= 0.995 && ratio <= 1.005) {
+      el.textContent = 'en el precio de sacrificio';
+      el.style.color = 'var(--txt)';
+    } else if (ratio < 1) {
+      el.innerHTML = `−${fmt((1 - ratio) * 100, 1)} %<small>necesita ×${fmt(1 / ratio, ratio < 0.1 ? 0 : 1)} para volver</small>`;
+      el.style.color = 'var(--dim)';
+    } else {
+      el.innerHTML = `×${fmt(ratio, ratio < 10 ? 1 : 0)}<small>por encima del sacrificio</small>`;
+      el.style.color = 'var(--ok)';
+    }
 
     // escenarios: PLS/mes aportado = (eur/precio) ; combinado con ritmo actual
     const V11 = 32_000_000;
-    const restante = Math.max(0, V11 - v.ganado_total);
+    const restante = Math.max(0, V11 - ganadoRealT);
+    const base = ritmoDiario().pls_dia;
     [0, 50, 150].forEach(eur => {
       const plsMes = price > 0 ? eur / price : 0;
       const plsDiaExtra = plsMes / 30.44;
-      const ritmo = v.pls_dia + plsDiaExtra;
+      const ritmo = base + plsDiaExtra;
       const dias = ritmo > 0 ? restante / ritmo : Infinity;
       const el = $('scn' + eur);
       el.innerHTML = (isFinite(dias) ? `${fmt(dias)} d` : '–') + '<small>al validador #11</small>';
@@ -901,10 +1309,16 @@ input[type=text].fld{
     const year = new Date().getFullYear().toString();
     $('fiscYear').textContent = year;
     $('fiscYear2').textContent = year;
-    const ganadoYear = daily.filter(d => d.fecha.startsWith(year)).reduce((acc, d) => acc + (d.ganado_dia || 0), 0);
-    const ganadoMostrar = ganadoYear || v.ganado_total;
+    const ganadoYear = diarioReal().filter(d => d.fecha.startsWith(year))
+      .reduce((acc, d) => acc + (d.ganado_dia || 0), 0);
+    // La fiscalidad cuenta lo retirado, así que aquí manda la ganancia real.
+    const ganadoMostrar = ganadoYear || ganadoRealT;
     $('fiscGanado').innerHTML = `${fmt(ganadoMostrar)} PLS<small style="display:block;color:var(--mute);font-size:11px">≈ ${fmt(ganadoMostrar * fiscPrice(), 2)} $</small>`;
   }
+
+  // La marca del sacrificio se coloca desde la misma escala logarítmica que
+  // el slider, así no se descuadra si algún día cambia el rango.
+  $('simRefSac').style.setProperty('--t', sliderFromPrice(PRECIO_SACRIFICIO) / 1000);
 
   $('simSlider').addEventListener('input', e => {
     simPricePerUnit = priceFromSlider(Number(e.target.value));
@@ -914,10 +1328,26 @@ input[type=text].fld{
 
   $('btnCsv').addEventListener('click', () => {
     const year = new Date().getFullYear().toString();
-    const rows = daily.filter(d => d.fecha.startsWith(year));
-    const header = 'fecha,ganado_dia,ganado_acum,apr_medio,salud\n';
-    const body = rows.map(d => [d.fecha, d.ganado_dia, d.ganado_acum, d.apr_medio, d.salud].join(',')).join('\n');
-    const blob = new Blob([header + body], { type: 'text/csv' });
+    const saludPorDia = new Map(daily.map(d => [d.fecha, d]));
+    const rows = diarioReal().filter(d => d.fecha.startsWith(year))
+      .map(d => ({ ...d, ...(saludPorDia.get(d.fecha) || {}), ganado_dia: d.ganado_dia }));
+    const precio = fiscPrice();
+    // El valor se calcula a un precio único, no al precio de cada día: no
+    // guardamos el histórico de cotización. La cabecera lo deja por escrito
+    // para que nadie lo confunda con una valoración fiscal exacta.
+    const header = `# Recompensas de staking ${year} — PLSDASH\n`
+      + `# valor_usd calculado a un precio fijo de ${precio} $/PLS, no al precio de cada día\n`
+      + 'fecha,ganado_dia_pls,ganado_acum_pls,valor_usd,apr_medio,salud,minutos_caido\n';
+    const body = rows.map(d => [
+      d.fecha,
+      d.ganado_dia ?? 0,
+      d.ganado_acum ?? 0,
+      ((d.ganado_dia || 0) * precio).toFixed(6),
+      d.apr_medio ?? '',
+      d.salud ?? '',
+      d.minutos_caido ?? 0,
+    ].join(',')).join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `validadores-${year}.csv`;
@@ -945,76 +1375,152 @@ input[type=text].fld{
     }, 1000);
   }
 
+  // Dos cosas distintas pueden ir mal y ninguna debe pasar desapercibida:
+  // que el NUC deje de reportar (datos viejos en KV) o que el panel no
+  // consiga hablar con la API (red caída). Se comprueba en su propio reloj,
+  // no solo al refrescar, para que un fallo de red no silencie el aviso.
+  let lastError = null;
+
   function checkStale() {
+    const dot = $('syncDot');
+    const banner = $('staleBanner');
+
+    if (lastError) {
+      banner.style.display = 'block';
+      banner.querySelector('b').textContent = 'Sin conexión con el panel.';
+      $('staleMsg').textContent = lastError === 0
+        ? 'No se pudo contactar con el servidor. Los datos que ves pueden estar desfasados.'
+        : `El servidor respondió con un error (${lastError}). Los datos que ves pueden estar desfasados.`;
+      dot.className = 'bad';
+      return;
+    }
+
     if (!estado) return;
     const ageMin = (Date.now() / 1000 - estado.generado_ts) / 60;
-    const dot = $('syncDot');
     if (ageMin > 15) {
-      $('staleBanner').style.display = 'block';
-      $('staleMsg').textContent = `Última actualización hace ${fmt(ageMin, 0)} min — el NUC podría no estar reportando.`;
+      banner.style.display = 'block';
       dot.className = 'bad';
+
+      // Un descarte posterior al último dato bueno demuestra que el recolector
+      // sigue ejecutándose: lo que falla son las lecturas, no la máquina. Sin
+      // esta distinción los dos casos se ven igual y llevan a ir a mirar un
+      // NUC que está perfectamente encendido.
+      const rechazando = ultimoDescarte && ultimoDescarte.ts > estado.generado_ts;
+      if (rechazando) {
+        banner.querySelector('b').textContent = 'Datos rechazados, no es el NUC.';
+        $('staleMsg').textContent =
+          `El nodo responde pero sus lecturas no se admiten (${ultimoDescarte.detalle || 'sin detalle'}). `
+          + `Último dato bueno hace ${fmt(ageMin, 0)} min.`;
+      } else {
+        banner.querySelector('b').textContent = 'Sin datos recientes.';
+        $('staleMsg').textContent = `El NUC no reporta desde hace ${fmt(ageMin, 0)} min. Revisa que el nodo y el cron sigan vivos.`;
+      }
     } else if (ageMin > 5) {
-      $('staleBanner').style.display = 'none';
+      banner.style.display = 'none';
       dot.className = 'warn';
     } else {
-      $('staleBanner').style.display = 'none';
+      banner.style.display = 'none';
       dot.className = '';
     }
   }
 
   async function loadPrice() {
     try {
-      const res = await fetch('https://api.dexscreener.com/latest/dex/search?q=WPLS');
-      const data = await res.json();
-      const price = data?.pairs?.[0]?.priceUsd;
-      if (price) {
-        simPricePerUnit = Number(price);
+      const res = await fetch(`https://api.dexscreener.com/token-pairs/v1/pulsechain/${WPLS}`);
+      if (!res.ok) return;
+      const pairs = await res.json();
+      if (!Array.isArray(pairs) || !pairs.length) return;
+
+      // `priceUsd` es el precio del token BASE del par, así que solo valen los
+      // pares donde WPLS es la base: en uno tipo HEX/WPLS traería el precio del
+      // HEX. Misma comprobación que hace index.html.
+      //
+      // Hoy no cambia nada —WPLS/DAI, el de más liquidez, ya lleva WPLS como
+      // base— pero protege de que mañana lo haga otro par.
+      const propios = pairs.filter(p => (p.baseToken?.address || '').toLowerCase() === WPLS);
+      if (!propios.length) return;
+
+      const best = propios.reduce((a, p) => (p.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? p : a, propios[0]);
+      const price = parseFloat(best.priceUsd);
+      if (price > 0) {
+        simPricePerUnit = price;
         $('simSlider').value = sliderFromPrice(simPricePerUnit);
       }
     } catch { /* mantiene el valor por defecto si falla */ }
   }
 
-  async function refresh() {
-    const [est, hist24, histTodo, ev] = await Promise.all([
-      api('/estado'),
-      api('/historico?rango=24h'),
-      api('/historico?rango=todo'),
-      api('/eventos?limit=15'),
-    ]);
-    estado = est;
-    snapshots24h = hist24.datos || [];
-    daily = histTodo.datos || [];
-    lastFetch = Date.now();
+  // `daily` solo cambia una vez al día: no tiene sentido pedir el histórico
+  // completo a D1 en cada refresco de un minuto.
+  let dailyLoadedAt = 0;
+  const DAILY_TTL = 30 * 60 * 1000;
 
-    renderResumen();
-    renderValidadores();
-    renderNodo();
-    renderTools();
-    renderEventos(ev.eventos || []);
+  async function refresh() {
+    try {
+      const necesitaDaily = Date.now() - dailyLoadedAt > DAILY_TTL;
+      const peticiones = [
+        api('/estado'),
+        api('/historico?rango=24h'),
+        api('/historico?rango=serie'),
+        api('/ganancia'),
+        api('/eventos?limit=15'),
+        api(`/eventos?limit=1&tipos=${TIPOS_INCIDENCIA.join(',')}`),
+        api('/eventos?limit=1&tipos=descarte'),
+        necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
+        necesitaDaily ? api('/validadores') : Promise.resolve(null),
+      ];
+      const [est, hist24, hSerie, gan, ev, inc, desc, histTodo, valHist] = await Promise.all(peticiones);
+
+      estado = est;
+      snapshots24h = hist24.datos || [];
+      serie = hSerie.datos || [];
+      ganancia = gan && !gan.error ? gan : (gan && gan.total ? gan : null);
+      ultimoIncidente = (inc.eventos || [])[0] || null;
+      ultimoDescarte = (desc.eventos || [])[0] || null;
+      if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
+      if (valHist) { valHistorico = valHist; }
+      lastFetch = Date.now();
+      lastError = null;
+
+      renderResumen();
+      renderValidadores();
+      renderNodo();
+      renderTools();
+      renderEventos(ev.eventos || []);
+    } catch (e) {
+      if (e.status === 401) { showPin('Sesión caducada, introduce el PIN de nuevo.'); return; }
+      // 404 = KV todavía sin datos; el resto son fallos reales de red/servidor.
+      lastError = e.status;
+      console.error('Fallo al actualizar:', e);
+    }
     checkStale();
   }
 
   async function boot() {
     startSyncClock();
+    clearInterval(window.__valStale);
+    window.__valStale = setInterval(checkStale, 30000);
     await loadPrice();
-    try {
-      await refresh();
-    } catch (e) {
-      if (e.message !== '401') console.error(e);
-    }
+    await refresh();
     clearInterval(window.__valPoll);
-    window.__valPoll = setInterval(() => refresh().catch(e => { if (e.message !== '401') console.error(e); }), 60000);
+    window.__valPoll = setInterval(refresh, 60000);
   }
 
-  // arranque: comprobar si ya hay sesión válida (cookie de una visita anterior)
+  function enterApp() {
+    $('pinview').classList.add('off');
+    $('appview').classList.add('on');
+    boot();
+  }
+
+  // Arranque: comprobar si ya hay sesión válida (cookie de una visita anterior).
+  // Solo un 401 significa "no tienes sesión"; un fallo de red o un KV vacío no
+  // deben mandarte a la pantalla de PIN.
   (async function initial() {
     try {
       await api('/estado');
-      $('pinview').classList.add('off');
-      $('appview').classList.add('on');
-      boot();
-    } catch {
-      // sin sesión válida: se queda en la pantalla de PIN
+      enterApp();
+    } catch (e) {
+      if (e.status === 401) return; // se queda en la pantalla de PIN
+      enterApp();                   // sesión válida, pero algo más falla: entra y muestra el aviso
     }
   })();
 })();
