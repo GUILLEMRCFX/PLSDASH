@@ -2,14 +2,21 @@
  * PLSDASH — Validator Dashboard: /api/val/historico
  *
  * Requiere sesión válida (ver _middleware.js).
- * ?rango= 24h | 7d | 30d | todo
- *   24h  → `snapshots` (resolución horaria), últimas 24h
- *   7d   → `daily` (resolución diaria), últimos 7 días
- *   30d  → `daily`, últimos 30 días
- *   todo → `daily` completo
+ * ?rango= 24h | 7d | 30d | todo | serie
+ *   24h   → `snapshots` (resolución horaria), últimas 24h
+ *   7d    → `daily` (resolución diaria), últimos 7 días
+ *   30d   → `daily`, últimos 30 días
+ *   todo  → `daily` completo
+ *   serie → toda la serie de `snapshots`, solo ts y ganado
+ *
+ * `serie` existe para reconstruir la ganancia acumulada. `ganado` es el
+ * excedente sin barrer, y el protocolo lo retira cada ~9 h dejándolo a cero,
+ * así que la ganancia real solo se puede recomponer recorriendo la serie
+ * entera y sumando lo que se llevó cada barrido. Se devuelven dos columnas
+ * para que crezca despacio: unas 8.800 filas al año.
  */
 
-const RANGOS = new Set(['24h', '7d', '30d', 'todo']);
+const RANGOS = new Set(['24h', '7d', '30d', 'todo', 'serie']);
 
 const err = (msg, status) =>
   new Response(JSON.stringify({ error: msg }), {
@@ -22,10 +29,14 @@ export async function onRequestGet({ request, env }) {
 
   const url = new URL(request.url);
   const rango = url.searchParams.get('rango') || '24h';
-  if (!RANGOS.has(rango)) return err('rango inválido (24h | 7d | 30d | todo)', 400);
+  if (!RANGOS.has(rango)) return err('rango inválido (24h | 7d | 30d | todo | serie)', 400);
 
   let stmt;
-  if (rango === '24h') {
+  if (rango === 'serie') {
+    stmt = env.VALIDATOR_DB.prepare(
+      'SELECT ts, ganado FROM snapshots WHERE ganado IS NOT NULL ORDER BY ts ASC'
+    );
+  } else if (rango === '24h') {
     const desde = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
     stmt = env.VALIDATOR_DB.prepare('SELECT * FROM snapshots WHERE ts >= ? ORDER BY ts ASC').bind(desde);
   } else if (rango === 'todo') {

@@ -345,6 +345,7 @@ input[type=text].fld{
     <div class="lbl">Ganado desde el inicio</div>
     <div class="num" id="hlNum">– <span>PLS</span></div>
     <div class="meta" id="hlMeta">&nbsp;</div>
+    <div class="meta" id="hlNota" style="margin-top:6px;color:var(--mute);font-size:11px">&nbsp;</div>
   </div>
 
   <div class="grid2">
@@ -586,6 +587,7 @@ input[type=text].fld{
   let daily = [];        // historico rango=todo (resolución diaria)
   let snapshots24h = []; // historico rango=24h (resolución horaria)
   let valHistorico = { por_dia: [], por_validador: [] }; // validador_diario
+  let serie = [];        // toda la serie de snapshots (ts, ganado)
   let ultimoIncidente = null; // evento más reciente que cuenta como incidencia
   let ultimoDescarte = null;  // última vez que la tubería rechazó una lectura
   let lastFetch = 0;
@@ -594,6 +596,9 @@ input[type=text].fld{
   // Lo que rompe la racha de "sin incidencias": caídas, slashes, desincronizaciones
   // y reinicios. Un bloque propuesto o una activación no son incidencias.
   const TIPOS_INCIDENCIA = ['caida', 'slash', 'desync', 'reinicio', 'aviso'];
+
+  // Activación de los diez validadores (evento `activacion` en D1).
+  const ACTIVACION_TS = 1786095955;
 
   // ---------- utilidades ----------
   const $ = id => document.getElementById(id);
@@ -751,6 +756,44 @@ input[type=text].fld{
       : `Sin incidencias en ${periodo} activo`;
   }
 
+  // Ganancia real acumulada.
+  //
+  // `ganado` (= balance − stake) NO es lo ganado: es solo el excedente que
+  // todavía no se ha retirado. Cada ~9 h el protocolo barre ese excedente a la
+  // wallet de retirada y el contador vuelve a cero. Verificado dos veces el 8 y
+  // 9 de ago: el balance vuelve a 320.000.000 exactos y la acumulación sigue
+  // después al mismo ritmo de siempre.
+  //
+  // La ganancia real se recompone recorriendo la serie: cada bajada es un
+  // barrido, y lo que había justo antes es lo que se llevó.
+  function gananciaAcumulada() {
+    if (serie.length < 2) return null;
+
+    let barrido = 0;
+    let barridos = 0;
+    for (let i = 1; i < serie.length; i++) {
+      if (serie[i].ganado < serie[i - 1].ganado) {
+        barrido += serie[i - 1].ganado;
+        barridos++;
+      }
+    }
+
+    const excedente = serie[serie.length - 1].ganado;
+    return {
+      // El excedente que ya había en la primera medición se cuenta también:
+      // estaba ganado, aunque no sepamos si antes hubo barridos que no vimos.
+      total: barrido + excedente + serie[0].ganado,
+      barrido,
+      barridos,
+      excedente,
+      // Solo se puede recomponer desde que se empezó a registrar. Si el
+      // recolector arrancó después de la activación, lo barrido antes queda
+      // fuera y esta cifra es un suelo, no el total.
+      desde: serie[0].ts,
+      completo: serie[0].ts <= ACTIVACION_TS + 3600,
+    };
+  }
+
   // Ritmo de recompensas. `pls_dia` de KV es la media desde la activación, y
   // durante las primeras semanas está dominada por el periodo en que los
   // validadores aún entraban en cola ganando casi nada: subestima el ritmo
@@ -801,11 +844,27 @@ input[type=text].fld{
     $('statusSub').textContent = estado.salud === 'ok' ? textoIncidencias() : s.label;
 
     const ritmo = ritmoDiario();
+    const acum = gananciaAcumulada();
 
-    $('hlNum').innerHTML = `${fmt(v.ganado_total)} <span>PLS</span>`;
-    const usdTotal = fiscPrice() ? v.ganado_total * fiscPrice() : null;
+    // El número principal es la ganancia real, no el excedente sin barrer.
+    const ganadoReal = acum ? acum.total : v.ganado_total;
+    $('hlNum').innerHTML = `${fmt(ganadoReal)} <span>PLS</span>`;
+
+    const usdTotal = fiscPrice() ? ganadoReal * fiscPrice() : null;
     $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '')
       + `<b>+${fmt(ritmo.pls_dia / 24)} PLS/h</b> ${ritmo.base}`;
+
+    // Decir de dónde sale la cifra: sin esto, un número que incluye barridos
+    // es indistinguible de uno que no, y el error de antes era invisible.
+    const nota = $('hlNota');
+    if (!acum) {
+      nota.textContent = 'Sin serie suficiente para descontar los barridos.';
+    } else {
+      const partes = [`${fmt(acum.barrido)} PLS ya retirados en ${acum.barridos} barrido${acum.barridos === 1 ? '' : 's'}`,
+                      `${fmt(acum.excedente)} sin barrer`];
+      nota.textContent = partes.join(' · ')
+        + (acum.completo ? '' : ' · suelo: falta lo barrido antes de empezar a registrar');
+    }
 
     // "Hoy": el día cerrado de `daily` si existe; si no, proyección al ritmo medido.
     const today = new Date().toISOString().slice(0, 10);
@@ -843,17 +902,17 @@ input[type=text].fld{
 
     // línea de hitos: dominio 0 → 320M (break-even), hito intermedio a 32M (validador #11)
     const BE = 320_000_000, V11 = 32_000_000;
-    const progressPct = Math.min(100, (v.ganado_total / BE) * 100);
+    const progressPct = Math.min(100, (ganadoReal / BE) * 100);
     $('jFill').style.width = progressPct + '%';
     $('jNow').style.left = progressPct + '%';
-    $('jHoyV').textContent = `${fmtCompact(v.ganado_total)} PLS`;
+    $('jHoyV').textContent = `${fmtCompact(ganadoReal)} PLS`;
     $('jHoyD').textContent = `${fmt(v.horas_activo, 1)} h activo`;
 
     if (ritmo.pls_dia > 0) {
-      const diasV11 = Math.max(0, (V11 - v.ganado_total) / ritmo.pls_dia);
-      const diasBE = Math.max(0, (BE - v.ganado_total) / ritmo.pls_dia);
-      $('jV11D').textContent = v.ganado_total >= V11 ? 'alcanzado' : `en ~${fmt(diasV11)} días`;
-      $('jBeD').textContent = v.ganado_total >= BE ? 'alcanzado' : `en ~${fmt(diasBE / 365, 1)} años`;
+      const diasV11 = Math.max(0, (V11 - ganadoReal) / ritmo.pls_dia);
+      const diasBE = Math.max(0, (BE - ganadoReal) / ritmo.pls_dia);
+      $('jV11D').textContent = ganadoReal >= V11 ? 'alcanzado' : `en ~${fmt(diasV11)} días`;
+      $('jBeD').textContent = ganadoReal >= BE ? 'alcanzado' : `en ~${fmt(diasBE / 365, 1)} años`;
     } else {
       $('jV11D').textContent = 'sin ritmo medible';
       $('jBeD').textContent = 'sin ritmo medible';
@@ -1135,8 +1194,10 @@ input[type=text].fld{
 
     $('simPrice').textContent = `${price < 0.0001 ? price.toFixed(7) : price.toFixed(5)} $`;
     $('simStake').textContent = `${fmt(v.stake_total * price, 2)} $`;
-    $('simGanado').textContent = `${fmt(v.ganado_total * price, 2)} $`;
-    const proy = (v.ganado_total + ritmoDiario().pls_dia * 365) * price;
+    const acumT = gananciaAcumulada();
+    const ganadoRealT = acumT ? acumT.total : v.ganado_total;
+    $('simGanado').textContent = `${fmt(ganadoRealT * price, 2)} $`;
+    const proy = (ganadoRealT + ritmoDiario().pls_dia * 365) * price;
     $('simProy').textContent = `${fmt(proy, 2)} $`;
 
     // Contexto frente al precio de sacrificio: cuánto falta (o sobra) para volver allí.
@@ -1155,7 +1216,7 @@ input[type=text].fld{
 
     // escenarios: PLS/mes aportado = (eur/precio) ; combinado con ritmo actual
     const V11 = 32_000_000;
-    const restante = Math.max(0, V11 - v.ganado_total);
+    const restante = Math.max(0, V11 - ganadoRealT);
     const base = ritmoDiario().pls_dia;
     [0, 50, 150].forEach(eur => {
       const plsMes = price > 0 ? eur / price : 0;
@@ -1171,7 +1232,8 @@ input[type=text].fld{
     $('fiscYear').textContent = year;
     $('fiscYear2').textContent = year;
     const ganadoYear = daily.filter(d => d.fecha.startsWith(year)).reduce((acc, d) => acc + (d.ganado_dia || 0), 0);
-    const ganadoMostrar = ganadoYear || v.ganado_total;
+    // La fiscalidad cuenta lo retirado, así que aquí manda la ganancia real.
+    const ganadoMostrar = ganadoYear || ganadoRealT;
     $('fiscGanado').innerHTML = `${fmt(ganadoMostrar)} PLS<small style="display:block;color:var(--mute);font-size:11px">≈ ${fmt(ganadoMostrar * fiscPrice(), 2)} $</small>`;
   }
 
@@ -1308,16 +1370,18 @@ input[type=text].fld{
       const peticiones = [
         api('/estado'),
         api('/historico?rango=24h'),
+        api('/historico?rango=serie'),
         api('/eventos?limit=15'),
         api(`/eventos?limit=1&tipos=${TIPOS_INCIDENCIA.join(',')}`),
         api('/eventos?limit=1&tipos=descarte'),
         necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
         necesitaDaily ? api('/validadores') : Promise.resolve(null),
       ];
-      const [est, hist24, ev, inc, desc, histTodo, valHist] = await Promise.all(peticiones);
+      const [est, hist24, hSerie, ev, inc, desc, histTodo, valHist] = await Promise.all(peticiones);
 
       estado = est;
       snapshots24h = hist24.datos || [];
+      serie = hSerie.datos || [];
       ultimoIncidente = (inc.eventos || [])[0] || null;
       ultimoDescarte = (desc.eventos || [])[0] || null;
       if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
