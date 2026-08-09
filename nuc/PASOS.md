@@ -7,15 +7,17 @@ esperar.
 
 ## Paso 1 — Copiar los archivos al NUC
 
-Desde el NUC:
+**Mientras la rama no esté fusionada hay que pedirla por su nombre**: un
+`git clone` a secas trae `main`, donde esta carpeta todavía no existe.
 
 ```bash
-cd /home/guillem
-git clone https://github.com/GUILLEMRCFX/PLSDASH.git /tmp/plsdash
+rm -rf /tmp/plsdash
+git clone -b claude/lo-pillas-hqchw0 \
+  https://github.com/GUILLEMRCFX/PLSDASH.git /tmp/plsdash
 cp /tmp/plsdash/nuc/*.py /home/guillem/
 ```
 
-Si ya tienes el repo clonado, basta con un `git pull` y copiar los `.py`.
+Una vez fusionada la rama a `main`, el `-b ...` sobra.
 
 ## Paso 2 — Comprobar que todo responde
 
