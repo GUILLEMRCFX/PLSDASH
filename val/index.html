@@ -122,9 +122,15 @@ body{
 .headline .num span{font-size:17px;-webkit-text-fill-color:var(--dim);letter-spacing:0}
 .headline .meta{font-size:12px;color:var(--dim)}
 .headline .meta b{color:var(--ok);font-weight:600}
+.headline .num{cursor:pointer;user-select:none}
+.pill-blq{
+  font-size:10px;font-weight:600;color:#dcbcff;background:#a855f722;
+  border:1px solid #a855f744;border-radius:5px;padding:1px 4px;margin-left:5px;
+  vertical-align:1px;letter-spacing:.3px;
+}
 
 .stat .k{font-size:10.5px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
-.stat .v{font-size:22px;font-weight:600;letter-spacing:-.6px;margin-top:7px}
+.stat .v{font-size:22px;font-weight:600;letter-spacing:-.6px;margin-top:7px;white-space:nowrap}
 .stat .v small{font-size:12px;color:var(--dim);font-weight:500;letter-spacing:0}
 .stat .d{font-size:11px;color:var(--mute);margin-top:5px}
 .stat .d.pos{color:var(--ok)}
@@ -196,7 +202,10 @@ body{
 .ct{font-size:10.5px;padding:5px 10px;border-radius:7px;background:#ffffff08;color:var(--mute);cursor:pointer;font-weight:600;border:1px solid transparent;font-family:inherit}
 .ct.on{background:#a855f71f;color:#dcbcff;border-color:#a855f744}
 .bars{display:flex;align-items:flex-end;gap:5px;height:112px;margin-top:16px}
-.bar{flex:1;border-radius:4px 4px 0 0;background:var(--grad);opacity:.8;min-height:2px}
+.bar{flex:1;border-radius:4px 4px 0 0;background:var(--grad);opacity:.55;min-height:2px}
+/* Los ciclos con bloque destacan: es lo que explica los picos. */
+.bar.con-bloque{opacity:1;box-shadow:0 0 0 1px #ffffff22 inset}
+.chart-pie{font-size:10.5px;color:var(--mute);margin-top:10px;text-align:right}
 
 /* ---------- validator rows ---------- */
 .vrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
@@ -220,7 +229,8 @@ body{
 .nrow .l{font-size:13px;color:var(--dim)}
 .nrow .r{font-size:13.5px;font-weight:600}
 .nrow .r small{font-size:11px;color:var(--mute);font-weight:400;display:block;margin-top:2px;text-align:right}
-.meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:10px}
+.meter{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:14px}
+.runway{font-size:11px;color:var(--mute);margin-top:9px;line-height:1.5}
 .meter i{display:block;height:100%;background:var(--grad);width:0%}
 
 .note{
@@ -233,6 +243,13 @@ body{
 
 /* ---------- tools ---------- */
 .sim-val{font-size:30px;font-weight:700;letter-spacing:-1px;margin:4px 0 2px}
+.sim-fila{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.btn-ahora{
+  flex:none;font-size:11px;font-weight:600;padding:6px 12px;border-radius:8px;
+  background:#a855f71f;color:#dcbcff;border:1px solid #a855f744;
+  font-family:inherit;cursor:pointer;
+}
+.btn-ahora:disabled{opacity:.35;cursor:default}
 .sim-lbl{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:1px;font-weight:600}
 /* pista del simulador: el input y la marca del precio de sacrificio comparten
    el mismo sistema de coordenadas, descontando el ancho del pulgar (20px) */
@@ -434,8 +451,8 @@ input[type=text].fld{
     </div>
   </div>
 
-  <div class="eyebrow">Últimos 30 días</div>
-  <div class="card">
+  <div class="eyebrow" id="strip30Titulo" style="display:none">Últimos 30 días</div>
+  <div class="card" id="strip30Bloque" style="display:none">
     <div class="strip" id="strip30"></div>
     <div class="strip-x"><span>hace 30 d</span><span>hoy</span></div>
   </div>
@@ -448,16 +465,17 @@ input[type=text].fld{
   <div class="eyebrow">Recompensas</div>
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:13.5px;font-weight:600">Acumulado</div>
+      <div style="font-size:13.5px;font-weight:600">Por barrido</div>
       <div class="chart-tabs" id="chartTabs">
         <span class="ct" data-r="24h">24h</span><span class="ct on" data-r="7d">7d</span><span class="ct" data-r="30d">30d</span>
       </div>
     </div>
     <div class="bars" id="rewardsBars"></div>
+    <div class="chart-pie" id="chartPie"></div>
   </div>
 
   <div class="eyebrow">Propuestas de bloque</div>
-  <div class="grid2">
+  <div class="grid3">
     <div class="card stat">
       <div class="k">Total</div>
       <div class="v" id="blocksTotal">–</div>
@@ -468,13 +486,18 @@ input[type=text].fld{
       <div class="v" id="blocksNext">–</div>
       <div class="d" id="blocksNextD">&nbsp;</div>
     </div>
+    <div class="card stat">
+      <div class="k">Peso</div>
+      <div class="v" id="blocksPeso">–</div>
+      <div class="d" id="blocksPesoD">&nbsp;</div>
+    </div>
   </div>
 
 </section>
 
 <!-- ============ VALIDADORES ============ -->
 <section id="vals" class="pane">
-  <div class="grid2">
+  <div class="grid3">
     <div class="card stat">
       <div class="k">En staking</div>
       <div class="v" id="valStaking">–</div>
@@ -484,6 +507,11 @@ input[type=text].fld{
       <div class="k">Coste de fallos</div>
       <div class="v" id="valCoste">–</div>
       <div class="d">estimado, atestaciones perdidas</div>
+    </div>
+    <div class="card stat">
+      <div class="k">En la wallet</div>
+      <div class="v" id="valWallet">–</div>
+      <div class="d" id="valWalletD">&nbsp;</div>
     </div>
   </div>
 
@@ -509,10 +537,8 @@ input[type=text].fld{
     <div class="nrow"><div class="l">Carga</div><div class="r" id="nCarga">–</div></div>
     <div class="nrow"><div class="l">Memoria</div><div class="r" id="nRam">–</div></div>
     <div class="nrow"><div class="l">Disco NVMe</div><div class="r" id="nDisco">–</div></div>
-  </div>
-  <div class="meter"><i id="nDiscoBar"></i></div>
-  <div style="font-size:11px;color:var(--mute);margin-top:9px;padding:0 2px" id="nRunway">
-    Calculando runway de disco…
+    <div class="meter"><i id="nDiscoBar"></i></div>
+    <div class="runway" id="nRunway">Calculando runway de disco…</div>
   </div>
 
   <div class="eyebrow">Sincronización</div>
@@ -548,12 +574,15 @@ input[type=text].fld{
   <div class="eyebrow">Simulador de precio</div>
   <div class="card">
     <div class="sim-lbl">Si PLS estuviera a</div>
-    <div class="sim-val" id="simPrice" style="background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">– $</div>
+    <div class="sim-fila">
+      <div class="sim-val" id="simPrice" style="background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent">– $</div>
+      <button class="btn-ahora" id="btnAhora" title="Volver al precio real">Ahora</button>
+    </div>
     <div class="simtrack">
       <div class="simref" id="simRefSac" data-label="sacrificio"></div>
       <input type="range" min="0" max="1000" value="350" id="simSlider">
     </div>
-    <div class="ticks"><span>0,000005</span><span>0,0001</span><span>0,002</span></div>
+    <div class="ticks"><span>0,0₅5</span><span>0,0₃1</span><span>0,002</span></div>
     <div style="margin-top:18px">
       <div class="nrow"><div class="l">Valor del stake</div><div class="r" id="simStake">–</div></div>
       <div class="nrow"><div class="l">Ganado hasta hoy</div><div class="r" id="simGanado" style="color:var(--ok)">–</div></div>
@@ -776,6 +805,13 @@ input[type=text].fld{
   // salía del 25-38 % cuando todos iban perfectos.
   //
   // Un bloque es suerte, no rendimiento, y no puede definir el listón.
+  // Marca de bloques propuestos, para la lista de validadores.
+  function bloquesDe(indice) {
+    const n = ganancia?.por_validador?.[indice] || 0;
+    if (!n) return '';
+    return ` <span class="pill-blq" title="${n} bloque${n === 1 ? '' : 's'} propuesto${n === 1 ? '' : 's'}">⬦${n > 1 ? ' ' + n : ''}</span>`;
+  }
+
   function referenciaGrupo(valores) {
     if (valores.length < 3) return null;
     const orden = [...valores].sort((a, b) => a - b);
@@ -950,6 +986,29 @@ input[type=text].fld{
     return { pls_dia: estado.validadores.pls_dia, base: 'media desde la activación', provisional: true };
   }
 
+  // El número principal alterna entre PLS y dólares al tocarlo. La elección
+  // se recuerda entre sesiones porque es una preferencia, no un modo puntual.
+  let ganadoActual = null;
+  let enDolares = localStorage.getItem('val_moneda') === 'usd';
+
+  function pintarPrincipal() {
+    if (ganadoActual == null) return;
+    const precio = precioPLS();
+    if (enDolares && precio) {
+      $('hlNum').innerHTML = `${fmt(ganadoActual * precio, 2)} <span>$</span>`;
+    } else {
+      $('hlNum').innerHTML = `${fmt(ganadoActual)} <span>PLS</span>`;
+    }
+    $('hlNum').title = enDolares ? 'Tocar para ver en PLS' : 'Tocar para ver en dólares';
+  }
+
+  $('hlNum').addEventListener('click', () => {
+    if (!precioPLS()) return;   // sin precio no hay nada que alternar
+    enDolares = !enDolares;
+    localStorage.setItem('val_moneda', enDolares ? 'usd' : 'pls');
+    pintarPrincipal();
+  });
+
   function paintStatus(boxEl, ringEl, salud) {
     const s = SALUD_MAP[salud] || SALUD_MAP.sin_datos;
     ringEl.style.borderColor = s.color;
@@ -972,11 +1031,10 @@ input[type=text].fld{
 
     // El número principal es la ganancia real, no el excedente sin barrer.
     const ganadoReal = acum ? acum.total : v.ganado_total;
-    $('hlNum').innerHTML = `${fmt(ganadoReal)} <span>PLS</span>`;
+    ganadoActual = ganadoReal;
+    pintarPrincipal();
 
-    const usdTotal = precioPLS() ? ganadoReal * precioPLS() : null;
-    $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '')
-      + `<b>+${fmt(ritmo.pls_dia / 24)} PLS/h</b> ${ritmo.base}`;
+    $('hlMeta').innerHTML = `<b>+${fmt(ritmo.pls_dia / 24)} PLS/h</b> ${ritmo.base}`;
 
     // Decir de dónde sale la cifra: sin esto, un número que incluye barridos
     // es indistinguible de uno que no, y el error de antes era invisible.
@@ -1001,7 +1059,9 @@ input[type=text].fld{
     const hoyRow = dias.find(d => d.fecha === today);
     const ayerRow = dias.find(d => d.fecha === ayer);
     const hoyGanado = hoyRow ? hoyRow.ganado_dia : ritmo.pls_dia;
-    $('statHoyV').innerHTML = `${fmt(hoyGanado)} <small>PLS</small>`;
+    // Compacto: con tres tarjetas por fila, «35.651 PLS» parte la unidad a
+    // otra línea y descuadra la altura frente a «8,86 %» y «99,7 %».
+    $('statHoyV').innerHTML = `${fmtCompact(hoyGanado)} <small>PLS</small>`;
 
     // Comparar contra ayer solo tiene sentido con el día cerrado; si el de hoy
     // va a medias, la caída sería un artefacto de la hora que sea.
@@ -1024,9 +1084,9 @@ input[type=text].fld{
       $('statEfecD').textContent = 'aún sin media histórica';
       $('statEfecD').className = 'd';
     } else {
-      const delta = efecPct - media;
+      // Sin color: es contexto, no una alerta. En rojo parecía un problema.
       $('statEfecD').textContent = `tu media: ${fmt(media, 1)}%`;
-      $('statEfecD').className = 'd' + (Math.abs(delta) < 0.2 ? '' : (delta > 0 ? ' pos' : ' neg'));
+      $('statEfecD').className = 'd';
     }
 
     // línea de hitos: dominio 0 → 320M (break-even), hito intermedio a 32M (validador #11)
@@ -1048,7 +1108,12 @@ input[type=text].fld{
     }
     $('jBase').textContent = ritmo.provisional ? `${ritmo.base} · provisional` : ritmo.base;
 
-    // franja 30 días
+    // Franja de 30 días: con dos días de historial son 28 huecos vacíos y
+    // parece que falta algo. Se esconde hasta que haya una semana que enseñar.
+    const diasConDatos = diarioReal().length;
+    $('strip30Bloque').style.display = diasConDatos >= 7 ? '' : 'none';
+    $('strip30Titulo').style.display = diasConDatos >= 7 ? '' : 'none';
+
     const stripEl = $('strip30');
     const dias30 = new Map(diarioReal().map(d => [d.fecha, d.ganado_dia]));
     stripEl.innerHTML = '';
@@ -1076,8 +1141,9 @@ input[type=text].fld{
     });
 
     // propuestas de bloque
-    const totalBloques = daily.reduce((acc, d) => acc + (d.bloques || 0), 0);
-    $('blocksTotal').textContent = totalBloques;
+    // `daily.bloques` no lo rellena nadie; los bloques reales están marcados
+    // en `barridos` y llegan contados en /api/val/ganancia.
+    $('blocksTotal').textContent = ganancia ? ganancia.bloques : '–';
     if (v.total > 0) {
       const red = estado.red_validadores_activos || RED_VALIDADORES_RESPALDO;
       const slotsPorDia = 86400 / SLOT_SECONDS;
@@ -1085,6 +1151,16 @@ input[type=text].fld{
       $('blocksNext').innerHTML = `~${fmt(diasSiguiente, diasSiguiente < 2 ? 1 : 0)} <small>días</small>`;
       $('blocksNextD').textContent = `${v.total} de ${fmt(red)}`
         + (estado.red_validadores_activos ? '' : ' (red sin medir)');
+    }
+
+    // Cuánto del total viene de proponer bloques: la parte de suerte frente al
+    // rendimiento base del nodo. Es también lo que explica que el APR baile.
+    if (ganancia && ganancia.peso_bloques != null && ganancia.pls_bloques > 0) {
+      $('blocksPeso').innerHTML = `${fmt(ganancia.peso_bloques, 1)}<small>%</small>`;
+      $('blocksPesoD').textContent = `${fmtCompact(ganancia.pls_bloques)} PLS de ${fmtCompact(ganancia.total)}`;
+    } else {
+      $('blocksPeso').textContent = '–';
+      $('blocksPesoD').textContent = 'sin bloques aún';
     }
 
     // APR sobre la ganancia real, no sobre el excedente: es la rentabilidad
@@ -1121,16 +1197,16 @@ input[type=text].fld{
     return c >= a ? c - a : c;
   }
 
+  // Cada barra es un ciclo de barrido completo (~8,1 h), no una hora suelta:
+  // así se compara ciclo contra ciclo, que es la unidad real en la que el
+  // protocolo paga. Los que llevaron bloque van marcados.
   function valoresChart(rango) {
-    if (rango === '24h') {
-      const out = [];
-      for (let i = 1; i < snapshots24h.length; i++) {
-        out.push(ganadoEntre(snapshots24h[i - 1].ganado, snapshots24h[i].ganado));
-      }
-      return out;
-    }
-    const n = rango === '7d' ? 7 : 30;
-    return diarioReal().filter(d => d.completo).slice(-n).map(d => d.ganado_dia || 0);
+    const ciclos = ganancia?.ciclos || [];
+    if (!ciclos.length) return [];
+
+    const horas = rango === '24h' ? 24 : (rango === '7d' ? 24 * 7 : 24 * 30);
+    const desde = Date.now() / 1000 - horas * 3600;
+    return ciclos.filter(c => c.ts >= desde);
   }
 
   // Abrir en un rango vacío hace pensar que algo está roto. Si el rango por
@@ -1221,15 +1297,28 @@ input[type=text].fld{
   function renderChart() {
     const bars = $('rewardsBars');
     bars.innerHTML = '';
-    const values = valoresChart(currentChartRange);
-    if (!values.length) { bars.innerHTML = '<div class="empty-msg">Todavía no hay suficiente historial.</div>'; return; }
-    const max = Math.max(1, ...values);
-    values.forEach(v => {
+    const ciclos = valoresChart(currentChartRange);
+    if (!ciclos.length) {
+      bars.innerHTML = '<div class="empty-msg">Sin barridos en este periodo.</div>';
+      $('chartPie').textContent = '';
+      return;
+    }
+
+    const max = Math.max(1, ...ciclos.map(c => c.pls));
+    for (const c of ciclos) {
       const bar = document.createElement('div');
-      bar.className = 'bar';
-      bar.style.height = Math.max(2, (v / max) * 100) + '%';
+      bar.className = 'bar' + (c.bloques > 0 ? ' con-bloque' : '');
+      bar.style.height = Math.max(2, (c.pls / max) * 100) + '%';
+      const cuando = new Date(c.ts * 1000)
+        .toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      bar.title = `${cuando} · ${fmt(c.pls)} PLS`
+        + (c.bloques ? ` · ${c.bloques} bloque${c.bloques === 1 ? '' : 's'}` : '');
       bars.appendChild(bar);
-    });
+    }
+
+    const conBloque = ciclos.filter(c => c.bloques > 0).length;
+    $('chartPie').textContent = `${ciclos.length} barrido${ciclos.length === 1 ? '' : 's'}`
+      + (conBloque ? ` · ${conBloque} con bloque` : '');
   }
 
   $('chartTabs').addEventListener('click', e => {
@@ -1289,17 +1378,30 @@ input[type=text].fld{
     const costeFallos = detalle.reduce((acc, d) => acc + Math.max(0, refGrupo - d.ganado), 0);
     $('valCoste').innerHTML = `−${fmt(costeFallos)} <small>PLS</small>`;
 
+    if (ganancia && ganancia.saldo_wallet != null) {
+      $('valWallet').innerHTML = `${fmtCompact(ganancia.saldo_wallet)} <small>PLS</small>`;
+      const p = precioPLS();
+      $('valWalletD').textContent = p
+        ? `≈ ${fmt(ganancia.saldo_wallet * p, 2)} $ · lo ya cobrado`
+        : 'lo que de verdad ha llegado';
+    } else {
+      $('valWallet').textContent = '–';
+      $('valWalletD').textContent = 'sin lectura de la cadena';
+    }
+
     const rows = $('valRows');
     if (!detalle.length) { rows.innerHTML = '<div class="empty-msg">Sin datos de validadores.</div>'; return; }
     rows.innerHTML = '';
-    // Orden por efectividad: el que va rezagado es el que interesa mirar.
-    [...detalle].sort((a, b) => b.ganado - a.ganado).forEach(d => {
+    // Orden fijo por índice. Ordenar por ganancia hacía bailar la lista en
+    // cada carga, y con los barridos la ganancia se reinicia cada ocho horas:
+    // el orden cambiaba sin que pasara nada.
+    [...detalle].sort((a, b) => a.indice - b.indice).forEach((d, i) => {
       const efec = Math.min(100, (d.ganado / refGrupo) * 100);
       const row = document.createElement('div');
       row.className = 'vrow';
       row.innerHTML = `
-        <div class="vn">${String(d.indice).slice(-2)}</div>
-        <div class="vinfo"><div class="a">${d.indice}${d.slashed ? ' ⚠︎' : ''}</div><div class="b mono">${d.pubkey_corta} · ${efec.toFixed(1)}%</div></div>
+        <div class="vn">${i + 1}</div>
+        <div class="vinfo"><div class="a">${d.indice}${d.slashed ? ' ⚠︎' : ''}${bloquesDe(d.indice)}</div><div class="b mono">${d.pubkey_corta} · ${efec.toFixed(1)}%</div></div>
         <div class="vright"><div class="a">+${fmt(d.ganado)}</div><div class="b">${fmtCompact(d.balance)}</div></div>`;
       if (d.slashed || d.estado !== 'active_ongoing') {
         row.querySelector('.vinfo .a').style.color = 'var(--bad)';
@@ -1429,7 +1531,7 @@ input[type=text].fld{
     const v = estado.validadores;
     const price = simPricePerUnit;
 
-    $('simPrice').textContent = `${price < 0.0001 ? price.toFixed(7) : price.toFixed(5)} $`;
+    $('simPrice').textContent = `${fmtPrecio(price)} $`;
     $('simStake').textContent = `${fmt(v.stake_total * price, 2)} $`;
     const acumT = gananciaAcumulada();
     const ganadoRealT = acumT ? acumT.total : v.ganado_total;
@@ -1469,6 +1571,15 @@ input[type=text].fld{
   // La marca del sacrificio se coloca desde la misma escala logarítmica que
   // el slider, así no se descuadra si algún día cambia el rango.
   $('simRefSac').style.setProperty('--t', sliderFromPrice(PRECIO_SACRIFICIO) / 1000);
+
+  $('btnAhora').addEventListener('click', () => {
+    const p = precioPLS();
+    if (!p) return;
+    sliderTocado = false;
+    simPricePerUnit = p;
+    $('simSlider').value = sliderFromPrice(p);
+    renderTools();
+  });
 
   $('simSlider').addEventListener('input', e => {
     sliderTocado = true;
@@ -1586,23 +1697,26 @@ input[type=text].fld{
           $('simSlider').value = sliderFromPrice(price);
         }
         pintarPrecio(price, best.priceChange?.h24);
+        $('btnAhora').disabled = false;
+        pintarPrincipal();
       }
     } catch { /* se queda con el último precio bueno si falla */ }
   }
 
-  function pintarPrecio(precio, cambio24) {
-    // Notación compacta para los ceros: 0,0₅9406 en vez de 0,000009406, que a
-    // simple vista se confunde con un orden de magnitud distinto.
+  // Notación compacta para los ceros: 0,0₅9406 en vez de 0,000009406, que a
+  // simple vista se confunde con un orden de magnitud distinto. Se usa en todo
+  // el panel —cabecera y simulador— para no leer el mismo dato de dos formas.
+  function fmtPrecio(precio) {
+    if (!(precio > 0)) return '–';
     const exp = Math.floor(Math.log10(precio));
-    let texto;
-    if (exp >= -4) {
-      texto = precio.toFixed(6);
-    } else {
-      const ceros = -exp - 1;
-      const digitos = Math.round(precio * Math.pow(10, ceros + 4));
-      texto = `0,0${'₀₁₂₃₄₅₆₇₈₉'[ceros]}${digitos}`;
-    }
-    $('precioVal').textContent = `$${texto}`;
+    if (exp >= -4) return precio.toFixed(6).replace('.', ',');
+    const ceros = -exp - 1;
+    const digitos = Math.round(precio * Math.pow(10, ceros + 4));
+    return `0,0${'₀₁₂₃₄₅₆₇₈₉'[ceros]}${digitos}`;
+  }
+
+  function pintarPrecio(precio, cambio24) {
+    $('precioVal').textContent = `$${fmtPrecio(precio)}`;
 
     const chg = $('precioChg');
     if (cambio24 == null || !Number.isFinite(Number(cambio24))) {
