@@ -1431,10 +1431,12 @@ input[type=text].fld{
       const pairs = await res.json();
       if (!Array.isArray(pairs) || !pairs.length) return;
 
-      // `priceUsd` es el precio del token BASE del par. Si WPLS es el token de
-      // cotización —un par HEX/WPLS, por ejemplo— ese campo trae el precio del
-      // HEX. Sin filtrar salía 0,00000941 en vez de 0,0000358, y como el número
-      // es plausible el error no se nota: hay que comprobarlo, no mirarlo.
+      // `priceUsd` es el precio del token BASE del par, así que solo valen los
+      // pares donde WPLS es la base: en uno tipo HEX/WPLS traería el precio del
+      // HEX. Misma comprobación que hace index.html.
+      //
+      // Hoy no cambia nada —WPLS/DAI, el de más liquidez, ya lleva WPLS como
+      // base— pero protege de que mañana lo haga otro par.
       const propios = pairs.filter(p => (p.baseToken?.address || '').toLowerCase() === WPLS);
       if (!propios.length) return;
 

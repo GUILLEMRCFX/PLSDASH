@@ -137,10 +137,17 @@ try:
     from precio_y_bloques import precio_pls
 
     p = precio_pls()
-    if p and p > 0:
-        resultado("OK", "Precio de PLS disponible", f"{p:.8f} $/PLS")
-    else:
+    if not p or p <= 0:
         resultado("FALLO", "Precio de PLS disponible", "DexScreener no devolvió precio")
+    elif not (1e-6 <= p <= 1e-3):
+        # Un precio de otro orden de magnitud casi siempre significa que se ha
+        # leído el par equivocado, no que PLS se haya movido tanto.
+        resultado("FALLO", "Precio de PLS disponible",
+                  f"{p:.8f} $/PLS está fuera del rango esperado (1e-6 a 1e-3)")
+    else:
+        resultado("OK", "Precio de PLS disponible",
+                  f"{p:.8f} $/PLS · tu wallet valdría "
+                  f"{miles(515921 * p)} $ aprox.")
 except Exception as e:
     resultado("FALLO", "Precio de PLS disponible", str(e))
 
