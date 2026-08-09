@@ -27,10 +27,14 @@ lo que ya se sabe. El nodo estaba sano en ambos momentos (67 peers,
 sincronizado, epochs avanzando, 45 °C): es la API de Lighthouse devolviendo
 balances incoherentes de forma intermitente.
 
+Las bajadas de `ganado` resultaron ser barridos de saldo del protocolo, no
+datos malos: cada ~8,1 h retira el excedente y el contador vuelve a cero. Las
+guardias de monotonía que hubo aquí habrían congelado la tubería cada ocho
+horas, y están retiradas.
+
 Barreras, de más a menos fiable:
 
-  * `revisar_snapshot(...)` — en push.py. Continuidad: ni bajadas sin
-    penalización ni subidas fuera de todo ritmo plausible.
+  * `revisar_snapshot(...)` — en push.py. Corta subidas imposibles.
   * `lectura_estable(...)`  — en collector.py. Lee dos veces y desconfía si
     las dos lecturas no coinciden.
   * `validar(estado)`       — en collector.py. Formas imposibles conocidas.
@@ -118,41 +122,6 @@ def marcar_sin_datos(estado, motivos):
     return estado
 
 
-def admisible(ultimo_ganado, ganado, slashed=0):
-    """¿Es admisible escribir este `ganado` en D1?
-
-    Las recompensas acumuladas solo suben. Una bajada real solo puede venir de
-    una penalización, y una penalización de verdad también mueve el campo
-    `slashed`: si baja sin que nadie esté penalizado, el dato está mal.
-
-    Devuelve (True, None) o (False, motivo).
-    """
-    if ganado is None:
-        return False, "ganado ausente"
-
-    if ultimo_ganado is None:
-        return True, None  # primera fila, no hay contra qué comparar
-
-    if ganado >= ultimo_ganado:
-        return True, None
-
-    if slashed and slashed > 0:
-        return True, None  # bajada explicada por una penalización real
-
-    return False, (
-        f"ganado bajaría de {ultimo_ganado} a {ganado} sin validadores "
-        "penalizados; las recompensas acumuladas solo suben"
-    )
-
-
-def ultimo_ganado_conocido(d1):
-    """Último `ganado` bueno registrado en D1, o None si la tabla está vacía."""
-    filas = d1(
-        "SELECT ganado FROM snapshots WHERE ganado IS NOT NULL "
-        "ORDER BY ts DESC LIMIT 1"
-    )
-    return float(filas[0]["ganado"]) if filas else None
-
 
 # --------------------------------------------------------------------------
 # Continuidad: la barrera que de verdad aguanta
@@ -212,31 +181,12 @@ def ritmo_referencia(d1, n=VENTANA_REFERENCIA):
     return (ritmos[medio - 1] + ritmos[medio]) / 2
 
 
-# Margen para reconocer un barrido: tras la retirada el balance vuelve al stake
-# exacto, y lo único que puede haberse acumulado encima son las recompensas de
-# las epochs transcurridas desde entonces. Una hora larga de margen sobra.
-MARGEN_BARRIDO_PLS = 5_000
-
-
-def es_barrido(balance_total, stake_total, ganado):
-    """¿La bajada se explica por una retirada parcial del protocolo?
-
-    Tras el barrido el balance queda en el stake exacto y vuelve a subir desde
-    ahí, así que el excedente actual tiene que ser pequeño y el balance tiene
-    que cuadrar con stake + ese excedente.
-    """
-    if not balance_total or not stake_total:
-        return False
-    if ganado is None or ganado < 0 or ganado > MARGEN_BARRIDO_PLS:
-        return False
-    return abs(balance_total - (stake_total + ganado)) < 1.0
-
-
-def revisar_snapshot(d1, ts, ganado, slashed=0, balance_total=None, stake_total=None):
+def revisar_snapshot(d1, ts, ganado):
     """¿Es admisible escribir este snapshot? Devuelve (bool, motivo).
 
-    Comprueba continuidad contra lo ya registrado: las recompensas acumuladas
-    solo suben, y suben a un ritmo que se parece al de las horas anteriores.
+    Ya no se exige que `ganado` suba: baja cada ~8,1 h porque el protocolo
+    barre el excedente, y eso es funcionamiento normal. Lo único que se corta
+    es una subida disparatada, que sí delata una lectura mala.
     """
     if ganado is None:
         return False, "ganado ausente"
@@ -252,26 +202,16 @@ def revisar_snapshot(d1, ts, ganado, slashed=0, balance_total=None, stake_total=
     ganado_previo = float(filas[0]["ganado"])
 
     # --- bajadas ---
+    #
+    # Una bajada NO se rechaza. El protocolo retira el excedente sobre los 32M
+    # a la wallet cada ~8,1 h, el balance vuelve al stake exacto y `ganado`
+    # (que es balance − stake) empieza de cero otra vez. Es el funcionamiento
+    # normal de la cadena, no un dato malo.
+    #
+    # Aquí hubo una guardia que exigía que las recompensas solo subieran.
+    # Habría congelado la tubería cada ocho horas.
     if ganado < ganado_previo:
-        if slashed and slashed > 0:
-            return True, None  # una penalización real sí puede bajar el saldo
-
-        # Un barrido de saldo NO es un error. El protocolo retira el excedente
-        # sobre los 32M a la wallet de retirada cada ~9 h, el balance vuelve a
-        # 32M exactos y `ganado` (que es balance − stake) empieza de cero otra
-        # vez. Observado dos veces el 8 y 9 de ago, con la acumulación
-        # siguiendo después al ritmo normal de ~2.890 PLS/h.
-        #
-        # La primera versión de esta guardia rechazaba estas bajadas y habría
-        # congelado la tubería cada nueve horas.
-        if es_barrido(balance_total, stake_total, ganado):
-            return True, None
-
-        return False, (
-            f"ganado bajaría de {ganado_previo:,.0f} a {ganado:,.0f} "
-            f"(−{ganado_previo - ganado:,.0f}) sin penalización y sin que el "
-            f"balance haya vuelto al stake: no parece un barrido"
-        )
+        return True, None
 
     horas = (int(ts) - ts_previo) / 3600
     if horas <= 0:

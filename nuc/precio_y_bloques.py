@@ -3,10 +3,9 @@ PLSDASH — añadidos para push.py en el NUC.
 
 Dos cosas que el recolector actual no hace:
 
-  1. Guardar el precio de PLS en cada snapshot. Es el único dato del
-     conjunto que no se puede reconstruir después: sin él no hay
-     fiscalidad correcta ni ganancia en euros, y cada hora sin capturarlo
-     se pierde para siempre.
+  1. Guardar el precio de PLS en cada snapshot, para poder ver su evolución
+     en el panel. No se puede reconstruir después: el precio de una hora
+     concreta no lo sirve ninguna API pasado el momento.
 
   2. Detectar propuestas de bloque. push.py ya detecta caídas, reinicios
      y desincronizaciones, pero no bloques, así que el registro de vida se
@@ -64,9 +63,8 @@ def precio_pls():
     """USD por PLS, tomado del par de WPLS con más liquidez.
 
     Devuelve None si no se puede obtener. Un hueco en la columna es
-    preferible a un precio inventado: el hueco se ve y se puede rellenar
-    desde otra fuente, mientras que un cero o un valor de relleno se
-    confunde con un dato bueno y contamina la fiscalidad para siempre.
+    preferible a un precio inventado: el hueco se ve, y un cero de relleno se
+    confunde con un dato bueno y deforma la gráfica sin dejar rastro.
     """
     try:
         r = requests.get(f"{DEXSCREENER}/{WPLS}", timeout=TIMEOUT)

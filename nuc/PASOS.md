@@ -33,9 +33,9 @@ No modifica nada, solo lee. Se puede ejecutar cuantas veces se quiera.
 
 ## Paso 3 — Enganchar el precio y los bloques en `push.py`
 
-Esto es lo único urgente de verdad: **el precio de PLS no se puede recuperar
-después**. Cada hora que pasa sin guardarlo es una hora perdida para siempre
-de cara a la fiscalidad.
+El precio de PLS no se puede recuperar después: ninguna API sirve el precio de
+una hora concreta pasado el momento. Se guarda para poder ver su evolución en
+el panel.
 
 Tres cambios, detallados en `INTEGRACION.md`:
 
