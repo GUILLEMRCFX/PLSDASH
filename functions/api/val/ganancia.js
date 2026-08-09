@@ -44,9 +44,21 @@ const WEI = 1e18;
 // El recolector escribe cada 3 min; recontar más a menudo no aporta nada.
 const FRESCURA_MS = 5 * 60 * 1000;
 
-// Tope de páginas por pasada. En marcha normal es una sola; esto acota el
-// primer arranque, que tiene que recorrer todo lo acumulado hasta ahora.
-const MAX_PAGINAS = 25;
+// Activación de los diez validadores actuales. Todo lo anterior pertenece al
+// validador que usó esta misma wallet durante casi un año, y son miles de
+// retiradas: sin este corte, una tabla vacía dispara un recorrido que termina
+// en 524 (timeout de Cloudflare) sin llegar a escribir nada.
+const ACTIVACION_TS = 1786095955;
+
+// Páginas por fase y pasada. Cada llamada hace como mucho NOVEDADES + SIEMBRA,
+// así que el peor caso son 6 peticiones al explorador. En marcha normal es una.
+//
+// 3 páginas son 150 retiradas ≈ cinco días de barridos, margen de sobra para
+// que una ausencia larga no deje huecos entre lo guardado y lo nuevo.
+const PAGINAS_NOVEDADES = 3;
+const PAGINAS_SIEMBRA = 3;
+
+const CLAVE_SIEMBRA = 'barridos_siembra_completa';
 
 // D1 acepta lotes grandes, pero trocear mantiene cada escritura acotada.
 const TAM_LOTE = 100;
@@ -65,10 +77,29 @@ async function pedir(ruta, params) {
   return res.json();
 }
 
-/** Última retirada ya guardada. null si la tabla está vacía. */
-async function cursor(db) {
-  const fila = await db.prepare('SELECT MAX(indice_retirada) AS tope FROM barridos').first();
-  return fila && fila.tope != null ? Number(fila.tope) : null;
+/** Extremos de lo ya guardado. Sirven de cursor en las dos direcciones. */
+async function extremos(db) {
+  const fila = await db.prepare(
+    'SELECT MAX(indice_retirada) AS tope, MIN(indice_retirada) AS suelo FROM barridos'
+  ).first();
+  return {
+    tope: fila && fila.tope != null ? Number(fila.tope) : null,
+    suelo: fila && fila.suelo != null ? Number(fila.suelo) : null,
+  };
+}
+
+async function siembraCompleta(db) {
+  const fila = await db.prepare('SELECT valor FROM meta WHERE clave = ?')
+    .bind(CLAVE_SIEMBRA).first();
+  return fila?.valor === '1';
+}
+
+async function marcarSiembraCompleta(db) {
+  await db.prepare(
+    'INSERT INTO meta (clave, valor, actualizado) VALUES (?, ?, ?)'
+    + ' ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,'
+    + ' actualizado = excluded.actualizado'
+  ).bind(CLAVE_SIEMBRA, '1', Math.floor(Date.now() / 1000)).run();
 }
 
 /**
@@ -96,40 +127,53 @@ async function totales(db) {
 }
 
 /**
- * Recorre las retiradas posteriores a `desde` y las devuelve. El listado viene
- * de más nueva a más vieja, así que se para en cuanto alcanza lo ya guardado.
+ * Recorre el listado de retiradas, que viene de más nueva a más vieja.
+ *
+ * `arrancarEn`  índice desde el que continuar hacia atrás (para la siembra).
+ * `pararEn`     índice ya guardado: al alcanzarlo no queda nada nuevo.
+ * `maxPaginas`  presupuesto de esta pasada.
+ *
+ * Devuelve lo encontrado y el motivo de la parada, que es lo que dice si la
+ * siembra ha terminado o si hay que seguir en la próxima llamada.
  */
-async function retiradasNuevas(desde) {
-  const nuevas = [];
+async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas }) {
+  const encontradas = [];
   let params = { items_count: 50 };
+  if (arrancarEn != null) params.index = arrancarEn;
 
-  for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+  let motivo = 'presupuesto';
+  for (let pagina = 0; pagina < maxPaginas; pagina++) {
     const datos = await pedir(`/addresses/${WALLET}/withdrawals`, params);
     const items = datos.items || [];
-    if (!items.length) break;
+    if (!items.length) { motivo = 'fin'; break; }
 
-    let alcanzado = false;
+    let parada = null;
     for (const w of items) {
       const indice = Number(w.index);
-      if (desde != null && indice <= desde) { alcanzado = true; break; }
+      const ts = Math.floor(Date.parse(w.timestamp) / 1000);
+
+      // Cruzar la activación significa haber llegado al validador anterior.
+      if (ts < ACTIVACION_TS) { parada = 'activacion'; break; }
+      if (pararEn != null && indice <= pararEn) { parada = 'conocido'; break; }
 
       const validador = Number(w.validator_index);
       if (validador < PRIMER_VALIDADOR || validador > ULTIMO_VALIDADOR) continue;
 
-      nuevas.push({
+      encontradas.push({
         indice,
         validador,
         pls: Number(w.amount) / WEI,
-        ts: Math.floor(Date.parse(w.timestamp) / 1000),
+        ts,
         bloque: Number(w.block_number) || null,
       });
     }
 
-    if (alcanzado || !datos.next_page_params) break;
+    if (parada) { motivo = parada; break; }
+    if (!datos.next_page_params) { motivo = 'fin'; break; }
     params = { items_count: 50, ...datos.next_page_params };
   }
 
-  return nuevas;
+  return { encontradas, motivo };
 }
 
 /**
@@ -168,7 +212,10 @@ export async function onRequestGet({ env }) {
   try {
     if (env.PLSDASH_KV) {
       const cache = await env.PLSDASH_KV.get(CLAVE_CACHE, { type: 'json' });
-      if (cache && Date.now() - (cache.actualizado || 0) < FRESCURA_MS) {
+      // Durante la siembra la caché se acorta: si no, cada tramo esperaría
+      // cinco minutos y completar el histórico llevaría horas.
+      const ventana = cache && cache.sembrando ? 5000 : FRESCURA_MS;
+      if (cache && Date.now() - (cache.actualizado || 0) < ventana) {
         return json({ ...cache, obsoleto: false, de_cache: true });
       }
     }
@@ -176,8 +223,35 @@ export async function onRequestGet({ env }) {
 
   let nuevas = 0;
   let error = null;
+  let sembrando = false;
+
   try {
-    nuevas = await guardar(db, await retiradasNuevas(await cursor(db)));
+    const { tope, suelo } = await extremos(db);
+
+    // Fase 1 — novedades. Desde la más reciente hasta alcanzar lo guardado.
+    const nov = await recorrer({ pararEn: tope, maxPaginas: PAGINAS_NOVEDADES });
+    nuevas += await guardar(db, nov.encontradas);
+
+    // Fase 2 — siembra hacia atrás, a trozos. La tabla empieza vacía y el
+    // histórico no cabe en una sola llamada sin agotar el tiempo del Worker,
+    // así que cada carga del panel avanza un tramo y se guarda el progreso
+    // solo con haber escrito las filas: el cursor es el mínimo de la tabla.
+    if (!(await siembraCompleta(db))) {
+      const desde = suelo ?? (nov.encontradas.length
+        ? Math.min(...nov.encontradas.map(n => n.indice))
+        : null);
+
+      if (desde != null) {
+        const atras = await recorrer({ arrancarEn: desde, maxPaginas: PAGINAS_SIEMBRA });
+        nuevas += await guardar(db, atras.encontradas);
+
+        if (atras.motivo === 'activacion' || atras.motivo === 'fin') {
+          await marcarSiembraCompleta(db);
+        } else {
+          sembrando = true;
+        }
+      }
+    }
   } catch (e) {
     // Si el explorador no responde se sirve lo que ya está guardado: una cifra
     // algo vieja es mejor que ninguna, siempre que se diga.
@@ -185,7 +259,7 @@ export async function onRequestGet({ env }) {
   }
 
   const t = await totales(db);
-  const cuerpo = { ...t, nuevas, actualizado: Date.now() };
+  const cuerpo = { ...t, nuevas, sembrando, actualizado: Date.now() };
 
   if (!error && env.PLSDASH_KV) {
     try { await env.PLSDASH_KV.put(CLAVE_CACHE, JSON.stringify(cuerpo)); } catch { /* la caché no es crítica */ }
