@@ -596,6 +596,7 @@ input[type=text].fld{
   let snapshots24h = []; // historico rango=24h (resolución horaria)
   let valHistorico = { por_dia: [], por_validador: [] }; // validador_diario
   let serie = [];        // toda la serie de snapshots (ts, ganado)
+  let ganancia = null;   // retiradas reconciliadas contra la cadena
   let ultimoIncidente = null; // evento más reciente que cuenta como incidencia
   let ultimoDescarte = null;  // última vez que la tubería rechazó una lectura
   let lastFetch = 0;
@@ -775,6 +776,25 @@ input[type=text].fld{
   // La ganancia real se recompone recorriendo la serie: cada bajada es un
   // barrido, y lo que había justo antes es lo que se llevó.
   function gananciaAcumulada() {
+    const excedente = estado?.validadores?.ganado_total ?? 0;
+
+    // La cadena es la fuente buena: recoge también lo barrido antes de que el
+    // recolector arrancara, que la serie de snapshots no puede ver.
+    if (ganancia && ganancia.total > 0) {
+      return {
+        total: ganancia.total + excedente,
+        barrido: ganancia.total,
+        barridos: ganancia.barridos,
+        bloques: ganancia.bloques,
+        excedente,
+        fuente: ganancia.obsoleto ? 'cadena (dato en caché)' : 'cadena',
+        completo: true,
+      };
+    }
+
+    // Sin explorador se recompone de los snapshots: cada bajada es un barrido
+    // y lo que había justo antes es lo que se llevó. Solo alcanza desde que se
+    // empezó a registrar, así que es un suelo.
     if (serie.length < 2) return null;
 
     let barrido = 0;
@@ -786,20 +806,49 @@ input[type=text].fld{
       }
     }
 
-    const excedente = serie[serie.length - 1].ganado;
     return {
-      // El excedente que ya había en la primera medición se cuenta también:
-      // estaba ganado, aunque no sepamos si antes hubo barridos que no vimos.
       total: barrido + excedente + serie[0].ganado,
       barrido,
       barridos,
       excedente,
-      // Solo se puede recomponer desde que se empezó a registrar. Si el
-      // recolector arrancó después de la activación, lo barrido antes queda
-      // fuera y esta cifra es un suelo, no el total.
-      desde: serie[0].ts,
+      fuente: 'snapshots',
       completo: serie[0].ts <= ACTIVACION_TS + 3600,
     };
+  }
+
+  // Ganado por día, recompuesto de la serie.
+  //
+  // No se usa `daily.ganado_dia` porque guarda el excedente que había a
+  // medianoche, no lo ganado en la jornada: para el 8-ago anotó 20.728 PLS
+  // ignorando los ~26.768 que se barrieron esa tarde. Aquí cada tramo suma lo
+  // que subió, y cuando hubo barrido suma lo acumulado después de él.
+  function diarioReal() {
+    const porDia = new Map();
+    for (let i = 1; i < serie.length; i++) {
+      const anterior = serie[i - 1].ganado;
+      const actual = serie[i].ganado;
+      // Tras un barrido se pierde el tramo entre el último snapshot y el
+      // instante del barrido: queda algo por debajo, nunca por encima.
+      const ganado = actual >= anterior ? actual - anterior : actual;
+      const fecha = new Date(serie[i].ts * 1000).toISOString().slice(0, 10);
+
+      const d = porDia.get(fecha) || { fecha, ganado_dia: 0, desde: serie[i].ts, hasta: serie[i].ts };
+      d.ganado_dia += ganado;
+      d.desde = Math.min(d.desde, serie[i - 1].ts);
+      d.hasta = Math.max(d.hasta, serie[i].ts);
+      porDia.set(fecha, d);
+    }
+
+    return [...porDia.values()]
+      .map(d => ({
+        ...d,
+        // Horas de la jornada realmente cubiertas. El primer día registrado
+        // casi nunca está entero, y contarlo como completo hunde cualquier
+        // media: el 8-ago solo se midió desde las 13:53.
+        horas: (d.hasta - d.desde) / 3600,
+        completo: (d.hasta - d.desde) / 3600 >= 23,
+      }))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
   }
 
   // Ritmo de recompensas. `pls_dia` de KV es la media desde la activación, y
@@ -813,7 +862,8 @@ input[type=text].fld{
   // marca como provisional mientras la ventana sea de horas y no de días.
   function ritmoDiario() {
     const hoy = new Date().toISOString().slice(0, 10);
-    const cerrados = daily.filter(d => d.fecha !== hoy && d.ganado_dia > 0).slice(-7);
+    const cerrados = diarioReal()
+      .filter(d => d.fecha !== hoy && d.completo && d.ganado_dia > 0).slice(-7);
     if (cerrados.length >= 2) {
       return {
         pls_dia: cerrados.reduce((a, d) => a + d.ganado_dia, 0) / cerrados.length,
@@ -822,12 +872,15 @@ input[type=text].fld{
       };
     }
 
-    const s = snapshotsLimpios();
+    // Sin días enteros se mide sobre los snapshots, sumando tramo a tramo para
+    // que los barridos no resten.
+    const s = snapshots24h;
     if (s.length >= 2) {
       const horas = (s[s.length - 1].ts - s[0].ts) / 3600;
-      const delta = s[s.length - 1].ganado - s[0].ganado;
-      if (horas >= 2 && delta > 0) {
-        return { pls_dia: (delta / horas) * 24, base: `medido en ${fmt(horas, 0)} h`, provisional: true };
+      let acumulado = 0;
+      for (let i = 1; i < s.length; i++) acumulado += ganadoEntre(s[i - 1].ganado, s[i].ganado);
+      if (horas >= 2 && acumulado > 0) {
+        return { pls_dia: (acumulado / horas) * 24, base: `medido en ${fmt(horas, 0)} h`, provisional: true };
       }
     }
 
@@ -868,24 +921,29 @@ input[type=text].fld{
     if (!acum) {
       nota.textContent = 'Sin serie suficiente para descontar los barridos.';
     } else {
-      const partes = [`${fmt(acum.barrido)} PLS ya retirados en ${acum.barridos} barrido${acum.barridos === 1 ? '' : 's'}`,
+      const partes = [`${fmt(acum.barrido)} retirados en ${acum.barridos} barrido${acum.barridos === 1 ? '' : 's'}`,
                       `${fmt(acum.excedente)} sin barrer`];
-      nota.textContent = partes.join(' · ')
-        + (acum.completo ? '' : ' · suelo: falta lo barrido antes de empezar a registrar');
+      if (acum.fuente === 'snapshots' && !acum.completo) {
+        partes.push('suelo: falta lo barrido antes de registrar');
+      } else if (acum.fuente !== 'cadena') {
+        partes.push(acum.fuente);
+      }
+      nota.textContent = partes.join(' · ');
     }
 
     // "Hoy": el día cerrado de `daily` si existe; si no, proyección al ritmo medido.
     const today = new Date().toISOString().slice(0, 10);
     const ayer = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const hoyRow = daily.find(d => d.fecha === today);
-    const ayerRow = daily.find(d => d.fecha === ayer);
+    const dias = diarioReal();
+    const hoyRow = dias.find(d => d.fecha === today);
+    const ayerRow = dias.find(d => d.fecha === ayer);
     const hoyGanado = hoyRow ? hoyRow.ganado_dia : ritmo.pls_dia;
     $('statHoyV').innerHTML = `${fmt(hoyGanado)} <small>PLS</small>`;
 
     // Comparar contra ayer solo tiene sentido con el día cerrado; si el de hoy
     // va a medias, la caída sería un artefacto de la hora que sea.
     const dEl = $('statHoyD');
-    if (hoyRow && ayerRow && ayerRow.ganado_dia > 0) {
+    if (hoyRow && ayerRow && ayerRow.completo && ayerRow.ganado_dia > 0) {
       const pct = ((hoyRow.ganado_dia - ayerRow.ganado_dia) / ayerRow.ganado_dia) * 100;
       dEl.textContent = `${pct >= 0 ? '+' : ''}${fmt(pct, 1)}% vs ayer`;
       dEl.className = 'd' + (pct >= 0 ? ' pos' : ' neg');
@@ -929,8 +987,17 @@ input[type=text].fld{
 
     // franja 30 días
     const stripEl = $('strip30');
+    const dias30 = new Map(diarioReal().map(d => [d.fecha, d.ganado_dia]));
     stripEl.innerHTML = '';
-    const last30 = daily.slice(-30);
+    // Los días salen de la serie, que empieza antes que `daily`; la salud sí
+    // viene de `daily`, que es quien la registra.
+    const saludPorDia = new Map(daily.map(d => [d.fecha, d.salud]));
+    const last30 = diarioReal().slice(-30).map(d => ({
+      fecha: d.fecha,
+      ganado_dia: d.ganado_dia,
+      salud: saludPorDia.get(d.fecha),
+      minutos_caido: (daily.find(x => x.fecha === d.fecha) || {}).minutos_caido,
+    }));
     const pad = 30 - last30.length;
     for (let i = 0; i < pad; i++) {
       const sq = document.createElement('div'); sq.className = 'sq empty'; stripEl.appendChild(sq);
@@ -938,7 +1005,8 @@ input[type=text].fld{
     last30.forEach(d => {
       const sq = document.createElement('div');
       sq.className = 'sq' + (d.salud === 'aviso' ? ' w' : (d.salud === 'critico' ? ' b' : ''));
-      const partes = [d.fecha, `${fmt(d.ganado_dia || 0)} PLS`];
+      const real = dias30.get(d.fecha);
+      const partes = [d.fecha, `${fmt(real !== undefined ? real : (d.ganado_dia || 0))} PLS`];
       if (d.minutos_caido) partes.push(`caído ${fmt(d.minutos_caido)} min`);
       sq.title = partes.join(' · ');
       stripEl.appendChild(sq);
@@ -960,33 +1028,31 @@ input[type=text].fld{
     renderChart();
   }
 
-  // `snapshots.ganado` es acumulado, así que solo puede subir. Se han visto
-  // filas con 0 escritas por el collector cuando falla la lectura del nodo;
-  // colarlas convierte el siguiente punto en un pico falso enorme. Se
-  // descartan las que rompen la monotonía en vez de recortarlas a cero.
-  function snapshotsLimpios() {
-    const out = [];
-    let ultimo = -Infinity;
-    for (const s of snapshots24h) {
-      const g = Number(s.ganado);
-      if (!Number.isFinite(g) || g < ultimo) continue;
-      out.push(s);
-      ultimo = g;
-    }
-    return out;
+  // Ganado entre dos lecturas consecutivas.
+  //
+  // `ganado` sube mientras se acumula y cae a cero cuando el protocolo barre
+  // el excedente, así que una bajada no es un error: es un barrido, y lo
+  // ganado en ese tramo es lo que se haya acumulado después de él.
+  //
+  // Aquí vivía un filtro que descartaba toda fila que rompiera la monotonía,
+  // escrito cuando los barridos se tomaban por datos corruptos. Descartaba
+  // cada lectura posterior a un barrido y hundía el ritmo calculado.
+  function ganadoEntre(anterior, actual) {
+    const a = Number(anterior), c = Number(actual);
+    if (!Number.isFinite(a) || !Number.isFinite(c)) return 0;
+    return c >= a ? c - a : c;
   }
 
   function valoresChart(rango) {
     if (rango === '24h') {
-      const limpios = snapshotsLimpios();
       const out = [];
-      for (let i = 1; i < limpios.length; i++) {
-        out.push(limpios[i].ganado - limpios[i - 1].ganado);
+      for (let i = 1; i < snapshots24h.length; i++) {
+        out.push(ganadoEntre(snapshots24h[i - 1].ganado, snapshots24h[i].ganado));
       }
       return out;
     }
     const n = rango === '7d' ? 7 : 30;
-    return daily.slice(-n).map(d => d.ganado_dia || 0);
+    return diarioReal().filter(d => d.completo).slice(-n).map(d => d.ganado_dia || 0);
   }
 
   // Abrir en un rango vacío hace pensar que algo está roto. Si el rango por
@@ -1152,7 +1218,8 @@ input[type=text].fld{
       if (dias >= 1) pctPorDia = (b.disco_pct - a.disco_pct) / dias;
     }
 
-    const snaps = snapshotsLimpios();
+    // El disco no tiene nada que ver con los barridos: vale la serie tal cual.
+    const snaps = snapshots24h;
     if (pctPorDia === null && snaps.length >= 3) {
       const a = snaps[0], b = snaps[snaps.length - 1];
       const dias = (b.ts - a.ts) / 86400;
@@ -1240,7 +1307,8 @@ input[type=text].fld{
     const year = new Date().getFullYear().toString();
     $('fiscYear').textContent = year;
     $('fiscYear2').textContent = year;
-    const ganadoYear = daily.filter(d => d.fecha.startsWith(year)).reduce((acc, d) => acc + (d.ganado_dia || 0), 0);
+    const ganadoYear = diarioReal().filter(d => d.fecha.startsWith(year))
+      .reduce((acc, d) => acc + (d.ganado_dia || 0), 0);
     // La fiscalidad cuenta lo retirado, así que aquí manda la ganancia real.
     const ganadoMostrar = ganadoYear || ganadoRealT;
     $('fiscGanado').innerHTML = `${fmt(ganadoMostrar)} PLS<small style="display:block;color:var(--mute);font-size:11px">≈ ${fmt(ganadoMostrar * fiscPrice(), 2)} $</small>`;
@@ -1258,7 +1326,9 @@ input[type=text].fld{
 
   $('btnCsv').addEventListener('click', () => {
     const year = new Date().getFullYear().toString();
-    const rows = daily.filter(d => d.fecha.startsWith(year));
+    const saludPorDia = new Map(daily.map(d => [d.fecha, d]));
+    const rows = diarioReal().filter(d => d.fecha.startsWith(year))
+      .map(d => ({ ...d, ...(saludPorDia.get(d.fecha) || {}), ganado_dia: d.ganado_dia }));
     const precio = fiscPrice();
     // El valor se calcula a un precio único, no al precio de cada día: no
     // guardamos el histórico de cotización. La cabecera lo deja por escrito
@@ -1380,17 +1450,19 @@ input[type=text].fld{
         api('/estado'),
         api('/historico?rango=24h'),
         api('/historico?rango=serie'),
+        api('/ganancia'),
         api('/eventos?limit=15'),
         api(`/eventos?limit=1&tipos=${TIPOS_INCIDENCIA.join(',')}`),
         api('/eventos?limit=1&tipos=descarte'),
         necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
         necesitaDaily ? api('/validadores') : Promise.resolve(null),
       ];
-      const [est, hist24, hSerie, ev, inc, desc, histTodo, valHist] = await Promise.all(peticiones);
+      const [est, hist24, hSerie, gan, ev, inc, desc, histTodo, valHist] = await Promise.all(peticiones);
 
       estado = est;
       snapshots24h = hist24.datos || [];
       serie = hSerie.datos || [];
+      ganancia = gan && !gan.error ? gan : (gan && gan.total ? gan : null);
       ultimoIncidente = (inc.eventos || [])[0] || null;
       ultimoDescarte = (desc.eventos || [])[0] || null;
       if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
