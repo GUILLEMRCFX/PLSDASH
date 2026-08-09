@@ -75,8 +75,19 @@ def precio_pls():
         if not isinstance(pares, list) or not pares:
             return None
 
+        # `priceUsd` es el precio del token BASE del par. Si WPLS aparece como
+        # token de cotización —en un par HEX/WPLS, por ejemplo— ese campo es el
+        # precio del HEX. Sin este filtro se devolvía 0,00000941 en vez de
+        # 0,0000358: casi cuatro veces menos, y en silencio.
+        propios = [
+            p for p in pares
+            if ((p.get("baseToken") or {}).get("address") or "").lower() == WPLS
+        ]
+        if not propios:
+            return None
+
         mejor = max(
-            pares,
+            propios,
             key=lambda p: float((p.get("liquidity") or {}).get("usd") or 0),
         )
         precio = float(mejor.get("priceUsd") or 0)

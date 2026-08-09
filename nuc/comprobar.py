@@ -119,7 +119,11 @@ try:
               f"{miles(retirado)} PLS retirados en {len(ciclos)} barridos\n"
               f"{bloques} con recompensa de bloque · {descartadas} descartadas del validador anterior")
 except Exception as e:
-    resultado("FALLO", "El explorador responde", str(e))
+    # Un timeout del explorador no invalida la tubería: solo impide cuadrar
+    # aquí lo retirado. El panel lo reconcilia por su cuenta desde Cloudflare.
+    clase = "PEND" if "timed out" in str(e).lower() else "FALLO"
+    resultado(clase, "El explorador responde",
+              f"{e}\nReintenta; si insiste, el panel lo reconcilia igualmente.")
 
 # 6. El precio se está guardando
 try:

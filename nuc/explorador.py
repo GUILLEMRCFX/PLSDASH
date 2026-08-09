@@ -76,7 +76,7 @@ API = "https://api.scan.pulsechain.com/api/v2"
 # PLS, como ETH, se contabiliza en wei on-chain.
 WEI = 10 ** 18
 
-TIMEOUT = 20
+TIMEOUT = 45  # Blockscout puede tardar en listados largos
 
 # Tope de páginas por consulta. Blockscout pagina de 50 en 50; con retiradas
 # cada ~9 h esto cubre años sin dejar que un fallo convierta la consulta en un
