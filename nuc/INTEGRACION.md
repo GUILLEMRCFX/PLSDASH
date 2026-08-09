@@ -16,6 +16,31 @@ No hay que volver a ejecutarlas.
 
 ---
 
+# ⚠️ Antes de desplegar la validación: leer esto
+
+Lo que el 8-ago se tomó por datos corruptos **eran barridos de saldo
+legítimos**. El protocolo retira el excedente sobre los 32M a la wallet de
+retirada cada ~9 h; el balance vuelve a 32.000.000 exactos por validador y
+`ganado` (que es `balance − stake`) empieza de cero otra vez. Después la
+acumulación sigue al ritmo normal de ~2.890 PLS/h, que es lo que delata que no
+era ruido: una API rota no produce una progresión aritmética perfecta.
+
+Consecuencias que **siguen pendientes** y que esta validación no arregla:
+
+- **El panel muestra mal la ganancia.** «Ganado desde el inicio» enseña solo el
+  saldo sin barrer. La ganancia real es la suma de lo barrido más lo actual.
+  Con dos barridos observados, la cifra real ronda los 90.000 PLS frente a los
+  ~29.000 que muestra.
+- De esa cifra cuelgan los hitos, el break-even, la proyección y **la
+  fiscalidad**, que es la que más importa: hacienda cuenta lo retirado.
+- El invariante correcto no es «ganado solo sube» sino «barrido acumulado +
+  saldo actual solo sube». Falta llevar ese acumulado.
+
+Lo de aquí abajo ya es seguro de desplegar: reconoce los barridos y no los
+rechaza. Pero no resuelve el cálculo de la ganancia real.
+
+---
+
 # Validación (`validacion.py`)
 
 Dos barreras contra datos imposibles, después de que el 8-ago a las 19:00 la

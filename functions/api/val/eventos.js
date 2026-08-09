@@ -15,6 +15,11 @@ const MAX_LIMIT = 100;
 const TIPOS_VALIDOS = new Set([
   'activacion', 'bloque', 'caida', 'recuperacion', 'reinicio',
   'desync', 'resync', 'slash', 'aviso',
+  // `descarte` lo escribe la validación del NUC cuando rechaza una lectura.
+  // No es una incidencia de los validadores: es la tubería protegiéndose, y
+  // el panel lo usa para distinguir «el NUC está caído» de «el NUC responde
+  // pero sus datos no se admiten».
+  'descarte',
 ]);
 
 const err = (msg, status) =>

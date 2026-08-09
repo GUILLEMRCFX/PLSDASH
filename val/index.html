@@ -587,6 +587,7 @@ input[type=text].fld{
   let snapshots24h = []; // historico rango=24h (resolución horaria)
   let valHistorico = { por_dia: [], por_validador: [] }; // validador_diario
   let ultimoIncidente = null; // evento más reciente que cuenta como incidencia
+  let ultimoDescarte = null;  // última vez que la tubería rechazó una lectura
   let lastFetch = 0;
   let currentChartRange = '7d';
 
@@ -1255,9 +1256,22 @@ input[type=text].fld{
     const ageMin = (Date.now() / 1000 - estado.generado_ts) / 60;
     if (ageMin > 15) {
       banner.style.display = 'block';
-      banner.querySelector('b').textContent = 'Sin datos recientes.';
-      $('staleMsg').textContent = `El NUC no reporta desde hace ${fmt(ageMin, 0)} min. Revisa que el nodo y el cron sigan vivos.`;
       dot.className = 'bad';
+
+      // Un descarte posterior al último dato bueno demuestra que el recolector
+      // sigue ejecutándose: lo que falla son las lecturas, no la máquina. Sin
+      // esta distinción los dos casos se ven igual y llevan a ir a mirar un
+      // NUC que está perfectamente encendido.
+      const rechazando = ultimoDescarte && ultimoDescarte.ts > estado.generado_ts;
+      if (rechazando) {
+        banner.querySelector('b').textContent = 'Datos rechazados, no es el NUC.';
+        $('staleMsg').textContent =
+          `El nodo responde pero sus lecturas no se admiten (${ultimoDescarte.detalle || 'sin detalle'}). `
+          + `Último dato bueno hace ${fmt(ageMin, 0)} min.`;
+      } else {
+        banner.querySelector('b').textContent = 'Sin datos recientes.';
+        $('staleMsg').textContent = `El NUC no reporta desde hace ${fmt(ageMin, 0)} min. Revisa que el nodo y el cron sigan vivos.`;
+      }
     } else if (ageMin > 5) {
       banner.style.display = 'none';
       dot.className = 'warn';
@@ -1296,14 +1310,16 @@ input[type=text].fld{
         api('/historico?rango=24h'),
         api('/eventos?limit=15'),
         api(`/eventos?limit=1&tipos=${TIPOS_INCIDENCIA.join(',')}`),
+        api('/eventos?limit=1&tipos=descarte'),
         necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
         necesitaDaily ? api('/validadores') : Promise.resolve(null),
       ];
-      const [est, hist24, ev, inc, histTodo, valHist] = await Promise.all(peticiones);
+      const [est, hist24, ev, inc, desc, histTodo, valHist] = await Promise.all(peticiones);
 
       estado = est;
       snapshots24h = hist24.datos || [];
       ultimoIncidente = (inc.eventos || [])[0] || null;
+      ultimoDescarte = (desc.eventos || [])[0] || null;
       if (histTodo) { daily = histTodo.datos || []; dailyLoadedAt = Date.now(); }
       if (valHist) { valHistorico = valHist; }
       lastFetch = Date.now();
