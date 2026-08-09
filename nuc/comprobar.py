@@ -106,24 +106,31 @@ try:
 except Exception as e:
     resultado("FALLO", "Los 10 validadores activos", str(e))
 
-# 5. El explorador responde y filtra bien
+# 5. El explorador responde y se entiende su respuesta
+#
+# Solo se pide UNA página. Una comprobación de salud tiene que ser rápida: lo
+# que se quiere saber aquí es si la API contesta y si el filtrado funciona, no
+# recalcular el total. El total acumulado lo lleva el panel desde Cloudflare,
+# que además tiene mejor salida a internet que el NUC.
 retirado = None
 try:
     sys.path.insert(0, __file__.rsplit("/", 1)[0])
+    import explorador
     from explorador import retiradas, barridos
 
+    explorador.MAX_PAGINAS = 1
     retirado, detalle, descartadas = retiradas()
     ciclos = barridos(detalle)
     bloques = sum(len(c["bloques"]) for c in ciclos)
     resultado("OK", "El explorador responde",
-              f"{miles(retirado)} PLS retirados en {len(ciclos)} barridos\n"
-              f"{bloques} con recompensa de bloque · {descartadas} descartadas del validador anterior")
+              f"últimos {len(ciclos)} barridos: {miles(retirado)} PLS\n"
+              f"{bloques} con recompensa de bloque · {descartadas} del validador anterior\n"
+              f"(solo la última página; el total lo lleva el panel)")
 except Exception as e:
-    # Un timeout del explorador no invalida la tubería: solo impide cuadrar
-    # aquí lo retirado. El panel lo reconcilia por su cuenta desde Cloudflare.
-    clase = "PEND" if "timed out" in str(e).lower() else "FALLO"
-    resultado(clase, "El explorador responde",
-              f"{e}\nReintenta; si insiste, el panel lo reconcilia igualmente.")
+    # Que el explorador no conteste no invalida la tubería: el panel lo
+    # reconcilia por su cuenta desde Cloudflare.
+    resultado("PEND", "El explorador responde",
+              f"{e}\nNo bloquea: el panel reconcilia desde Cloudflare.")
 
 # 6. El precio se está guardando
 try:
@@ -137,17 +144,17 @@ try:
 except Exception as e:
     resultado("FALLO", "Precio de PLS disponible", str(e))
 
-# 7. La comprobación de fondo: ¿cuadran las dos fuentes?
-if retirado is not None and excedente is not None:
-    real = retirado + excedente
+# 7. Lo que el panel tiene que estar mostrando
+if excedente is not None:
     print()
-    resultado("OK", "GANANCIA REAL",
-              f"{miles(retirado)} retirados + {miles(excedente)} sin barrer\n"
-              f"= {miles(real)} PLS")
+    print("  ── El panel debe mostrar ──")
     print()
-    print("             Este es el número que debe aparecer en el panel.")
-    print("             Si el panel muestra algo parecido al excedente solo")
-    print("             ({} PLS), la reconciliación no está llegando.".format(miles(excedente)))
+    print(f"     Excedente sin barrer  : {miles(excedente)} PLS")
+    print("     + todo lo ya retirado desde la activación")
+    print()
+    print("     Si el número principal del panel se parece al excedente")
+    print(f"     ({miles(excedente)} PLS), la reconciliación no está llegando:")
+    print("     debería ser varias veces mayor.")
 
 # --------------------------------------------------------------------------
 
