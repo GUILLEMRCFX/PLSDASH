@@ -152,22 +152,44 @@ def retiradas(wallet=WALLET, validadores=VALIDADORES):
     El filtro por `validator_index` es lo que separa esta etapa de la anterior:
     sin él se sumaría un año de retiradas del validador viejo.
     """
-    items = _paginar(f"/addresses/{wallet}/withdrawals", {"items_count": 50})
     detalle = []
     descartadas = 0
-    for w in items:
-        vi = w.get("validator_index")
-        if validadores and vi is not None and int(vi) not in validadores:
-            descartadas += 1
-            continue
-        detalle.append({
-            "indice": w.get("index"),
-            "validador": vi,
-            "bloque": w.get("block_number"),
-            "fecha": w.get("timestamp"),
-            "ts": _ts(w.get("timestamp")),
-            "pls": _a_pls(w.get("amount")),
-        })
+    params = {"items_count": 50}
+
+    # El listado viene de más nueva a más vieja, así que en cuanto aparece una
+    # retirada anterior a la activación ya solo queda la etapa del validador
+    # antiguo: un año entero de páginas que no hace falta recorrer.
+    for _ in range(MAX_PAGINAS):
+        datos = _pedir(f"/addresses/{wallet}/withdrawals", params)
+        items = datos.get("items") or []
+        if not items:
+            break
+
+        agotado = False
+        for w in items:
+            ts = _ts(w.get("timestamp"))
+            if ts is not None and ts < ACTIVACION_TS:
+                agotado = True
+                break
+
+            vi = w.get("validator_index")
+            if validadores and vi is not None and int(vi) not in validadores:
+                descartadas += 1
+                continue
+
+            detalle.append({
+                "indice": w.get("index"),
+                "validador": vi,
+                "bloque": w.get("block_number"),
+                "fecha": w.get("timestamp"),
+                "ts": ts,
+                "pls": _a_pls(w.get("amount")),
+            })
+
+        if agotado or not datos.get("next_page_params"):
+            break
+        params = {"items_count": 50, **datos["next_page_params"]}
+
     return sum(d["pls"] for d in detalle), detalle, descartadas
 
 

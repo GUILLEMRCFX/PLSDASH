@@ -574,15 +574,17 @@ input[type=text].fld{
   'use strict';
 
   const API = '/api/val';
-  // Tamaño de la red. El respaldo es el recuento real del registro del nodo el
-  // 9-ago-2026 (109.600, medido; el brief decía 109.559). Pero la red crece, así
-  // que si el recolector lo publica en KV manda ese valor.
+  // Validadores ACTIVOS de la red, que son los únicos que proponen. Medido en
+  // el nodo el 9-ago-2026: 46.905. El registro completo son 109.600, más del
+  // doble, porque incluye pendientes de activar y ya salidos.
   //
-  // OJO con lo que mide: el registro incluye validadores pendientes de activar y
-  // ya salidos, y las propuestas solo se reparten entre los activos. Y hay un
-  // descuadre sin resolver — en 32 h se observaron 4 bloques donde este modelo
-  // predice 1. Por eso la estimación se muestra marcada como tal.
-  const RED_VALIDADORES_RESPALDO = 109600;
+  // Esa distinción resolvió el descuadre que traíamos: con el registro entero
+  // salían 4 bloques observados donde el modelo predecía 1 (probabilidad 2,3%);
+  // con los activos se esperan 2,5, y ver 4 tiene un 24% de probabilidad. Azar
+  // normal, no un fallo del modelo.
+  //
+  // La red se mueve, así que si el recolector publica el recuento manda ese.
+  const RED_VALIDADORES_RESPALDO = 46905;
   // 10 s/slot, derivado de los propios datos del nodo: entre la activación
   // (epoch 319720) y el snapshot del brief (epoch 320041) pasaron 321 epochs
   // × 32 slots en 103.013 s → 10,03 s por slot.
