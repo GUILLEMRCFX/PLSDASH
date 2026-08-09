@@ -8,18 +8,25 @@ beacon no puede dar y las cuadra con lo que tenemos guardado.
 ## Por qué hace falta
 
 `ganado` = `balance_total − stake_total` es solo el excedente **sin barrer**.
-Cada ~9 h el protocolo retira ese excedente a la wallet de retirada y el
-contador vuelve a cero. Así que la ganancia real tiene tres piezas, y el
-beacon solo ve la tercera:
+Cada ~8,1 h el protocolo lo retira a la wallet y el contador vuelve a cero:
 
-    ganancia real = retiradas acumuladas        (capa de consenso, barridas)
-                  + ingresos por bloque         (capa de ejecución, directos)
-                  + excedente sin barrer        (lo único que ve `ganado`)
+    ganancia real = retiradas de nuestros validadores + excedente sin barrer
 
-Los ingresos por proponer bloque **no pasan por el balance del validador**:
-las propinas de la capa de ejecución se abonan directamente a la dirección
-receptora de comisiones. Por eso no aparecen en `ganado` y por eso el saldo de
-la wallet crece más deprisa de lo que explican las atestaciones.
+Con los datos del 9-ago-2026 eso son 142.451,91 + 29.115,55 = 171.567,46 PLS,
+frente a los 29.115,55 que enseñaba el panel. Casi seis veces menos.
+
+La recompensa de proponer un bloque **sí** pasa por el balance del validador y
+por tanto se barre con el resto: en cada ciclo, uno de los diez cobra ~8.100
+PLS en vez de los ~2.390 habituales. Contarlas es una forma barata de contar
+bloques sin recorrer las duties del beacon.
+
+## Verificación cruzada
+
+Los barridos del explorador cuadran con los snapshots propios con un 0,23% de
+desviación, así que las dos fuentes se confirman entre sí:
+
+    08-08 18:59  explorador 29.679  ·  snapshot 26.768 + 59 min de ritmo
+    09-09 03:04  explorador 29.636  ·  snapshot 29.372 +  4 min de ritmo
 
 ## Uso
 
@@ -31,10 +38,6 @@ Como módulo, desde push.py:
 Como comprobación manual, en el NUC:
 
     python3 explorador.py
-
-Esto último imprime todo lo que ve y es la forma de verificar que la API
-responde lo que este código espera: no se ha podido probar contra el
-explorador real desde el entorno donde se escribió.
 """
 
 import json
@@ -47,11 +50,26 @@ WALLET = "0x952E0311DdDCe7090d61a275f411a6ddF879BDc8"
 
 # ATENCIÓN: esta wallet YA SE USÓ con un validador anterior durante cerca de un
 # año. Su saldo y su lista de bloques mezclan aquella etapa con la actual, así
-# que **nada de lo que devuelve el explorador sirve sin filtrar por fecha**.
+# que nada de lo que devuelve el explorador sirve sin filtrar.
 #
-# Activación de los diez validadores actuales (tabla `eventos`, tipo
-# `activacion`): 2026-08-07T09:45:55Z.
+# El filtro bueno son los índices de validador, no las fechas: cada retirada
+# trae `validator_index`, y los diez actuales son 109549..109558. Es exacto y no
+# depende de acertar con la marca de activación.
+VALIDADORES = set(range(109549, 109559))
+
+# Activación de los diez actuales (evento `activacion` en D1). Se conserva solo
+# como red de seguridad para listados que no traigan índice de validador.
 ACTIVACION_TS = 1786095955
+
+# Cadencia real de los barridos, medida sobre cinco retiradas consecutivas:
+# 8,06 / 8,11 / 8,11 / 8,08 h. No son las ~9 h que sugería el muestreo horario.
+HORAS_ENTRE_BARRIDOS = 8.09
+
+# Una retirada normal ronda los 2.390 PLS por validador y ciclo. Cuando un
+# validador propone un bloque, la suya sube a ~8.100: unos 5.720 PLS de más.
+# Sirve para contar bloques sin recorrer las duties, aunque dos bloques en el
+# mismo ciclo se contarían como uno.
+UMBRAL_BLOQUE_PLS = 5000
 
 API = "https://api.scan.pulsechain.com/api/v2"
 
@@ -117,50 +135,61 @@ def _ts(marca):
         return None
 
 
-def retiradas(wallet=WALLET, desde_ts=ACTIVACION_TS):
-    """Retiradas de consenso posteriores a `desde_ts`. (total_pls, [detalle]).
+def retiradas(wallet=WALLET, validadores=VALIDADORES):
+    """Retiradas de consenso de nuestros validadores.
 
-    El filtro por fecha no es un detalle: sin él se cuenta también lo que
-    cobró el validador anterior con esta misma wallet.
+    Devuelve (total_pls, [detalle], descartadas).
+
+    Forma de la respuesta, verificada contra la API real el 9-ago-2026:
+
+        {"items": [{"amount": "2385987101633000000000",   # wei, cadena
+                    "block_number": 27240802,
+                    "index": 160124319,
+                    "timestamp": "2026-08-09T03:04:35.000000Z",
+                    "validator_index": 109558}, ...],
+         "next_page_params": {"index": ..., "items_count": ...}}
+
+    El filtro por `validator_index` es lo que separa esta etapa de la anterior:
+    sin él se sumaría un año de retiradas del validador viejo.
     """
     items = _paginar(f"/addresses/{wallet}/withdrawals", {"items_count": 50})
     detalle = []
     descartadas = 0
     for w in items:
-        ts = _ts(w.get("timestamp"))
-        if desde_ts and ts is not None and ts < desde_ts:
+        vi = w.get("validator_index")
+        if validadores and vi is not None and int(vi) not in validadores:
             descartadas += 1
             continue
         detalle.append({
             "indice": w.get("index"),
+            "validador": vi,
             "bloque": w.get("block_number"),
             "fecha": w.get("timestamp"),
-            "ts": ts,
+            "ts": _ts(w.get("timestamp")),
             "pls": _a_pls(w.get("amount")),
         })
     return sum(d["pls"] for d in detalle), detalle, descartadas
 
 
-def bloques_validados(wallet=WALLET, desde_ts=ACTIVACION_TS):
-    """Bloques propuestos después de `desde_ts`. (cuántos, [detalle], descartados).
+def barridos(detalle):
+    """Agrupa las retiradas en barridos (todas comparten instante).
 
-    Los 37 que muestra la ficha del explorador incluyen los del validador
-    anterior; sin filtrar, el contador del panel sería falso.
+    Un barrido puede repartirse entre dos bloques consecutivos —se ha visto
+    partido en 3 + 7 validadores con 10 s de diferencia—, así que se agrupa por
+    marca de tiempo redondeada al minuto.
     """
-    items = _paginar(f"/addresses/{wallet}/blocks-validated", {"items_count": 50})
-    detalle = []
-    descartados = 0
-    for b in items:
-        ts = _ts(b.get("timestamp"))
-        if desde_ts and ts is not None and ts < desde_ts:
-            descartados += 1
+    grupos = {}
+    for d in detalle:
+        if d["ts"] is None:
             continue
-        detalle.append({
-            "altura": b.get("height"),
-            "fecha": b.get("timestamp"),
-            "ts": ts,
-        })
-    return len(detalle), detalle, descartados
+        clave = d["ts"] // 60
+        g = grupos.setdefault(clave, {"ts": d["ts"], "pls": 0.0, "validadores": 0, "bloques": []})
+        g["pls"] += d["pls"]
+        g["validadores"] += 1
+        if d["pls"] > UMBRAL_BLOQUE_PLS:
+            g["bloques"].append(d["validador"])
+
+    return sorted(grupos.values(), key=lambda g: g["ts"])
 
 
 def saldo_wallet(wallet=WALLET):
@@ -186,25 +215,27 @@ def reconciliar(saldo_sin_barrer=0.0, wallet=WALLET):
     informe = {"ts": int(time.time()), "error": None}
     try:
         total_retirado, det_ret, ret_previas = retiradas(wallet)
-        n_bloques, det_blq, blq_previos = bloques_validados(wallet)
         saldo = saldo_wallet(wallet)
     except Exception as e:
         informe["error"] = f"{type(e).__name__}: {e}"
         return informe
 
+    ciclos = barridos(det_ret)
+    con_bloque = [b for c in ciclos for b in c["bloques"]]
+
     informe.update({
         "retirado_consenso": total_retirado,
-        "bloques": n_bloques,
+        "barridos": len(ciclos),
+        "bloques_por_retirada": len(con_bloque),
+        "validadores_con_bloque": con_bloque,
         "saldo_wallet": saldo,
         "saldo_sin_barrer": saldo_sin_barrer,
-        # Lo retirado desde la activación más lo que aún no se ha barrido.
+        # Lo retirado por nuestros validadores más lo que aún no se ha barrido.
+        # Esta es la ganancia real: `ganado` del beacon solo ve el segundo
+        # sumando y por eso se queda muy corto.
         "ganancia_real": total_retirado + saldo_sin_barrer,
-        "ultima_retirada": det_ret[0] if det_ret else None,
-        "ultimo_bloque": det_blq[0] if det_blq else None,
-        # Lo descartado por ser de la etapa anterior. Si sale 0 en las dos,
-        # sospechar del filtro antes que celebrarlo.
+        "ultimo_barrido": ciclos[-1] if ciclos else None,
         "retiradas_descartadas": ret_previas,
-        "bloques_descartados": blq_previos,
     })
 
     # El saldo de la wallet NO se compara con lo retirado: arrastra el resto de
@@ -219,26 +250,21 @@ if __name__ == "__main__":
 
     if inf["error"]:
         print(f"  ERROR: {inf['error']}")
-        print("\n  Si la API ha cambiado de forma, ajustar _pedir/_paginar.")
         raise SystemExit(1)
 
     def pls(x):
         return f"{x:,.2f} PLS".replace(",", "@").replace(".", ",").replace("@", ".")
 
-    print("  Desde la activación de los 10 validadores actuales")
-    print("  (2026-08-07 09:45:55 UTC):\n")
-    print(f"    Retiradas de consenso : {pls(inf['retirado_consenso'])}")
-    print(f"    Bloques propuestos    : {inf['bloques']}")
+    print(f"  Barridos                : {inf['barridos']}")
+    print(f"  Retirado (validadores {min(VALIDADORES)}-{max(VALIDADORES)})")
+    print(f"                          : {pls(inf['retirado_consenso'])}")
+    print(f"  Excedente sin barrer    : {pls(inf['saldo_sin_barrer'])}")
+    print(f"  {'-' * 44}")
+    print(f"  GANANCIA REAL           : {pls(inf['ganancia_real'])}")
     print()
-    print("  Descartado por ser del validador anterior:\n")
-    print(f"    Retiradas             : {inf['retiradas_descartadas']}")
-    print(f"    Bloques               : {inf['bloques_descartados']}")
+    print(f"  Retiradas con bloque    : {inf['bloques_por_retirada']}"
+          f"  (validadores {inf['validadores_con_bloque']})")
+    print(f"  Descartadas por ser del validador anterior: {inf['retiradas_descartadas']}")
     print()
-    print(f"  Saldo actual de la wallet: {pls(inf['saldo_wallet'])}")
-    print("    (mezcla ambas etapas: no atribuible a los validadores actuales)")
-    print()
-    print(f"  Última retirada : {inf['ultima_retirada']}")
-    print(f"  Último bloque   : {inf['ultimo_bloque']}")
-    print()
-    print("  Ganancia real = retiradas desde la activación + excedente sin barrer")
-    print(f"                = {pls(inf['retirado_consenso'])} + lo que diga el beacon ahora")
+    print(f"  Saldo de la wallet      : {pls(inf['saldo_wallet'])}")
+    print("    (mezcla ambas etapas, no atribuible a los validadores actuales)")
