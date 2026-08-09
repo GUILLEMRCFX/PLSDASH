@@ -57,6 +57,12 @@ body{
 .back{display:flex;align-items:center;gap:9px;color:var(--dim);font-size:13px;font-weight:500;text-decoration:none;background:none;border:none;font-family:inherit;cursor:pointer}
 .back .chev{font-size:16px;line-height:1}
 .hdr-top h1{font-size:16px;font-weight:600;letter-spacing:-.2px}
+/* precio de PLS: presente en todas las pestañas, sin robar protagonismo */
+.precio{display:flex;align-items:baseline;gap:6px;font-family:'JetBrains Mono',monospace}
+.precio .p-val{font-size:12.5px;font-weight:500;color:var(--txt);letter-spacing:-.2px}
+.precio .p-chg{font-size:10px;color:var(--mute)}
+.precio .p-chg.up{color:var(--ok)}
+.precio .p-chg.down{color:var(--bad)}
 .sync{font-size:10.5px;color:var(--mute);display:flex;align-items:center;gap:6px}
 .sync i{width:5px;height:5px;border-radius:50%;background:var(--ok);display:block}
 .sync i.warn{background:var(--warn)}
@@ -155,6 +161,16 @@ body{
 .sq.b{background:var(--bad)}
 .sq.empty{background:var(--line);opacity:.4}
 .strip-x{display:flex;justify-content:space-between;font-size:10px;color:var(--mute);margin-top:8px}
+
+/* ---------- diente de sierra del ciclo de barrido ---------- */
+.ciclo-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.ciclo-v{font-size:19px;font-weight:600;letter-spacing:-.5px}
+.ciclo-l{font-size:10.5px;color:var(--mute);margin-top:2px}
+.sierra{width:100%;height:70px;display:block;overflow:visible}
+.sierra .linea{fill:none;stroke:url(#gradSierra);stroke-width:1.8;stroke-linejoin:round}
+.sierra .area{fill:url(#gradArea);stroke:none}
+.sierra .corte{stroke:var(--line);stroke-width:1;stroke-dasharray:2 3}
+.ciclo-nota{font-size:11px;color:var(--mute);margin-top:10px;line-height:1.5}
 
 /* ---------- feed ---------- */
 .feed{border-left:1.5px solid var(--line);margin-left:6px;padding-left:16px}
@@ -314,7 +330,10 @@ input[type=text].fld{
   <div class="hdr-in">
     <div class="hdr-top">
       <button class="back" id="btnLogout"><span class="chev">‹</span> Salir</button>
-      <h1>Validator Dashboard</h1>
+      <div class="precio" id="precioBox" title="Precio de PLS">
+        <span class="p-val" id="precioVal">–</span>
+        <span class="p-chg" id="precioChg"></span>
+      </div>
       <div class="sync"><i id="syncDot"></i> <span id="syncTime">–</span></div>
     </div>
     <nav class="tabs">
@@ -348,17 +367,39 @@ input[type=text].fld{
     <div class="meta" id="hlNota" style="margin-top:6px;color:var(--mute);font-size:11px">&nbsp;</div>
   </div>
 
-  <div class="grid2">
+  <div class="grid3">
     <div class="card stat">
       <div class="k">Hoy</div>
       <div class="v" id="statHoyV">–</div>
       <div class="d" id="statHoyD">&nbsp;</div>
     </div>
     <div class="card stat">
+      <div class="k">APR</div>
+      <div class="v" id="statAprV">–</div>
+      <div class="d" id="statAprD">&nbsp;</div>
+    </div>
+    <div class="card stat">
       <div class="k">Efectividad</div>
       <div class="v" id="statEfecV">–</div>
       <div class="d" id="statEfecD">&nbsp;</div>
     </div>
+  </div>
+
+  <div class="eyebrow">Ciclo de barrido</div>
+  <div class="card">
+    <div class="ciclo-top">
+      <div>
+        <div class="ciclo-v" id="cicloV">–</div>
+        <div class="ciclo-l">sin barrer ahora</div>
+      </div>
+      <div style="text-align:right">
+        <div class="ciclo-v" id="cicloProx">–</div>
+        <div class="ciclo-l">próximo barrido</div>
+      </div>
+    </div>
+    <svg class="sierra" id="sierra" viewBox="0 0 320 70" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="strip-x"><span id="sierraDesde">–</span><span>ahora</span></div>
+    <div class="ciclo-nota" id="cicloNota">&nbsp;</div>
   </div>
 
   <!-- SIGNATURE: milestone line -->
@@ -534,18 +575,6 @@ input[type=text].fld{
     <div class="scn">
       <div class="l"><div class="a">+150 € al mes</div><div class="b">reinvirtiendo</div></div>
       <div class="r" id="scn150">–<small>al validador #11</small></div>
-    </div>
-  </div>
-
-  <div class="eyebrow">Fiscalidad</div>
-  <div class="card">
-    <div class="nrow"><div class="l">Ganado en <span id="fiscYear">–</span></div><div class="r" id="fiscGanado">–</div></div>
-    <div style="margin-top:10px">
-      <div class="sim-lbl">Precio medio de compra ($/PLS, opcional)</div>
-      <input type="text" class="fld mono" id="fiscCosto" placeholder="ej. 0.00006" inputmode="decimal">
-    </div>
-    <div style="margin-top:14px">
-      <button class="btn" id="btnCsv">Exportar <span id="fiscYear2">–</span> a CSV</button>
     </div>
   </div>
 
@@ -913,7 +942,7 @@ input[type=text].fld{
     const ganadoReal = acum ? acum.total : v.ganado_total;
     $('hlNum').innerHTML = `${fmt(ganadoReal)} <span>PLS</span>`;
 
-    const usdTotal = fiscPrice() ? ganadoReal * fiscPrice() : null;
+    const usdTotal = precioPLS() ? ganadoReal * precioPLS() : null;
     $('hlMeta').innerHTML = (usdTotal !== null ? `≈ ${fmt(usdTotal, 2)} $ · ` : '')
       + `<b>+${fmt(ritmo.pls_dia / 24)} PLS/h</b> ${ritmo.base}`;
 
@@ -1026,6 +1055,21 @@ input[type=text].fld{
         + (estado.red_validadores_activos ? '' : ' (red sin medir)');
     }
 
+    // APR sobre la ganancia real, no sobre el excedente: es la rentabilidad
+    // efectiva del stake, que es la pregunta de fondo («¿voy bien?»).
+    const horas = Number(v.horas_activo) || 0;
+    if (acum && horas >= 1 && v.stake_total > 0) {
+      const apr = (acum.total / horas) * 8760 / v.stake_total * 100;
+      $('statAprV').innerHTML = `${fmt(apr, 2)}<small>%</small>`;
+      $('statAprD').textContent = `sobre ${fmtCompact(v.stake_total)} en staking`;
+    } else {
+      $('statAprV').textContent = '–';
+      $('statAprD').textContent = 'aún sin recorrido';
+    }
+
+    $('cicloV').textContent = `${fmt(v.ganado_total)} PLS`;
+    renderSierra();
+
     ajustarRangoChart();
     renderChart();
   }
@@ -1065,6 +1109,81 @@ input[type=text].fld{
     if (!alternativo) return;
     currentChartRange = alternativo;
     document.querySelectorAll('.ct').forEach(x => x.classList.toggle('on', x.dataset.r === alternativo));
+  }
+
+  // Diente de sierra: `ganado` sube durante ~8,1 h y el barrido lo devuelve a
+  // cero. Ver la forma explica de un vistazo por qué el número del beacon no
+  // es lo ganado, y dice cuánto falta para el próximo corte.
+  const HORAS_CICLO = 8.09;
+
+  function renderSierra() {
+    const svg = $('sierra');
+    const puntos = serie.slice(-Math.ceil((HORAS_CICLO * 4) + 1) * 3);
+    if (puntos.length < 3) {
+      svg.innerHTML = '';
+      $('cicloNota').textContent = 'Aún no hay serie suficiente para dibujar el ciclo.';
+      return;
+    }
+
+    const t0 = puntos[0].ts;
+    const t1 = puntos[puntos.length - 1].ts;
+    const span = Math.max(1, t1 - t0);
+    const max = Math.max(...puntos.map(p => p.ganado), 1);
+
+    const x = p => ((p.ts - t0) / span) * 320;
+    const y = p => 70 - (p.ganado / max) * 62;
+
+    // Cada barrido parte la línea: unirlos dibujaría una caída diagonal que no
+    // ocurrió, porque el excedente cae de golpe.
+    const tramos = [[]];
+    for (let i = 0; i < puntos.length; i++) {
+      if (i && puntos[i].ganado < puntos[i - 1].ganado) tramos.push([]);
+      tramos[tramos.length - 1].push(puntos[i]);
+    }
+
+    const partes = [];
+    partes.push(`<defs>
+      <linearGradient id="gradSierra" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#ff5ca8"/><stop offset="55%" stop-color="#a855f7"/>
+        <stop offset="100%" stop-color="#22d3ee"/>
+      </linearGradient>
+      <linearGradient id="gradArea" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#a855f7" stop-opacity=".22"/>
+        <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+      </linearGradient>
+    </defs>`);
+
+    for (const tramo of tramos) {
+      if (tramo.length < 2) continue;
+      const d = tramo.map(p => `${x(p).toFixed(1)},${y(p).toFixed(1)}`).join(' ');
+      const primero = x(tramo[0]).toFixed(1);
+      const ultimo = x(tramo[tramo.length - 1]).toFixed(1);
+      partes.push(`<polygon class="area" points="${primero},70 ${d} ${ultimo},70"/>`);
+      partes.push(`<polyline class="linea" points="${d}"/>`);
+      if (tramo !== tramos[0]) {
+        partes.push(`<line class="corte" x1="${primero}" y1="0" x2="${primero}" y2="70"/>`);
+      }
+    }
+    svg.innerHTML = partes.join('');
+
+    $('sierraDesde').textContent = new Date(t0 * 1000)
+      .toLocaleString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+    // El próximo barrido se estima desde el último observado, que es el
+    // arranque del tramo actual.
+    const ultimoCorte = tramos.length > 1 ? tramos[tramos.length - 1][0].ts : null;
+    if (ultimoCorte) {
+      const faltan = (ultimoCorte + HORAS_CICLO * 3600 - Date.now() / 1000) / 3600;
+      $('cicloProx').textContent = faltan > 0
+        ? (faltan >= 1 ? `${fmt(faltan, 1)} h` : `${fmt(faltan * 60)} min`)
+        : 'ya toca';
+      $('cicloNota').textContent =
+        `El protocolo retira el excedente cada ~${fmt(HORAS_CICLO, 1)} h. `
+        + `${tramos.length - 1} barrido${tramos.length === 2 ? '' : 's'} en lo que se ve aquí.`;
+    } else {
+      $('cicloProx').textContent = '–';
+      $('cicloNota').textContent = 'Todavía no se ha observado ningún barrido en esta ventana.';
+    }
   }
 
   function renderChart() {
@@ -1246,7 +1365,8 @@ input[type=text].fld{
   }
 
   // ---------- herramientas ----------
-  let simPricePerUnit = 0.00007; // se ajusta al cargar via DexScreener si es posible
+  let simPricePerUnit = 0.00001;  // lo mueve el slider
+  let sliderTocado = false;       // una vez tocado, deja de seguir al precio real
 
   const SIM_MIN = 0.000005, SIM_MAX = 0.002;
   const PRECIO_SACRIFICIO = 0.0001; // referencia del sacrificio de PLS
@@ -1259,10 +1379,13 @@ input[type=text].fld{
     return Math.max(0, Math.min(1000, Math.round(t * 1000)));
   }
 
-  function fiscPrice() {
-    const v = $('fiscCosto') ? $('fiscCosto').value.replace(',', '.') : '';
-    const n = Number(v);
-    return n > 0 ? n : simPricePerUnit;
+  // Precio de PLS en vivo, del par de WPLS con más liquidez donde WPLS es la
+  // base. `simPricePerUnit` lo mueve el slider del simulador, así que no vale
+  // para valorar de verdad: para eso está este, que no lo toca nadie.
+  let precioVivo = null;
+
+  function precioPLS() {
+    return precioVivo;
   }
 
   function renderTools() {
@@ -1305,15 +1428,6 @@ input[type=text].fld{
       el.innerHTML = (isFinite(dias) ? `${fmt(dias)} d` : '–') + '<small>al validador #11</small>';
     });
 
-    // fiscalidad
-    const year = new Date().getFullYear().toString();
-    $('fiscYear').textContent = year;
-    $('fiscYear2').textContent = year;
-    const ganadoYear = diarioReal().filter(d => d.fecha.startsWith(year))
-      .reduce((acc, d) => acc + (d.ganado_dia || 0), 0);
-    // La fiscalidad cuenta lo retirado, así que aquí manda la ganancia real.
-    const ganadoMostrar = ganadoYear || ganadoRealT;
-    $('fiscGanado').innerHTML = `${fmt(ganadoMostrar)} PLS<small style="display:block;color:var(--mute);font-size:11px">≈ ${fmt(ganadoMostrar * fiscPrice(), 2)} $</small>`;
   }
 
   // La marca del sacrificio se coloca desde la misma escala logarítmica que
@@ -1321,39 +1435,11 @@ input[type=text].fld{
   $('simRefSac').style.setProperty('--t', sliderFromPrice(PRECIO_SACRIFICIO) / 1000);
 
   $('simSlider').addEventListener('input', e => {
+    sliderTocado = true;
     simPricePerUnit = priceFromSlider(Number(e.target.value));
     renderTools();
   });
-  $('fiscCosto').addEventListener('input', renderTools);
 
-  $('btnCsv').addEventListener('click', () => {
-    const year = new Date().getFullYear().toString();
-    const saludPorDia = new Map(daily.map(d => [d.fecha, d]));
-    const rows = diarioReal().filter(d => d.fecha.startsWith(year))
-      .map(d => ({ ...d, ...(saludPorDia.get(d.fecha) || {}), ganado_dia: d.ganado_dia }));
-    const precio = fiscPrice();
-    // El valor se calcula a un precio único, no al precio de cada día: no
-    // guardamos el histórico de cotización. La cabecera lo deja por escrito
-    // para que nadie lo confunda con una valoración fiscal exacta.
-    const header = `# Recompensas de staking ${year} — PLSDASH\n`
-      + `# valor_usd calculado a un precio fijo de ${precio} $/PLS, no al precio de cada día\n`
-      + 'fecha,ganado_dia_pls,ganado_acum_pls,valor_usd,apr_medio,salud,minutos_caido\n';
-    const body = rows.map(d => [
-      d.fecha,
-      d.ganado_dia ?? 0,
-      d.ganado_acum ?? 0,
-      ((d.ganado_dia || 0) * precio).toFixed(6),
-      d.apr_medio ?? '',
-      d.salud ?? '',
-      d.minutos_caido ?? 0,
-    ].join(',')).join('\n');
-    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `validadores-${year}.csv`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  });
 
   document.querySelectorAll('.toggle').forEach(t => {
     const key = 'val_alert_' + t.dataset.alert;
@@ -1443,10 +1529,40 @@ input[type=text].fld{
       const best = propios.reduce((a, p) => (p.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? p : a, propios[0]);
       const price = parseFloat(best.priceUsd);
       if (price > 0) {
-        simPricePerUnit = price;
-        $('simSlider').value = sliderFromPrice(simPricePerUnit);
+        precioVivo = price;
+        // El slider arranca en el precio real, pero luego va por libre.
+        if (!sliderTocado) {
+          simPricePerUnit = price;
+          $('simSlider').value = sliderFromPrice(price);
+        }
+        pintarPrecio(price, best.priceChange?.h24);
       }
-    } catch { /* mantiene el valor por defecto si falla */ }
+    } catch { /* se queda con el último precio bueno si falla */ }
+  }
+
+  function pintarPrecio(precio, cambio24) {
+    // Notación compacta para los ceros: 0,0₅9406 en vez de 0,000009406, que a
+    // simple vista se confunde con un orden de magnitud distinto.
+    const exp = Math.floor(Math.log10(precio));
+    let texto;
+    if (exp >= -4) {
+      texto = precio.toFixed(6);
+    } else {
+      const ceros = -exp - 1;
+      const digitos = Math.round(precio * Math.pow(10, ceros + 4));
+      texto = `0,0${'₀₁₂₃₄₅₆₇₈₉'[ceros]}${digitos}`;
+    }
+    $('precioVal').textContent = `$${texto}`;
+
+    const chg = $('precioChg');
+    if (cambio24 == null || !Number.isFinite(Number(cambio24))) {
+      chg.textContent = '';
+      chg.className = 'p-chg';
+    } else {
+      const c = Number(cambio24);
+      chg.textContent = `${c >= 0 ? '+' : ''}${c.toFixed(1)}%`;
+      chg.className = 'p-chg ' + (c >= 0 ? 'up' : 'down');
+    }
   }
 
   // `daily` solo cambia una vez al día: no tiene sentido pedir el histórico
@@ -1499,6 +1615,8 @@ input[type=text].fld{
     startSyncClock();
     clearInterval(window.__valStale);
     window.__valStale = setInterval(checkStale, 30000);
+    clearInterval(window.__valPrecio);
+    window.__valPrecio = setInterval(loadPrice, 120000);
     await loadPrice();
     await refresh();
     clearInterval(window.__valPoll);

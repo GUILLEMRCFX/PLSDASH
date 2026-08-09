@@ -86,7 +86,11 @@ async function retiradasNuevas(desdeIndice) {
 
       const pls = Number(w.amount) / WEI;
       total += pls;
-      nuevas.push({ indice, validador, pls, ts: Date.parse(w.timestamp) / 1000 });
+      nuevas.push({
+        indice, validador, pls,
+        ts: Math.floor(Date.parse(w.timestamp) / 1000),
+        bloque: Number(w.block_number) || null,
+      });
       if (!Number.isFinite(maxIndice) || indice > maxIndice) maxIndice = indice;
     }
 
@@ -95,6 +99,30 @@ async function retiradasNuevas(desdeIndice) {
   }
 
   return { total, maxIndice, nuevas };
+}
+
+/**
+ * Guarda las retiradas en `barridos`. INSERT OR IGNORE porque el índice de
+ * retirada es la clave primaria: reprocesar el mismo tramo no duplica nada.
+ *
+ * `precio_pls` se deja a NULL a propósito: la columna existe, pero no se
+ * necesita ninguna valoración histórica.
+ */
+async function guardarBarridos(db, nuevas) {
+  if (!db || !nuevas.length) return 0;
+
+  const stmt = db.prepare(
+    'INSERT OR IGNORE INTO barridos '
+    + '(indice_retirada, ts, validador, cantidad, bloque, es_bloque, precio_pls) '
+    + 'VALUES (?, ?, ?, ?, ?, ?, NULL)'
+  );
+
+  const lotes = nuevas.map(n => stmt.bind(
+    n.indice, n.ts, n.validador, n.pls, n.bloque ?? null, n.pls > UMBRAL_BLOQUE ? 1 : 0
+  ));
+
+  const res = await db.batch(lotes);
+  return res.reduce((acc, r) => acc + (r.meta?.changes || 0), 0);
 }
 
 export async function onRequestGet({ env }) {
@@ -126,6 +154,15 @@ export async function onRequestGet({ env }) {
       }
 
       await env.PLSDASH_KV.put(CLAVE, JSON.stringify(acumulado));
+
+      // El histórico de barridos vive en D1; KV solo lleva el acumulado para
+      // no recorrer el listado entero en cada carga. Si esto falla, la cifra
+      // que ve el panel sigue siendo correcta.
+      try {
+        await guardarBarridos(env.VALIDATOR_DB, nuevas);
+      } catch (e) {
+        console.error('no se pudieron guardar los barridos:', e);
+      }
     } catch (e) {
       // Si el explorador falla se devuelve lo último acumulado marcándolo:
       // una cifra un poco vieja es mejor que ninguna, siempre que se sepa.

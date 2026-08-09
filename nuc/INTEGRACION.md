@@ -16,35 +16,16 @@ No hay que volver a ejecutarlas.
 
 ---
 
-# ⚠️ Antes de desplegar la validación: leer esto
-
-Lo que el 8-ago se tomó por datos corruptos **eran barridos de saldo
-legítimos**. El protocolo retira el excedente sobre los 32M a la wallet de
-retirada cada ~9 h; el balance vuelve a 32.000.000 exactos por validador y
-`ganado` (que es `balance − stake`) empieza de cero otra vez. Después la
-acumulación sigue al ritmo normal de ~2.890 PLS/h, que es lo que delata que no
-era ruido: una API rota no produce una progresión aritmética perfecta.
-
-Consecuencias que **siguen pendientes** y que esta validación no arregla:
-
-- **El panel muestra mal la ganancia.** «Ganado desde el inicio» enseña solo el
-  saldo sin barrer. La ganancia real es la suma de lo barrido más lo actual.
-  Con dos barridos observados, la cifra real ronda los 90.000 PLS frente a los
-  ~29.000 que muestra.
-- De esa cifra cuelgan los hitos, el break-even, la proyección y **la
-  fiscalidad**, que es la que más importa: hacienda cuenta lo retirado.
-- El invariante correcto no es «ganado solo sube» sino «barrido acumulado +
-  saldo actual solo sube». Falta llevar ese acumulado.
-
-Lo de aquí abajo ya es seguro de desplegar: reconoce los barridos y no los
-rechaza. Pero no resuelve el cálculo de la ganancia real.
-
----
-
 # Validación (`validacion.py`)
 
-Dos barreras contra datos imposibles, después de que el 8-ago a las 19:00 la
-tubería escribiera `ganado=0` con los diez validadores activos y `salud="ok"`.
+Lo que el 8-ago se tomó por datos corruptos **eran barridos de saldo
+legítimos**: el protocolo retira el excedente sobre los 32M cada ~8,1 h y
+`ganado` vuelve a cero. Las guardias de monotonía que hubo aquí están
+retiradas — habrían congelado la tubería cada ocho horas.
+
+El panel ya calcula la ganancia real (barridos + excedente) por su cuenta
+desde Cloudflare, así que esto no le hace falta para dar la cifra buena.
+
 
 ## A. En `collector.py`, antes de devolver el estado
 
@@ -63,7 +44,7 @@ return estado
 ## B. En `push.py`, antes de escribir nada
 
 ```python
-from validacion import admisible, ultimo_ganado_conocido
+from validacion import revisar_snapshot, registrar_descarte
 
 if estado.get("salud") == "sin_datos":
     print("[push] estado no fiable, no se escribe nada en esta pasada")
@@ -82,17 +63,20 @@ no reporta desde hace X min». Esa ruta ya está construida y probada.
 ## C. En `push.py`, antes del `INSERT INTO snapshots`
 
 ```python
-ultimo = ultimo_ganado_conocido(d1)
-ok, motivo = admisible(ultimo, ganado, slashed=v.get("slashed", 0))
+ok, motivo = revisar_snapshot(d1, ts, ganado)
 if not ok:
     print(f"[push] snapshot rechazado: {motivo}")
+    registrar_descarte(d1, motivo)
 else:
     d1("INSERT INTO snapshots (...) VALUES (...)", [...])
 ```
 
-Las recompensas acumuladas solo suben. Una bajada real solo puede venir de una
-penalización, y una penalización de verdad también mueve el campo `slashed`:
-si baja sin que nadie esté penalizado, el dato está mal y no entra.
+**Una bajada de `ganado` no se rechaza.** Cada ~8,1 h el protocolo retira el
+excedente sobre los 32M a la wallet y el contador vuelve a cero: es el
+funcionamiento normal de la cadena. Lo único que corta esta guardia es una
+subida disparatada —más de 8 veces el ritmo típico—, que sí delata una lectura
+mala. El listón está en 8x y no en 3x porque una propuesta de bloque real ya
+triplica el ritmo de esa hora.
 
 ## Qué rechaza exactamente `validar()`
 
@@ -101,10 +85,11 @@ activos; antes de eso un `ganado` a cero es legítimo. Cumplido eso, rechaza:
 
 | Motivo | Por qué |
 |---|---|
-| `ganado_total` ausente, cero o negativo | Con validadores activos horas, imposible |
-| `balance_total` == `stake_total` exacto | Es la firma de `effective_balance` |
-| `balance` == 32.000.000 clavado en algún validador | La misma firma, uno a uno |
+| `ganado_total` ausente o negativo | Un excedente negativo es imposible |
 | `ganado_total` ≠ suma del detalle (±0,01) | Uno de los dos está mal y no se sabe cuál |
+
+Ni `ganado_total` a cero ni `balance_total` igual al stake se rechazan: ambos
+son exactamente lo que deja un barrido recién hecho.
 
 Comprobado contra la fila corrupta real (la caza por tres motivos a la vez) y
 contra las seis filas buenas del 8-ago, más los casos de validador recién
@@ -137,8 +122,8 @@ d1(
 
 `precio_pls()` devuelve `None` si falla, y `None` se guarda como `NULL`. Es
 deliberado: un hueco se ve y se puede rellenar desde otra fuente, mientras que
-un `0` de relleno se confunde con un precio real y contamina la fiscalidad sin
-dejar rastro.
+un `0` de relleno se confunde con un precio real y deforma la gráfica de
+evolución sin dejar rastro.
 
 ## 2b. Publicar el tamaño de la red
 
@@ -168,13 +153,12 @@ def red_validadores_activos():
         return None
 ```
 
-Mientras no llegue, el panel usa 109.600 —el registro completo medido el
+Mientras no llegue, el panel usa 46.905 —los activos medidos en el nodo el
 9-ago-2026— y lo marca como «red sin medir».
 
-**Descuadre pendiente:** en la ventana del 7 al 9 de agosto se observaron 4
-bloques donde este modelo predice 1 (probabilidad del 2,3%). Puede ser que los
-activos sean bastantes menos que el registro, que las retiradas grandes no sean
-todas propuestas, o azar con una muestra de cuatro. No está resuelto.
+Ese número resolvió un descuadre: con el registro completo (109.600) salían 4
+bloques observados donde el modelo predecía 1, probabilidad del 2,3%. Con los
+activos se esperan 2,5 y ver 4 tiene un 24% de probabilidad. Azar normal.
 
 ## 3. Revisar bloques en cada ejecución
 
