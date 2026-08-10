@@ -179,19 +179,32 @@ body{
 .ciclo-nota{font-size:11px;color:var(--mute);margin-top:10px;line-height:1.5}
 
 /* ---------- feed ---------- */
-.feed{border-left:1.5px solid var(--line);margin-left:6px;padding-left:16px}
-.ev{position:relative;padding:0 0 18px}
-.ev:last-child{padding-bottom:0}
+.feed{border-left:1.5px solid var(--line);margin-left:5px;padding-left:14px}
+/* Una línea por evento: dos líneas con interlineado se comían la pantalla en
+   cuanto el registro pasaba de una docena de entradas. */
+.ev{
+  position:relative;display:flex;align-items:baseline;justify-content:space-between;
+  gap:10px;padding:7px 0;
+}
 .ev::before{
-  content:"";position:absolute;left:-22.5px;top:4px;width:9px;height:9px;border-radius:50%;
+  content:"";position:absolute;left:-19.5px;top:11px;width:8px;height:8px;border-radius:50%;
   background:var(--surface);border:2px solid var(--mute);
 }
+.ev-izq{display:flex;align-items:baseline;gap:7px;min-width:0;flex-wrap:nowrap;overflow:hidden}
+.ev-izq .ttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev-izq b{white-space:nowrap}
+.ver-todo{
+  width:100%;margin-top:10px;padding:9px;border-radius:10px;
+  background:none;border:1px solid var(--line);color:var(--dim);
+  font-family:inherit;font-size:11.5px;font-weight:500;cursor:pointer;
+}
+.ver-todo:hover{border-color:#a855f755;color:var(--txt)}
 .ev.good::before{border-color:var(--ok)}
 .ev.warn::before{border-color:var(--warn)}
 .ev.bad::before{border-color:var(--bad)}
 .ev .h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
-.ev .ttl{font-size:13.5px;font-weight:500}
-.ev .tm{font-size:10.5px;color:var(--mute);white-space:nowrap}
+.ev .ttl{font-size:13px;font-weight:500}
+.ev .tm{font-size:10.5px;color:var(--mute);white-space:nowrap;flex:none}
 .ev .sb{font-size:11.5px;color:var(--dim);margin-top:3px}
 .ev .sb b{color:var(--ok)}
 .ev .sb b.neg{color:var(--bad)}
@@ -472,6 +485,7 @@ input[type=text].fld{
   <div class="eyebrow">Registro</div>
   <div class="card">
     <div class="feed" id="feedList"><div class="empty-msg">Cargando…</div></div>
+    <button class="ver-todo" id="feedVerTodo" style="display:none"></button>
   </div>
 
   <div class="eyebrow">Recompensas</div>
@@ -795,6 +809,11 @@ input[type=text].fld{
   });
 
   // ---------- tabs ----------
+  $('feedVerTodo').addEventListener('click', () => {
+    verTodosLosEventos = !verTodosLosEventos;
+    renderEventos(null);   // null = repinta con lo que ya hay en memoria
+  });
+
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(x => x.classList.remove('on'));
     t.classList.add('on');
@@ -1352,35 +1371,108 @@ input[type=text].fld{
   // Un barrido es rutina del protocolo, no un aviso: punto gris, sin color.
   const EV_NEUTRO = new Set(['barrido']);
 
-  function renderEventos(eventos) {
-    const el = $('feedList');
-    if (!eventos.length) { el.innerHTML = '<div class="empty-msg">Sin eventos todavía.</div>'; return; }
-    el.innerHTML = '';
-    eventos.forEach(ev => {
-      const cls = EV_BAD.has(ev.tipo) ? 'bad'
-        : EV_GOOD.has(ev.tipo) ? 'good'
-        : EV_NEUTRO.has(ev.tipo) ? '' : 'warn';
-      const div = document.createElement('div');
-      div.className = 'ev ' + cls;
+  // Cuántos eventos se ven de entrada. El registro suma un barrido cada ~8 h
+  // más los bloques: en una semana son treinta entradas, y el Resumen dejaría
+  // enterradas la gráfica y las propuestas.
+  const EVENTOS_VISIBLES = 5;
+  let verTodosLosEventos = false;
+  let eventosCache = [];
 
-      const h = document.createElement('div'); h.className = 'h';
-      const ttl = document.createElement('div'); ttl.className = 'ttl'; ttl.textContent = ev.titulo;
-      const tm = document.createElement('div'); tm.className = 'tm'; tm.textContent = relTime(ev.ts);
-      h.append(ttl, tm);
+  /**
+   * Un barrido y los bloques de ese mismo ciclo son el mismo hecho, y salían
+   * como entradas separadas con idéntica hora. Se funden en una.
+   */
+  function fundirEventos(eventos) {
+    // Dos pasadas y no una: los bloques se insertaron después del barrido, así
+    // que con el mismo `ts` salen antes al ordenar. Recorrer una sola vez
+    // buscaba un barrido que todavía no se había visto y no fundía nada.
+    const barridos = new Map();
+    for (const ev of eventos) {
+      if (ev.tipo === 'barrido') barridos.set(ev.ts, { ...ev, proponentes: [] });
+    }
 
-      const sb = document.createElement('div'); sb.className = 'sb';
-      sb.textContent = ev.detalle || '';
-      if (ev.pls != null) {
-        const b = document.createElement('b');
-        if (ev.pls < 0) b.className = 'neg';
-        b.textContent = `${ev.pls >= 0 ? '+' : ''}${fmt(ev.pls)} PLS`;
-        if (sb.textContent) sb.append(' · ');
-        sb.append(b);
+    const salida = [];
+    for (const ev of eventos) {
+      if (ev.tipo === 'barrido') {
+        salida.push(barridos.get(ev.ts));
+      } else if (ev.tipo === 'bloque' && barridos.has(ev.ts)) {
+        barridos.get(ev.ts).proponentes.push(ev.validador);
+      } else {
+        salida.push({ ...ev });
       }
+    }
+    return salida;
+  }
 
-      div.append(h, sb);
-      el.appendChild(div);
-    });
+  function pintarEvento(ev) {
+    const cls = EV_BAD.has(ev.tipo) ? 'bad'
+      : EV_GOOD.has(ev.tipo) ? 'good'
+      : EV_NEUTRO.has(ev.tipo) ? '' : 'warn';
+
+    // Un barrido que trae bloque deja de ser rutina: se marca en verde.
+    const conBloque = ev.proponentes && ev.proponentes.length;
+    const div = document.createElement('div');
+    div.className = 'ev ' + (conBloque ? 'good' : cls);
+
+    const izq = document.createElement('div');
+    izq.className = 'ev-izq';
+
+    const ttl = document.createElement('span');
+    ttl.className = 'ttl';
+    ttl.textContent = ev.titulo;
+    izq.append(ttl);
+
+    if (conBloque) {
+      const p = document.createElement('span');
+      p.className = 'pill-blq';
+      p.textContent = `⬦${ev.proponentes.length > 1 ? ' ' + ev.proponentes.length : ''}`;
+      p.title = `Incluye bloque de ${ev.proponentes.join(', ')}`;
+      izq.append(p);
+    }
+
+    if (ev.pls != null) {
+      const b = document.createElement('b');
+      if (ev.pls < 0) b.className = 'neg';
+      b.textContent = `${ev.pls >= 0 ? '+' : ''}${fmt(ev.pls)} PLS`;
+      izq.append(b);
+    }
+
+    const tm = document.createElement('div');
+    tm.className = 'tm';
+    tm.textContent = relTime(ev.ts);
+
+    // El detalle sobrevive en el tooltip: en una línea no cabe, pero tampoco
+    // hace falta leerlo siempre.
+    const partes = [ev.detalle, conBloque ? `bloque de ${ev.proponentes.join(', ')}` : null];
+    div.title = partes.filter(Boolean).join(' · ');
+
+    div.append(izq, tm);
+    return div;
+  }
+
+  function renderEventos(eventos) {
+    if (eventos) eventosCache = fundirEventos(eventos);
+
+    const el = $('feedList');
+    el.innerHTML = '';
+    if (!eventosCache.length) {
+      el.innerHTML = '<div class="empty-msg">Sin eventos todavía.</div>';
+      $('feedVerTodo').style.display = 'none';
+      return;
+    }
+
+    const mostrar = verTodosLosEventos ? eventosCache : eventosCache.slice(0, EVENTOS_VISIBLES);
+    for (const ev of mostrar) el.appendChild(pintarEvento(ev));
+
+    const boton = $('feedVerTodo');
+    if (eventosCache.length <= EVENTOS_VISIBLES) {
+      boton.style.display = 'none';
+    } else {
+      boton.style.display = '';
+      boton.textContent = verTodosLosEventos
+        ? 'Ver menos'
+        : `Ver los ${eventosCache.length}`;
+    }
   }
 
   // ---------- render: validadores ----------
@@ -1769,7 +1861,7 @@ input[type=text].fld{
         api('/historico?rango=24h'),
         api('/historico?rango=serie'),
         api('/ganancia'),
-        api('/eventos?limit=15'),
+        api('/eventos?limit=60'),
         api(`/eventos?limit=1&tipos=${TIPOS_INCIDENCIA.join(',')}`),
         api('/eventos?limit=1&tipos=descarte'),
         necesitaDaily ? api('/historico?rango=todo') : Promise.resolve(null),
