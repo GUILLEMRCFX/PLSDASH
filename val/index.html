@@ -208,8 +208,18 @@ body{
 .chart-pie{font-size:10.5px;color:var(--mute);margin-top:10px;text-align:right}
 
 /* ---------- validator rows ---------- */
-.vrow{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line-soft)}
+.vrow{
+  display:flex;align-items:center;gap:12px;padding:13px 0;
+  border-bottom:1px solid var(--line-soft);
+  color:inherit;text-decoration:none;transition:opacity .12s;
+}
 .vrow:last-child{border-bottom:none}
+.vrow:active{opacity:.6}
+@media(hover:hover){ .vrow:hover .vchev{color:var(--dim);transform:translateX(2px)} }
+.vchev{
+  flex:none;font-size:17px;color:var(--line);margin-left:-4px;
+  transition:color .12s,transform .12s;
+}
 .vn{
   width:30px;height:30px;border-radius:9px;flex:none;
   background:#a855f716;border:1px solid #a855f72e;
@@ -673,6 +683,10 @@ input[type=text].fld{
 
   // Activación de los diez validadores (evento `activacion` en D1).
   const ACTIVACION_TS = 1786095955;
+
+  // Explorador de la capa de consenso. Blockscout indexa la de ejecución y no
+  // tiene páginas por índice de validador; g4mm4 sí.
+  const EXPLORADOR_VALIDADOR = 'https://www.g4mm4.io/validator/';
 
   // ---------- utilidades ----------
   const $ = id => document.getElementById(id);
@@ -1397,12 +1411,19 @@ input[type=text].fld{
     // el orden cambiaba sin que pasara nada.
     [...detalle].sort((a, b) => a.indice - b.indice).forEach((d, i) => {
       const efec = Math.min(100, (d.ganado / refGrupo) * 100);
-      const row = document.createElement('div');
+      // Enlace real y no un manejador de click: así funcionan el toque, la
+      // rueda del ratón y «abrir en pestaña nueva» sin escribir nada.
+      const row = document.createElement('a');
       row.className = 'vrow';
+      row.href = `${EXPLORADOR_VALIDADOR}${d.indice}`;
+      row.target = '_blank';
+      row.rel = 'noopener noreferrer';
+      row.title = `Ver el validador ${d.indice} en g4mm4.io`;
       row.innerHTML = `
         <div class="vn">${i + 1}</div>
         <div class="vinfo"><div class="a">${d.indice}${d.slashed ? ' ⚠︎' : ''}${bloquesDe(d.indice)}</div><div class="b mono">${d.pubkey_corta} · ${efec.toFixed(1)}%</div></div>
-        <div class="vright"><div class="a">+${fmt(d.ganado)}</div><div class="b">${fmtCompact(d.balance)}</div></div>`;
+        <div class="vright"><div class="a">+${fmt(d.ganado)}</div><div class="b">${fmtCompact(d.balance)}</div></div>
+        <div class="vchev">›</div>`;
       if (d.slashed || d.estado !== 'active_ongoing') {
         row.querySelector('.vinfo .a').style.color = 'var(--bad)';
         row.querySelector('.vinfo .b').textContent = `${d.pubkey_corta} · ${d.estado}`;
