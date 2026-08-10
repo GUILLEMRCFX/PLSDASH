@@ -75,6 +75,20 @@ Contexto completo en `BRIEF-CLAUDE-CODE.md`.
 - `GET /api/val/validadores` → histórico de `validador_diario` agregado por
   fecha y por validador. Es la base de la media histórica de efectividad.
 
+### The Vault (`vault.js`)
+
+Easter egg de la portada. La tarjeta del valor total es una tapa: arrastrarla
+a la derecha revela un candado de combinación de cuatro ruedas, y la
+combinación correcta lleva a `/val/` con la sesión abierta.
+
+El PIN **no se comprueba en el cliente**. Los cuatro dígitos van al mismo
+`/api/val/auth` que usa el teclado, y el servidor decide; `vault.js` no sabe
+cuál es el PIN. El teclado sigue existiendo para quien entra por la URL.
+
+Se desactiva borrando la etiqueta `<script src="/vault.js">` de `index.html`.
+No toca nada más de la página: envuelve el hero al arrancar y todo lo suyo
+vive dentro de ese envoltorio.
+
 ### Notas sobre los datos
 
 - **El ritmo de recompensas no se toma de `pls_dia`.** Ese campo es la media
@@ -128,7 +142,14 @@ Pages sirve los dos sitios:
 
 **Se activa con la variable de entorno `VAL_HOST`** (valor:
 `val.plsdash.com`). Mientras no exista, el middleware no cambia nada y el
-panel sigue en `plsdash.com/val/`. Así el bloqueo y el subdominio entran en
+panel sigue en `plsdash.com/val/`.
+
+> ⚠ **Hoy `VAL_HOST` debe seguir sin definir.** El Easter egg de la portada
+> (`vault.js`) manda el PIN a `/api/val/auth` desde `plsdash.com`, y esa ruta
+> devuelve 404 en cuanto el subdominio entra en vigor. El candado se limitaría
+> a rechazar todo sin decir por qué. Para mover el panel al subdominio
+> conservando el Vault hay que dejar pasar `/auth` desde el dominio principal
+> y emitir la cookie con `Domain=.plsdash.com`. Así el bloqueo y el subdominio entran en
 vigor a la vez y no hay una ventana sin acceso por ningún sitio.
 
 Las rutas que pasan por Functions están en `_routes.json`; una ruta nueva del
