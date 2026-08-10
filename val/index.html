@@ -777,7 +777,10 @@ input[type=text].fld{
 
   function pinPress(k) {
     if (k === 'back') { pinDigits = pinDigits.slice(0, -1); pinRender(); return; }
-    if (k === 'exit') { pinDigits = ''; pinRender(); return; }
+    // «Salir» desde la pantalla del PIN devuelve a PLSDASH. Antes solo
+    // borraba los dígitos, así que dejaba al visitante encerrado en una
+    // pantalla sin salida visible.
+    if (k === 'exit') { window.location.href = '/'; return; }
     if (pinDigits.length >= 4) return;
     pinDigits += k;
     pinRender();

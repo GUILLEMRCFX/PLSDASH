@@ -9,6 +9,19 @@
  * El panel no se enlaza desde ninguna parte y el dominio principal lo niega,
  * así que `plsdash.com/val/` deja de ser una puerta adivinable al mismo sitio.
  *
+ * ⚠ EL VAULT DEPENDE DE QUE `VAL_HOST` SIGA SIN DEFINIR.
+ *
+ * El Easter egg de la portada (`/vault.js`) manda el PIN a `/api/val/auth`
+ * desde `plsdash.com`. En cuanto se define `VAL_HOST`, esa llamada empieza a
+ * recibir 404 y el candado se limita a rechazar cualquier combinación, sin
+ * decir por qué — que es justo lo que hace ante un PIN incorrecto, así que el
+ * fallo es indistinguible del funcionamiento normal.
+ *
+ * Para mover el panel a `val.plsdash.com` conservando el Vault hacen falta dos
+ * cambios: dejar pasar `/api/val/auth` desde el dominio principal, y emitir la
+ * cookie con `Domain=.plsdash.com` — sin eso no viaja entre hostnames y el
+ * panel volvería a pedir el PIN nada más llegar.
+ *
  * ACTIVACIÓN: mientras no exista la variable de entorno `VAL_HOST` este
  * middleware no cambia nada. Así el panel sigue accesible en
  * `plsdash.com/val/` hasta que el subdominio esté configurado y probado, y

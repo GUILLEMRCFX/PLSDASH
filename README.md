@@ -75,6 +75,20 @@ Contexto completo en `BRIEF-CLAUDE-CODE.md`.
 - `GET /api/val/validadores` → histórico de `validador_diario` agregado por
   fecha y por validador. Es la base de la media histórica de efectividad.
 
+### The Vault (`vault.js`)
+
+Easter egg de la portada. La tarjeta del valor total es una tapa: arrastrarla
+a la derecha revela un candado de combinación de cuatro ruedas, y la
+combinación correcta lleva a `/val/` con la sesión abierta.
+
+El PIN **no se comprueba en el cliente**. Los cuatro dígitos van al mismo
+`/api/val/auth` que usa el teclado, y el servidor decide; `vault.js` no sabe
+cuál es el PIN. El teclado sigue existiendo para quien entra por la URL.
+
+Se desactiva borrando la etiqueta `<script src="/vault.js">` de `index.html`.
+No toca nada más de la página: envuelve el hero al arrancar y todo lo suyo
+vive dentro de ese envoltorio.
+
 ### Notas sobre los datos
 
 - **El ritmo de recompensas no se toma de `pls_dia`.** Ese campo es la media
@@ -82,14 +96,18 @@ Contexto completo en `BRIEF-CLAUDE-CODE.md`.
   en cola, así que subestima el ritmo real hasta 10× durante las primeras
   semanas. El panel lo mide sobre días cerrados de `daily` y, mientras no los
   haya, sobre `snapshots`, marcándolo como provisional.
-- **`snapshots.ganado` es acumulado y solo puede subir.** Se han observado
-  filas con `0` escritas cuando falla la lectura del nodo; el frontend las
-  descarta para que no generen picos falsos en la gráfica.
-- **`snapshots.precio_pls`** guarda el precio de PLS en cada snapshot horario.
-  Es el único dato del conjunto que no se puede reconstruir después: sin él no
-  hay fiscalidad correcta ni ganancia en euros. `NULL` significa que
-  DexScreener no respondió en esa hora — un hueco honesto, nunca un cero.
-- **`meta`** guarda la última epoch revisada en busca de bloques propuestos.
+- **`snapshots.ganado` NO es lo ganado**, es el excedente sin barrer: cada
+  ~8,1 h el protocolo retira el sobrante sobre los 32M a la wallet y el
+  contador vuelve a cero. La ganancia real son las retiradas acumuladas más
+  ese excedente, y la calcula `/api/val/ganancia` contra la cadena.
+- **`snapshots.precio_pls`** guarda el precio de PLS en cada snapshot horario,
+  para poder ver su evolución. No se puede reconstruir después: ninguna API
+  sirve el precio de una hora concreta pasado el momento. `NULL` significa que
+  DexScreener no respondió — un hueco honesto, nunca un cero.
+- **`barridos`** es la fuente de verdad de las retiradas, y de ella salen los
+  totales, el contador de bloques y la gráfica por ciclos.
+- **`meta`** lleva los cursores: hasta dónde llega la siembra de `barridos` y
+  hasta qué instante se han pasado los barridos al registro de vida.
 
 El código del NUC que alimenta ambas cosas está en `nuc/`, con las
 instrucciones de integración en `nuc/INTEGRACION.md`.
@@ -128,8 +146,14 @@ Pages sirve los dos sitios:
 
 **Se activa con la variable de entorno `VAL_HOST`** (valor:
 `val.plsdash.com`). Mientras no exista, el middleware no cambia nada y el
-panel sigue en `plsdash.com/val/`. Así el bloqueo y el subdominio entran en
-vigor a la vez y no hay una ventana sin acceso por ningún sitio.
+panel sigue en `plsdash.com/val/`.
+
+> ⚠ **Hoy `VAL_HOST` debe seguir sin definir.** El Easter egg de la portada
+> (`vault.js`) manda el PIN a `/api/val/auth` desde `plsdash.com`, y esa ruta
+> devuelve 404 en cuanto el subdominio entra en vigor. El candado se limitaría
+> a rechazar todo sin decir por qué. Para mover el panel al subdominio
+> conservando el Vault hay que dejar pasar `/auth` desde el dominio principal
+> y emitir la cookie con `Domain=.plsdash.com`.
 
 Las rutas que pasan por Functions están en `_routes.json`; una ruta nueva del
 panel hay que añadirla ahí o se servirá sin pasar por el filtro.
