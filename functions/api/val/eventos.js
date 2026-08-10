@@ -20,6 +20,9 @@ const TIPOS_VALIDOS = new Set([
   // el panel lo usa para distinguir «el NUC está caído» de «el NUC responde
   // pero sus datos no se admiten».
   'descarte',
+  // `barrido` lo escribe /api/val/ganancia al detectar una retirada del
+  // protocolo. Es el suceso más frecuente del registro y el que faltaba.
+  'barrido',
 ]);
 
 const err = (msg, status) =>

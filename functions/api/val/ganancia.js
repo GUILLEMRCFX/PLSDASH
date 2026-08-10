@@ -102,28 +102,71 @@ async function marcarSiembraCompleta(db) {
   ).bind(CLAVE_SIEMBRA, '1', Math.floor(Date.now() / 1000)).run();
 }
 
-/**
- * Totales calculados sobre la tabla.
- *
- * Un barrido reparte una retirada por validador en el mismo instante, y puede
- * partirse entre dos bloques consecutivos —se ha visto con 10 s de diferencia—
- * así que se agrupan por minuto para no contar el mismo dos veces.
- */
-async function totales(db) {
-  const fila = await db.prepare(
-    'SELECT COALESCE(SUM(cantidad), 0) AS total,'
-    + ' COALESCE(SUM(es_bloque), 0) AS bloques,'
-    + ' COUNT(DISTINCT ts / 60) AS barridos,'
-    + ' COUNT(*) AS retiradas'
-    + ' FROM barridos'
-  ).first();
+// Margen para considerar que dos retiradas pertenecen al mismo barrido. El
+// protocolo reparte los diez en el mismo instante, pero puede partirlos entre
+// dos bloques consecutivos: el del 9-ago fue 6 + 4 con 10 s de diferencia.
+const SEGUNDOS_MISMO_BARRIDO = 120;
 
-  return {
-    total: Number(fila?.total || 0),
-    bloques: Number(fila?.bloques || 0),
-    barridos: Number(fila?.barridos || 0),
-    retiradas: Number(fila?.retiradas || 0),
-  };
+// Agrupar por minuto fijo contaba ese barrido partido como dos. Se agrupa por
+// cercanía: una retirada abre ciclo nuevo solo si han pasado más de dos
+// minutos desde la anterior.
+const SQL_CICLOS = `
+  WITH marcado AS (
+    SELECT ts, cantidad, es_bloque, validador,
+           CASE WHEN LAG(ts) OVER (ORDER BY ts) IS NULL
+                  OR ts - LAG(ts) OVER (ORDER BY ts) > ?
+                THEN 1 ELSE 0 END AS inicio
+    FROM barridos
+  ), grupos AS (
+    SELECT *, SUM(inicio) OVER (ORDER BY ts ROWS UNBOUNDED PRECEDING) AS ciclo
+    FROM marcado
+  )
+  SELECT ciclo, MIN(ts) AS ts, COUNT(*) AS validadores,
+         SUM(cantidad) AS pls, SUM(es_bloque) AS bloques,
+         GROUP_CONCAT(CASE WHEN es_bloque = 1 THEN validador END) AS proponentes,
+         SUM(CASE WHEN es_bloque = 0 THEN cantidad END) AS pls_base,
+         SUM(CASE WHEN es_bloque = 0 THEN 1 END) AS n_base
+  FROM grupos GROUP BY ciclo ORDER BY ts ASC`;
+
+async function ciclos(db) {
+  const { results } = await db.prepare(SQL_CICLOS).bind(SEGUNDOS_MISMO_BARRIDO).all();
+
+  return (results || []).map(c => {
+    // Lo que habría cobrado el proponente sin el bloque: la media de sus
+    // compañeros en ese mismo ciclo. La diferencia es la recompensa del bloque.
+    const base = c.n_base > 0 ? c.pls_base / c.n_base : null;
+    const extra = base != null && c.bloques > 0
+      ? Math.max(0, c.pls - (base * c.validadores))
+      : 0;
+
+    return {
+      ts: Number(c.ts),
+      validadores: Number(c.validadores),
+      pls: Number(c.pls),
+      bloques: Number(c.bloques),
+      proponentes: c.proponentes ? String(c.proponentes).split(',').map(Number) : [],
+      base_validador: base,
+      pls_bloques: extra,
+    };
+  });
+}
+
+/** Cuántos bloques lleva propuestos cada validador. */
+async function porValidador(db) {
+  const { results } = await db.prepare(
+    'SELECT validador, SUM(es_bloque) AS bloques FROM barridos'
+    + ' GROUP BY validador HAVING bloques > 0'
+  ).all();
+  const mapa = {};
+  for (const f of results || []) mapa[f.validador] = Number(f.bloques);
+  return mapa;
+}
+
+/** Saldo actual de la wallet: el dinero que de verdad ha llegado. */
+async function saldoWallet() {
+  const datos = await pedir(`/addresses/${WALLET}`, null);
+  const bruto = datos?.coin_balance;
+  return bruto != null ? Number(bruto) / WEI : null;
 }
 
 /**
@@ -203,6 +246,56 @@ async function guardar(db, nuevas) {
   return escritas;
 }
 
+/**
+ * Anota en `eventos` los barridos y bloques que aún no estuvieran.
+ *
+ * El registro de vida llevaba un solo evento —el sembrado a mano— mientras en
+ * dos días pasaban ocho bloques y ocho barridos. Los datos estaban en
+ * `barridos`; solo faltaba contarlos como sucesos.
+ *
+ * Se comprueba antes de insertar porque `eventos` no tiene clave natural: su
+ * id es autoincremental, así que un INSERT OR IGNORE no evitaría nada.
+ */
+async function registrarEventos(db, ciclosNuevos) {
+  let escritos = 0;
+
+  for (const c of ciclosNuevos) {
+    const yaBarrido = await db.prepare(
+      "SELECT 1 FROM eventos WHERE tipo = 'barrido' AND ts = ? LIMIT 1"
+    ).bind(c.ts).first();
+
+    if (!yaBarrido) {
+      await db.prepare(
+        'INSERT INTO eventos (ts, tipo, titulo, detalle, pls) VALUES (?, ?, ?, ?, ?)'
+      ).bind(
+        c.ts, 'barrido', 'Barrido de saldo',
+        `${c.validadores} validadores retirados`, c.pls
+      ).run();
+      escritos++;
+    }
+
+    for (const v of c.proponentes) {
+      const yaBloque = await db.prepare(
+        "SELECT 1 FROM eventos WHERE tipo = 'bloque' AND ts = ? AND validador = ? LIMIT 1"
+      ).bind(c.ts, v).first();
+      if (yaBloque) continue;
+
+      // La recompensa se reparte entre los proponentes del ciclo: si hubo dos,
+      // el extra medido es de los dos juntos.
+      const premio = c.bloques > 0 ? c.pls_bloques / c.bloques : null;
+      await db.prepare(
+        'INSERT INTO eventos (ts, tipo, titulo, detalle, pls, validador) VALUES (?, ?, ?, ?, ?, ?)'
+      ).bind(
+        c.ts, 'bloque', 'Bloque propuesto',
+        `Validador ${v}`, premio, v
+      ).run();
+      escritos++;
+    }
+  }
+
+  return escritos;
+}
+
 export async function onRequestGet({ env }) {
   const db = env.VALIDATOR_DB;
   if (!db) return json({ error: 'D1 no configurado (binding VALIDATOR_DB)' }, 500);
@@ -258,8 +351,38 @@ export async function onRequestGet({ env }) {
     error = String(e.message || e);
   }
 
-  const t = await totales(db);
-  const cuerpo = { ...t, nuevas, sembrando, actualizado: Date.now() };
+  const lista = await ciclos(db);
+  const total = lista.reduce((a, c) => a + c.pls, 0);
+  const bloques = lista.reduce((a, c) => a + c.bloques, 0);
+  const plsBloques = lista.reduce((a, c) => a + c.pls_bloques, 0);
+
+  // Si hubo filas nuevas, algún ciclo puede no estar aún en el registro.
+  if (nuevas > 0) {
+    try { await registrarEventos(db, lista); }
+    catch (e) { console.error('no se pudieron registrar los eventos:', e); }
+  }
+
+  let saldo = null;
+  if (!error) {
+    try { saldo = await saldoWallet(); } catch { /* dato de adorno, no crítico */ }
+  }
+
+  const cuerpo = {
+    total,
+    bloques,
+    barridos: lista.length,
+    retiradas: lista.reduce((a, c) => a + c.validadores, 0),
+    // Cuánto del total viene de proponer bloques. Es la parte de suerte
+    // frente al rendimiento base del nodo, y explica que el APR baile.
+    pls_bloques: plsBloques,
+    peso_bloques: total > 0 ? (plsBloques / total) * 100 : 0,
+    por_validador: await porValidador(db),
+    saldo_wallet: saldo,
+    ciclos: lista.slice(-40),
+    nuevas,
+    sembrando,
+    actualizado: Date.now(),
+  };
 
   if (!error && env.PLSDASH_KV) {
     try { await env.PLSDASH_KV.put(CLAVE_CACHE, JSON.stringify(cuerpo)); } catch { /* la caché no es crítica */ }
