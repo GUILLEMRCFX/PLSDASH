@@ -39,14 +39,27 @@
     // pulsación mantenida: basta con no dispararlo con un roce.
     minArranque: 30,
     umbralAsoma: 70,       // px visuales: empieza a verse la oscuridad
-    umbralAbierto: 140,    // px visuales: tope, CLACK, candado a la vista
 
-    // 0,68 y no el 0,55 pedido: las cuatro ruedas necesitan unos 140px de
-    // hueco, y con 0,55 abrir exigía 364px de arrastre — más ancho del que
-    // tiene un móvil de 390px. A 0,68 el tope llega a los 247px, que sí cabe,
-    // y la resistencia progresiva se mantiene: el ratio efectivo cae de 0,64
-    // al principio a 0,48 al final, así que sigue costando más cuanto más
-    // lejos. Se nota pesado sin volverse imposible.
+    // Esfuerzo necesario para disparar la apertura. No es el hueco final: al
+    // cruzarlo la tapa se suelta y termina su recorrido sola, como una tapa
+    // corredera que engancha. Así el candado puede ser grande sin exigir un
+    // arrastre imposible en un móvil.
+    //
+    // 120 y no 140: los 30px de arranque se descuentan del recorrido, así que
+    // con 140 el disparo pedía 277px de dedo. Con 120 son 235px, que sí caben
+    // en la pantalla de un iPhone.
+    umbralAbierto: 120,
+
+    // Hueco final. Las ruedas necesitan 46px de ancho para el pulgar (Apple
+    // recomienda 44 como mínimo), y cuatro de ellas más el cuerpo no caben en
+    // 140px: con el candado escalado a 0,82 la zona táctil se quedaba en 21px
+    // y fallaba el dedo.
+    apertura: 244,
+
+    // 0,68 y no el 0,55 pedido: con 0,55 el disparo se iba a más de 300px de
+    // dedo, más de lo que da la pantalla de un móvil. La resistencia
+    // progresiva se mantiene igual — el ratio efectivo baja de 0,66 a 0,58 a
+    // lo largo del tirón — así que sigue costando más cuanto más lejos.
     resistencia: 0.68,
   };
 
@@ -131,20 +144,16 @@
 @media(max-width:560px){ .vault-cripta{padding-left:9px} }
 
 /* ── el candado ── */
-/* Escalado para caber en los 140px que deja la tapa al llegar al tope. */
-/* Escalado para caber en los 140px que deja la tapa al llegar al tope, y
-   desplazado por --vp: entra desde detrás del borde izquierdo a medida que la
-   tapa se retira, como un mecanismo corredero. */
+/* Sin escalar: cualquier scale() encoge también la zona táctil, y era eso lo
+   que dejaba las ruedas en 21px de ancho. Se dibuja al tamaño que se toca.
+   --vp lo saca de detrás del borde izquierdo conforme la tapa se retira. */
 .candado{
   display:flex;align-items:center;transform-origin:left center;
-  transform:translateX(calc((var(--vp,0) - 1) * 96px)) scale(.9);
-}
-@media(max-width:560px){
-  .candado{transform:translateX(calc((var(--vp,0) - 1) * 88px)) scale(.82)}
+  transform:translateX(calc((var(--vp,0) - 1) * 150px));
 }
 
 .cuerpo{
-  position:relative;padding:15px 11px 13px;border-radius:11px;
+  position:relative;padding:17px 13px 15px;border-radius:13px;
   background:linear-gradient(165deg,#3a3a42,#1c1c22 55%,#141419);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.16),
@@ -167,18 +176,20 @@
 }
 
 .arco{
-  position:absolute;left:50%;transform:translateX(-50%);top:-26px;
-  width:52px;height:34px;z-index:-1;transition:none;
+  position:absolute;left:50%;transform:translateX(-50%);top:-32px;
+  width:66px;height:42px;z-index:-1;transition:none;
 }
 
-.ruedas{display:flex;gap:4px;position:relative}
+/* 46x84: por encima de los 44px que Apple recomienda como objetivo táctil
+   mínimo, en los dos ejes. El pulgar acierta sin mirar. */
+.ruedas{display:flex;gap:5px;position:relative}
 .rueda{
-  position:relative;width:28px;height:60px;border-radius:5px;overflow:hidden;
+  position:relative;width:46px;height:84px;border-radius:7px;overflow:hidden;
   background:linear-gradient(180deg,#0b0b0f,#232329 22%,#33333c 50%,#232329 78%,#0b0b0f);
   box-shadow:inset 0 0 0 1px rgba(0,0,0,.85),inset 0 0 10px rgba(0,0,0,.7);
   cursor:ns-resize;touch-action:none;
 }
-@media(max-width:560px){ .rueda{width:26px;height:54px} }
+@media(max-width:560px){ .rueda{width:44px;height:80px} }
 /* El cilindro se curva: oscuro arriba y abajo, claro en el centro. */
 .rueda::after{
   content:"";position:absolute;inset:0;pointer-events:none;
@@ -189,19 +200,19 @@
   display:flex;flex-direction:column;align-items:center;will-change:transform;
 }
 .rueda-tira span{
-  height:22px;line-height:22px;font-family:'JetBrains Mono',ui-monospace,monospace;
-  font-size:15px;font-weight:500;color:#c9c9d4;text-shadow:0 1px 0 rgba(0,0,0,.9);
+  height:28px;line-height:28px;font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:19px;font-weight:500;color:#c9c9d4;text-shadow:0 1px 0 rgba(0,0,0,.9);
 }
-@media(max-width:560px){ .rueda-tira span{height:20px;line-height:20px;font-size:14px} }
+@media(max-width:560px){ .rueda-tira span{height:26px;line-height:26px;font-size:18px} }
 
 /* Línea de lectura: por donde se lee la combinación. */
 .lectura{
-  position:absolute;left:-4px;right:-4px;top:50%;height:22px;transform:translateY(-50%);
+  position:absolute;left:-5px;right:-5px;top:50%;height:28px;transform:translateY(-50%);
   pointer-events:none;border-top:1px solid rgba(255,255,255,.14);
   border-bottom:1px solid rgba(0,0,0,.85);
   background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.01));
 }
-@media(max-width:560px){ .lectura{height:20px} }
+@media(max-width:560px){ .lectura{height:26px} }
 
 .vault-caja.temblor > .hero{animation:vault-temblor .4s}
 @keyframes vault-temblor{
@@ -230,9 +241,9 @@
   cripta.innerHTML = `
     <div class="candado" aria-hidden="true">
       <div class="cuerpo">
-        <svg class="arco" viewBox="0 0 52 34" fill="none">
-          <path d="M8 34V17a18 18 0 0 1 36 0v17" stroke="url(#vg)" stroke-width="7" stroke-linecap="round"/>
-          <defs><linearGradient id="vg" x1="0" y1="0" x2="0" y2="34">
+        <svg class="arco" viewBox="0 0 66 42" fill="none">
+          <path d="M10 42V21a23 23 0 0 1 46 0v21" stroke="url(#vg)" stroke-width="9" stroke-linecap="round"/>
+          <defs><linearGradient id="vg" x1="0" y1="0" x2="0" y2="42">
             <stop offset="0" stop-color="#6e6e7a"/><stop offset=".5" stop-color="#3d3d47"/>
             <stop offset="1" stop-color="#232329"/>
           </linearGradient></defs>
@@ -249,7 +260,7 @@
   const contenedorRuedas = cripta.querySelector('.ruedas');
 
   // ───────────────────────────────────────────────────── las ruedas
-  const ALTO_DIGITO = window.matchMedia('(max-width:560px)').matches ? 20 : 22;
+  const ALTO_DIGITO = window.matchMedia('(max-width:560px)').matches ? 26 : 28;
   const REPETICIONES = 7;           // tira larga para poder girar sin saltos
   const ruedas = [];
 
@@ -384,12 +395,33 @@
     // Cuánto se ha abierto, de 0 a 1. El candado va enganchado a esto: sale
     // de detrás del borde izquierdo a un ritmo algo distinto al de la tapa,
     // y ese desfase es lo que hace que parezca que estaba ahí debajo.
-    const progreso = Math.min(1, v / CONFIG.umbralAbierto);
+    const progreso = Math.min(1, v / CONFIG.apertura);
     cripta.style.setProperty('--vp', progreso.toFixed(3));
 
     cripta.classList.toggle('visible', v > 12);
-    const listo = v >= CONFIG.umbralAbierto - 2;
+    const listo = v >= CONFIG.apertura - 6;
     cripta.classList.toggle('activa', listo);
+  }
+
+  /**
+   * La tapa engancha y completa su recorrido sola, con un rebote corto al
+   * llegar. El CLACK cae al final del trayecto, no al cruzar el umbral.
+   */
+  function soltarTapa() {
+    const destino = Math.min(CONFIG.apertura, caja.clientWidth - 44);
+    let v = 0;
+    const animar = () => {
+      const dist = destino - px;
+      v = v * 0.62 + dist * 0.30;
+      if (Math.abs(dist) < 0.6 && Math.abs(v) < 0.6) {
+        moverTapa(destino);
+        clack(1);
+        return;
+      }
+      moverTapa(px + v);
+      requestAnimationFrame(animar);
+    };
+    animar();
   }
 
   function cerrarTapa() {
@@ -436,9 +468,8 @@
     const tope = CONFIG.umbralAbierto;
 
     if (suave >= tope && !abierto) {
-      moverTapa(tope);
       abierto = true;
-      clack(1);                              // CLACK: la tapa toca el tope
+      soltarTapa();                          // engancha y termina sola
       return;
     }
     moverTapa(Math.min(suave, tope));
@@ -491,7 +522,7 @@
   function abrir() {
     clunk();
     arco.style.transition = 'transform .55s cubic-bezier(.34,1.26,.64,1)';
-    arco.style.transform = 'translateX(-50%) translateY(-19px)';
+    arco.style.transform = 'translateX(-50%) translateY(-24px)';
 
     // La tapa acusa el golpe: se mueve un poco más.
     setTimeout(() => { moverTapa(CONFIG.umbralAbierto + 10); }, 90);

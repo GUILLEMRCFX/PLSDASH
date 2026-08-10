@@ -1,0 +1,14 @@
+{
+  "name": "PLSDASH",
+  "short_name": "PLSDASH",
+  "description": "Portfolio tracker en tiempo real para PulseChain",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#030208",
+  "theme_color": "#030208",
+  "icons": [
+    { "src": "/iconos/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/iconos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/iconos/icono-1024.png", "sizes": "1024x1024", "type": "image/png" }
+  ]
+}
