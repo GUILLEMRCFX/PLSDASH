@@ -96,14 +96,18 @@ vive dentro de ese envoltorio.
   en cola, así que subestima el ritmo real hasta 10× durante las primeras
   semanas. El panel lo mide sobre días cerrados de `daily` y, mientras no los
   haya, sobre `snapshots`, marcándolo como provisional.
-- **`snapshots.ganado` es acumulado y solo puede subir.** Se han observado
-  filas con `0` escritas cuando falla la lectura del nodo; el frontend las
-  descarta para que no generen picos falsos en la gráfica.
-- **`snapshots.precio_pls`** guarda el precio de PLS en cada snapshot horario.
-  Es el único dato del conjunto que no se puede reconstruir después: sin él no
-  hay fiscalidad correcta ni ganancia en euros. `NULL` significa que
-  DexScreener no respondió en esa hora — un hueco honesto, nunca un cero.
-- **`meta`** guarda la última epoch revisada en busca de bloques propuestos.
+- **`snapshots.ganado` NO es lo ganado**, es el excedente sin barrer: cada
+  ~8,1 h el protocolo retira el sobrante sobre los 32M a la wallet y el
+  contador vuelve a cero. La ganancia real son las retiradas acumuladas más
+  ese excedente, y la calcula `/api/val/ganancia` contra la cadena.
+- **`snapshots.precio_pls`** guarda el precio de PLS en cada snapshot horario,
+  para poder ver su evolución. No se puede reconstruir después: ninguna API
+  sirve el precio de una hora concreta pasado el momento. `NULL` significa que
+  DexScreener no respondió — un hueco honesto, nunca un cero.
+- **`barridos`** es la fuente de verdad de las retiradas, y de ella salen los
+  totales, el contador de bloques y la gráfica por ciclos.
+- **`meta`** lleva los cursores: hasta dónde llega la siembra de `barridos` y
+  hasta qué instante se han pasado los barridos al registro de vida.
 
 El código del NUC que alimenta ambas cosas está en `nuc/`, con las
 instrucciones de integración en `nuc/INTEGRACION.md`.
@@ -149,8 +153,7 @@ panel sigue en `plsdash.com/val/`.
 > devuelve 404 en cuanto el subdominio entra en vigor. El candado se limitaría
 > a rechazar todo sin decir por qué. Para mover el panel al subdominio
 > conservando el Vault hay que dejar pasar `/auth` desde el dominio principal
-> y emitir la cookie con `Domain=.plsdash.com`. Así el bloqueo y el subdominio entran en
-vigor a la vez y no hay una ventana sin acceso por ningún sitio.
+> y emitir la cookie con `Domain=.plsdash.com`.
 
 Las rutas que pasan por Functions están en `_routes.json`; una ruta nueva del
 panel hay que añadirla ahí o se servirá sin pasar por el filtro.
