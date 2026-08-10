@@ -202,7 +202,9 @@ body{
 .ct{font-size:10.5px;padding:5px 10px;border-radius:7px;background:#ffffff08;color:var(--mute);cursor:pointer;font-weight:600;border:1px solid transparent;font-family:inherit}
 .ct.on{background:#a855f71f;color:#dcbcff;border-color:#a855f744}
 .bars{display:flex;align-items:flex-end;gap:5px;height:112px;margin-top:16px}
-.bar{flex:1;border-radius:4px 4px 0 0;background:var(--grad);opacity:.55;min-height:2px}
+/* Con tres barridos en 24 h, `flex:1` las hacía tan anchas que parecían otra
+   cosa. El tope las mantiene con forma de barra aunque haya pocas. */
+.bar{flex:1;max-width:46px;border-radius:4px 4px 0 0;background:var(--grad);opacity:.55;min-height:2px}
 /* Los ciclos con bloque destacan: es lo que explica los picos. */
 .bar.con-bloque{opacity:1;box-shadow:0 0 0 1px #ffffff22 inset}
 .chart-pie{font-size:10.5px;color:var(--mute);margin-top:10px;text-align:right}
@@ -1347,13 +1349,17 @@ input[type=text].fld{
   // ---------- render: eventos ----------
   const EV_GOOD = new Set(['activacion', 'bloque', 'recuperacion', 'resync']);
   const EV_BAD = new Set(['slash']);
+  // Un barrido es rutina del protocolo, no un aviso: punto gris, sin color.
+  const EV_NEUTRO = new Set(['barrido']);
 
   function renderEventos(eventos) {
     const el = $('feedList');
     if (!eventos.length) { el.innerHTML = '<div class="empty-msg">Sin eventos todavía.</div>'; return; }
     el.innerHTML = '';
     eventos.forEach(ev => {
-      const cls = EV_BAD.has(ev.tipo) ? 'bad' : (EV_GOOD.has(ev.tipo) ? 'good' : 'warn');
+      const cls = EV_BAD.has(ev.tipo) ? 'bad'
+        : EV_GOOD.has(ev.tipo) ? 'good'
+        : EV_NEUTRO.has(ev.tipo) ? '' : 'warn';
       const div = document.createElement('div');
       div.className = 'ev ' + cls;
 
