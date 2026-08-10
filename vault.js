@@ -34,7 +34,10 @@
     // Si el panel se mueve a val.plsdash.com hay que cambiar `destino` y, sobre
     // todo, que la cookie de sesión salga con Domain=.plsdash.com; si no, no
     // viaja entre hostnames y el panel volverá a pedir el PIN.
-    msPulsacion: 500,      // pulsación mantenida antes de armar el arrastre
+    // Desplazamiento horizontal mínimo antes de responder. Al ir en el eje
+    // contrario al scroll, el conflicto desaparece solo y no hace falta
+    // pulsación mantenida: basta con no dispararlo con un roce.
+    minArranque: 30,
     umbralAsoma: 70,       // px visuales: empieza a verse la oscuridad
     umbralAbierto: 140,    // px visuales: tope, CLACK, candado a la vista
 
@@ -107,7 +110,13 @@
   const css = document.createElement('style');
   css.textContent = `
 .vault-caja{position:relative;margin-bottom:16px}
-.vault-caja > .hero{margin-bottom:0;position:relative;z-index:2;will-change:transform}
+.vault-caja > .hero{
+  margin-bottom:0;position:relative;z-index:2;will-change:transform;
+  /* El navegador se queda el desplazamiento vertical y nosotros solo el
+     horizontal, así que el scroll de la página nunca llega a disputarse.
+     pinch-zoom va explícito para no perder el zoom con dos dedos. */
+  touch-action:pan-y pinch-zoom;
+}
 .vault-cripta{
   position:absolute;inset:0;z-index:1;border-radius:24px;overflow:hidden;
   background:linear-gradient(150deg,#0a0710,#05040a 60%);
@@ -116,13 +125,23 @@
   padding-left:14px;opacity:0;pointer-events:none;
 }
 .vault-cripta.visible{opacity:1}
+/* La oscuridad entra antes que el mecanismo: primero se intuye que hay algo. */
+.vault-cripta{transition:opacity .18s ease-out}
 .vault-cripta.activa{pointer-events:auto}
 @media(max-width:560px){ .vault-cripta{padding-left:9px} }
 
 /* ── el candado ── */
 /* Escalado para caber en los 140px que deja la tapa al llegar al tope. */
-.candado{display:flex;align-items:center;transform:scale(.9);transform-origin:left center}
-@media(max-width:560px){ .candado{transform:scale(.82)} }
+/* Escalado para caber en los 140px que deja la tapa al llegar al tope, y
+   desplazado por --vp: entra desde detrás del borde izquierdo a medida que la
+   tapa se retira, como un mecanismo corredero. */
+.candado{
+  display:flex;align-items:center;transform-origin:left center;
+  transform:translateX(calc((var(--vp,0) - 1) * 96px)) scale(.9);
+}
+@media(max-width:560px){
+  .candado{transform:translateX(calc((var(--vp,0) - 1) * 88px)) scale(.82)}
+}
 
 .cuerpo{
   position:relative;padding:15px 11px 13px;border-radius:11px;
@@ -354,13 +373,20 @@
 
   // ────────────────────────────────────────── arrastre de la tapa
   let px = 0;                 // desplazamiento visual actual
-  let armado = false, arrastrando = false, inicioX = 0, inicioY = 0;
-  let temporizador = null, abierto = false, comprobando = false;
+  let arrastrando = false, descartado = false, inicioX = 0, inicioY = 0;
+  let abierto = false, comprobando = false;
 
   function moverTapa(v) {
     px = v;
     hero.style.setProperty('--vx', v + 'px');
     hero.style.transform = `translateX(${v}px)`;
+
+    // Cuánto se ha abierto, de 0 a 1. El candado va enganchado a esto: sale
+    // de detrás del borde izquierdo a un ritmo algo distinto al de la tapa,
+    // y ese desfase es lo que hace que parezca que estaba ahí debajo.
+    const progreso = Math.min(1, v / CONFIG.umbralAbierto);
+    cripta.style.setProperty('--vp', progreso.toFixed(3));
+
     cripta.classList.toggle('visible', v > 12);
     const listo = v >= CONFIG.umbralAbierto - 2;
     cripta.classList.toggle('activa', listo);
@@ -381,34 +407,31 @@
   hero.addEventListener('pointerdown', ev => {
     if (abierto || ev.target.closest('.vault-cripta')) return;
     inicioX = ev.clientX; inicioY = ev.clientY;
+    descartado = false;
     ctx();                                   // el contexto de audio nace aquí
-    clearTimeout(temporizador);
-    // Pulsación mantenida: un scroll normal jamás deja el dedo quieto medio
-    // segundo antes de moverse, así que esto separa los dos gestos de raíz.
-    temporizador = setTimeout(() => { armado = true; }, CONFIG.msPulsacion);
   });
 
   hero.addEventListener('pointermove', ev => {
-    if (abierto) return;
+    if (abierto || descartado) return;
     const dx = ev.clientX - inicioX;
     const dy = ev.clientY - inicioY;
 
-    if (!armado) {
-      // Moverse antes de tiempo cancela: era un scroll, no una intención.
-      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearTimeout(temporizador);
-      return;
-    }
-
     if (!arrastrando) {
-      if (dx < 10) return;                   // solo hacia la derecha
+      // Bloqueo de eje: si el gesto se declara vertical antes de recorrer lo
+      // suficiente en horizontal, es un scroll y no se vuelve a mirar hasta
+      // que se levante el dedo. `touch-action: pan-y` ya deja ese scroll en
+      // manos del navegador, así que ni siquiera llegan más eventos.
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) { descartado = true; return; }
+      // Solo hacia la derecha, y solo pasado el mínimo: un roce no abre nada.
+      if (dx < CONFIG.minArranque) return;
       arrastrando = true;
-      hero.style.touchAction = 'none';
       try { hero.setPointerCapture(ev.pointerId); } catch {}
     }
 
     // Resistencia creciente: cuanto más lejos, más cuesta. Sacar una pieza
-    // pesada de su ranura, no deslizar una tarjeta.
-    const bruto = Math.max(0, dx);
+    // pesada de su ranura, no deslizar una tarjeta. Se descuenta el mínimo de
+    // arranque para que el movimiento empiece desde cero y no dé un salto.
+    const bruto = Math.max(0, dx - CONFIG.minArranque);
     const suave = bruto * CONFIG.resistencia * (1 - Math.min(0.3, bruto / 1500));
     const tope = CONFIG.umbralAbierto;
 
@@ -416,18 +439,15 @@
       moverTapa(tope);
       abierto = true;
       clack(1);                              // CLACK: la tapa toca el tope
-      hero.style.touchAction = '';
       return;
     }
     moverTapa(Math.min(suave, tope));
   });
 
   const finTapa = ev => {
-    clearTimeout(temporizador);
-    armado = false;
+    descartado = false;
     if (!arrastrando) return;
     arrastrando = false;
-    hero.style.touchAction = '';
     try { hero.releasePointerCapture(ev.pointerId); } catch {}
     // Sin llegar al tope, la tapa vuelve a su sitio.
     if (!abierto) cerrarTapa();
