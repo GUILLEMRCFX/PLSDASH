@@ -60,6 +60,12 @@ const PAGINAS_SIEMBRA = 3;
 
 const CLAVE_SIEMBRA = 'barridos_siembra_completa';
 
+// Hasta qué instante se han pasado los barridos al registro de vida. Va
+// aparte del cursor de `barridos` porque son dos avances distintos: la tabla
+// puede estar completa y el registro no haberse escrito todavía, que es
+// justo lo que pasó al desplegar la escritura con la tabla ya sembrada.
+const CLAVE_EVENTOS = 'eventos_hasta_ts';
+
 // D1 acepta lotes grandes, pero trocear mantiene cada escritura acotada.
 const TAM_LOTE = 100;
 
@@ -88,18 +94,25 @@ async function extremos(db) {
   };
 }
 
-async function siembraCompleta(db) {
-  const fila = await db.prepare('SELECT valor FROM meta WHERE clave = ?')
-    .bind(CLAVE_SIEMBRA).first();
-  return fila?.valor === '1';
+async function leerMeta(db, clave) {
+  const fila = await db.prepare('SELECT valor FROM meta WHERE clave = ?').bind(clave).first();
+  return fila?.valor ?? null;
 }
 
-async function marcarSiembraCompleta(db) {
+async function escribirMeta(db, clave, valor) {
   await db.prepare(
     'INSERT INTO meta (clave, valor, actualizado) VALUES (?, ?, ?)'
     + ' ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor,'
     + ' actualizado = excluded.actualizado'
-  ).bind(CLAVE_SIEMBRA, '1', Math.floor(Date.now() / 1000)).run();
+  ).bind(clave, String(valor), Math.floor(Date.now() / 1000)).run();
+}
+
+async function siembraCompleta(db) {
+  return (await leerMeta(db, CLAVE_SIEMBRA)) === '1';
+}
+
+async function marcarSiembraCompleta(db) {
+  await escribirMeta(db, CLAVE_SIEMBRA, '1');
 }
 
 // Margen para considerar que dos retiradas pertenecen al mismo barrido. El
@@ -356,10 +369,19 @@ export async function onRequestGet({ env }) {
   const bloques = lista.reduce((a, c) => a + c.bloques, 0);
   const plsBloques = lista.reduce((a, c) => a + c.pls_bloques, 0);
 
-  // Si hubo filas nuevas, algún ciclo puede no estar aún en el registro.
-  if (nuevas > 0) {
-    try { await registrarEventos(db, lista); }
-    catch (e) { console.error('no se pudieron registrar los eventos:', e); }
+  // El registro avanza por su cuenta: se anotan los ciclos posteriores a lo
+  // ya registrado, haya habido filas nuevas o no. Atarlo a `nuevas > 0` dejó
+  // el registro vacío para siempre, porque la tabla ya estaba sembrada cuando
+  // la escritura llegó a producción y `nuevas` valía 0 en cada pasada.
+  try {
+    const desdeTs = Number(await leerMeta(db, CLAVE_EVENTOS)) || 0;
+    const pendientes = lista.filter(c => c.ts > desdeTs);
+    if (pendientes.length) {
+      await registrarEventos(db, pendientes);
+      await escribirMeta(db, CLAVE_EVENTOS, Math.max(...pendientes.map(c => c.ts)));
+    }
+  } catch (e) {
+    console.error('no se pudieron registrar los eventos:', e);
   }
 
   let saldo = null;
