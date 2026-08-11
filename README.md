@@ -5,8 +5,9 @@ direcciones de wallet públicas y mira todos tus tokens, su precio, el valor por
 token y el valor total de la cartera — sin conectar la wallet (solo lectura de
 direcciones públicas).
 
-> Compite en calidad con plsfolio.com. Diseño de firma: una línea de **latido
-> (ECG)** bajo el valor total, con el espectro de marca pink → violet → cyan.
+> Compite en calidad con plsfolio.com. Identidad: escudo con el espectro de
+> marca pink → violet → cyan sobre fondo plum-black, y el valor total como
+> única cifra con protagonismo.
 
 ## Características
 
