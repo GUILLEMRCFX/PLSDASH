@@ -385,7 +385,9 @@ input[type=text].fld{
 #appview{display:none}
 #appview.on{display:block}
 </style>
-  <link rel="icon" href="/favicon.ico" sizes="any">
+  <!-- Sin sizes="any": el .ico del pack solo trae 16x16, y declararlo
+       escalable haría que el navegador lo prefiriese al PNG de 32. -->
+  <link rel="icon" href="/favicon.ico">
   <link rel="icon" type="image/png" sizes="16x16" href="/icons/plsdash-16x16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/plsdash-32x32.png">
   <link rel="icon" type="image/png" sizes="48x48" href="/icons/plsdash-48x48.png">
