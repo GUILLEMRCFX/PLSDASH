@@ -324,7 +324,9 @@ input[type=text].fld{
 #pinview{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px}
 #pinview.off{display:none}
 .pinbox{width:100%;max-width:300px;text-align:center}
-.pinbox .mark{width:44px;height:44px;border-radius:13px;background:var(--grad);margin:0 auto 18px;display:flex;align-items:center;justify-content:center;font-weight:700;color:#12081c;font-size:17px}
+.pinbox .mark{width:60px;height:60px;border-radius:15px;overflow:hidden;margin:0 auto 18px;
+  box-shadow:0 0 28px rgba(168,85,247,.34),0 0 0 1px rgba(255,255,255,.07)}
+.pinbox .mark img{width:100%;height:100%;display:block}
 .pinbox h2{font-size:19px;font-weight:600;margin-bottom:5px}
 .pinbox p{font-size:12.5px;color:var(--mute);margin-bottom:18px}
 .pinerr{font-size:12px;color:var(--bad);min-height:16px;margin-bottom:8px}
@@ -384,8 +386,9 @@ input[type=text].fld{
 #appview.on{display:block}
 </style>
   <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/plsdash-16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/plsdash-32.png">
-  <link rel="icon" type="image/png" sizes="48x48" href="/icons/plsdash-48.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/plsdash-152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/plsdash-180.png">
   <link rel="manifest" href="/manifest.webmanifest">
 </head>
@@ -394,7 +397,7 @@ input[type=text].fld{
 <!-- ===================== PIN ===================== -->
 <div id="pinview">
   <div class="pinbox">
-    <div class="mark">P</div>
+    <div class="mark"><img src="/icons/plsdash-128.png" alt="" width="60" height="60" decoding="async"></div>
     <h2>Validator Dashboard</h2>
     <p>Introduce tu PIN</p>
     <div class="pinerr" id="pinErr"></div>

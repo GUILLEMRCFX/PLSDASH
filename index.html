@@ -63,8 +63,11 @@
   /* ---------- NAV ---------- */
   nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0 30px;gap:16px}
   .brand{display:flex;align-items:center;gap:11px;font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.01em;cursor:pointer;user-select:none}
-  .brand .mark{width:30px;height:30px;border-radius:9px;background:var(--pulse);display:grid;place-items:center;box-shadow:0 0 22px rgba(155,93,229,.5)}
-  .brand .mark svg{width:18px;height:18px}
+  /* El icono trae su propio fondo y su gradiente, así que la marca ya no
+     pinta ninguno: solo la sostiene y conserva el halo violeta de antes. */
+  .brand .mark{width:34px;height:34px;border-radius:10px;overflow:hidden;flex-shrink:0;
+    box-shadow:0 0 22px rgba(155,93,229,.42),0 0 0 1px rgba(255,255,255,.07)}
+  .brand .mark img{width:100%;height:100%;display:block}
   .brand b{font-weight:700}
   .brand span{color:var(--faint);font-weight:400}
   .nav-actions{display:flex;align-items:center;gap:10px}
@@ -395,8 +398,9 @@
   }
 </style>
   <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/plsdash-16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/plsdash-32.png">
-  <link rel="icon" type="image/png" sizes="48x48" href="/icons/plsdash-48.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/plsdash-152.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/icons/plsdash-180.png">
   <link rel="manifest" href="/manifest.webmanifest">
 </head>
@@ -407,7 +411,7 @@
   <nav>
     <div class="brand" onclick="goHome()" role="link" tabindex="0" aria-label="PLSDASH inicio">
       <span class="mark">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-6 4 12 2-6h6" stroke="#13060F" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <img src="/icons/plsdash-96.png" alt="" width="34" height="34" decoding="async">
       </span>
       <div><b>pls</b><span>dash</span></div>
     </div>
