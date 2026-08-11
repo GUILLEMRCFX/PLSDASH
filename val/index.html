@@ -340,6 +340,46 @@ input[type=text].fld{
 .pk.sm{font-size:13px;color:var(--mute)}
 .pk:disabled{opacity:.4}
 
+/* ---------- pantalla de carga ---------- */
+.carga{
+  position:fixed;inset:0;z-index:200;display:none;
+  flex-direction:column;align-items:center;justify-content:center;gap:22px;
+  background:var(--bg);
+}
+.carga.on{display:flex}
+.carga-caja{position:relative;width:132px;height:132px}
+.carga-anillo{width:100%;height:100%;transform:rotate(-90deg)}
+.carga-anillo .pista{fill:none;stroke:var(--line);stroke-width:3}
+.carga-anillo .avance{
+  fill:none;stroke:url(#ganillo);stroke-width:3;stroke-linecap:round;
+  stroke-dasharray:327;stroke-dashoffset:327;
+  transition:stroke-dashoffset .5s cubic-bezier(.2,.7,.3,1);
+}
+.carga-centro{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;
+}
+.carga-num{
+  font-family:'Space Grotesk',system-ui,sans-serif;font-size:40px;font-weight:700;
+  letter-spacing:-2px;line-height:1;
+  background:var(--grad);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;font-variant-numeric:tabular-nums;
+}
+.carga-de{font-size:11px;color:var(--mute);font-family:'JetBrains Mono',monospace;letter-spacing:.5px}
+.carga-paso{font-size:13px;color:var(--dim);min-height:18px;letter-spacing:.2px}
+
+/* Un punto por validador: se encienden conforme se leen. */
+.carga-puntos{display:flex;gap:5px;height:6px}
+.carga-puntos i{
+  width:6px;height:6px;border-radius:50%;background:var(--line);display:block;
+  transition:background .25s,transform .25s;
+}
+.carga-puntos i.on{background:var(--violet);transform:scale(1.25)}
+
+@media(prefers-reduced-motion:reduce){
+  .carga-anillo .avance,.carga-puntos i{transition:none}
+}
+
 #appview{display:none}
 #appview.on{display:block}
 </style>
@@ -368,6 +408,28 @@ input[type=text].fld{
       <button class="pk sm" data-k="exit">Salir</button><button class="pk" data-k="0">0</button><button class="pk sm" data-k="back">⌫</button>
     </div>
   </div>
+</div>
+
+<!-- ===================== CARGA ===================== -->
+<div id="cargando" class="carga">
+  <div class="carga-caja">
+    <svg class="carga-anillo" viewBox="0 0 120 120" aria-hidden="true">
+      <circle class="pista" cx="60" cy="60" r="52"/>
+      <circle class="avance" cx="60" cy="60" r="52"/>
+      <defs>
+        <linearGradient id="ganillo" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ff5ca8"/><stop offset=".55" stop-color="#a855f7"/>
+          <stop offset="1" stop-color="#22d3ee"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <div class="carga-centro">
+      <div class="carga-num" id="cargaNum">0</div>
+      <div class="carga-de" id="cargaDe">&nbsp;</div>
+    </div>
+  </div>
+  <div class="carga-paso" id="cargaPaso">Conectando</div>
+  <div class="carga-puntos" id="cargaPuntos"></div>
 </div>
 
 <!-- ===================== APP ===================== -->
@@ -1866,6 +1928,7 @@ input[type=text].fld{
 
   async function refresh() {
     try {
+      cargaPaso('Leyendo el nodo');
       const necesitaDaily = Date.now() - dailyLoadedAt > DAILY_TTL;
       const peticiones = [
         api('/estado'),
@@ -1882,12 +1945,20 @@ input[type=text].fld{
       // fallara cualquier petición secundaria dejaba el panel entero en
       // «Cargando…» aunque el estado hubiera llegado perfecto — un endpoint
       // auxiliar roto no puede tumbar la pantalla completa.
-      const res = await Promise.allSettled(peticiones);
+      // Cada petición empuja el anillo al resolverse, así que el avance es el
+      // de verdad y no una animación que va por su cuenta.
+      const vigiladas = peticiones.map(p => Promise.resolve(p).finally(cargaAvance));
+      const res = await Promise.allSettled(vigiladas);
       const [est, hist24, hSerie, gan, ev, inc, desc, histTodo, valHist] =
         res.map(r => r.status === 'fulfilled' ? r.value : null);
 
       const sesionCaducada = res.some(r => r.status === 'rejected' && r.reason?.status === 401);
-      if (sesionCaducada) { showPin('Sesión caducada, introduce el PIN de nuevo.'); return; }
+      if (sesionCaducada) {
+        CARGA.activa = false;
+        $('cargando').classList.remove('on');
+        showPin('Sesión caducada, introduce el PIN de nuevo.');
+        return;
+      }
 
       if (!est) {
         // Sin estado no hay panel: es el único fallo que importa de verdad.
@@ -1896,6 +1967,7 @@ input[type=text].fld{
         console.error('No se pudo leer /estado:', fallo);
       } else {
         estado = est;
+        cargaValidadores(est?.validadores?.total || 0);
         if (hist24) snapshots24h = hist24.datos || [];
         if (hSerie) serie = hSerie.datos || [];
         ganancia = gan && gan.total > 0 ? gan : null;
@@ -1919,6 +1991,7 @@ input[type=text].fld{
         if (ev) renderEventos(ev.eventos || []);
 
         // Los endpoints que fallaron se anotan, pero no bloquean nada.
+        cargaPaso('Reconciliando con la cadena');
         const caidos = ENDPOINTS.filter((_, i) => res[i].status === 'rejected');
         endpointsCaidos = caidos;
         if (caidos.length) console.warn('endpoints sin respuesta:', caidos.join(', '));
@@ -1927,6 +2000,9 @@ input[type=text].fld{
       lastError = e?.status ?? 0;
       console.error('Fallo al actualizar:', e);
     }
+    // Se retira pase lo que pase: si algo falló, el aviso vive en el panel, no
+    // en una pantalla de carga que se quedaría colgada para siempre.
+    cargaOcultar();
     checkStale();
   }
 
@@ -1942,9 +2018,79 @@ input[type=text].fld{
     window.__valPoll = setInterval(refresh, 60000);
   }
 
+  // ─────────────────────────────────────────── pantalla de carga
+  //
+  // El panel tarda unos segundos en tener todo: cinco o seis peticiones, una
+  // de ellas contra el explorador. En vez de enseñar guiones, se cuenta lo que
+  // va llegando de verdad — el anillo avanza con las peticiones resueltas y
+  // los validadores se encienden cuando `/estado` los trae, no con un
+  // temporizador que fingiría un progreso que no existe.
+  // `activa` corta el trabajo en los refrescos posteriores: el panel se
+  // recarga cada minuto y la pantalla solo tiene sentido la primera vez.
+  const CARGA = { activa: false, total: 0, hechas: 0, validadores: 0 };
+
+  function cargaMostrar(nPeticiones) {
+    CARGA.activa = true;
+    CARGA.total = nPeticiones;
+    CARGA.hechas = 0;
+    CARGA.validadores = 0;
+    $('cargando').classList.add('on');
+    $('cargaNum').textContent = '0';
+    $('cargaDe').innerHTML = '&nbsp;';
+    $('cargaPaso').textContent = 'Conectando';
+    $('cargaPuntos').innerHTML = '';
+    cargaAnillo(0);
+  }
+
+  function cargaAnillo(fraccion) {
+    const circunferencia = 327;
+    document.querySelector('.carga-anillo .avance')
+      .style.strokeDashoffset = circunferencia * (1 - Math.min(1, fraccion));
+  }
+
+  function cargaPaso(texto) {
+    if (CARGA.activa) $('cargaPaso').textContent = texto;
+  }
+
+  function cargaAvance() {
+    if (!CARGA.activa) return;
+    CARGA.hechas++;
+    cargaAnillo(CARGA.hechas / Math.max(1, CARGA.total));
+  }
+
+  /** Enciende los validadores uno a uno, ya con la cifra real en la mano. */
+  function cargaValidadores(n) {
+    if (!CARGA.activa || !n || CARGA.validadores) return;
+    CARGA.validadores = n;
+    const cont = $('cargaPuntos');
+    cont.innerHTML = '';
+    for (let i = 0; i < n; i++) cont.appendChild(document.createElement('i'));
+    $('cargaDe').textContent = `de ${n}`;
+
+    let i = 0;
+    const encender = () => {
+      if (i >= n) return;
+      cont.children[i].classList.add('on');
+      $('cargaNum').textContent = String(++i);
+      cargaPaso(`Leyendo validadores`);
+      setTimeout(encender, 70);
+    };
+    encender();
+  }
+
+  function cargaOcultar() {
+    if (!CARGA.activa) return;
+    CARGA.activa = false;
+    cargaAnillo(1);
+    // Un respiro tras completar el anillo: cortar en seco se ve brusco, y da
+    // tiempo a que terminen de encenderse los últimos validadores.
+    setTimeout(() => $('cargando').classList.remove('on'), 420);
+  }
+
   function enterApp() {
     $('pinview').classList.add('off');
     $('appview').classList.add('on');
+    cargaMostrar(7);
     boot();
   }
 
