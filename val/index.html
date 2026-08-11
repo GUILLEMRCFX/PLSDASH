@@ -385,11 +385,14 @@ input[type=text].fld{
 #appview{display:none}
 #appview.on{display:block}
 </style>
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="16x16" href="/icons/plsdash-16.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/plsdash-32.png">
-  <link rel="apple-touch-icon" sizes="152x152" href="/icons/plsdash-152.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/plsdash-180.png">
+  <!-- Sin sizes="any": el .ico del pack solo trae 16x16, y declararlo
+       escalable haría que el navegador lo prefiriese al PNG de 32. -->
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="16x16" href="/icons/plsdash-16x16.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/plsdash-32x32.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="/icons/plsdash-48x48.png">
+  <!-- iOS aplica su propia máscara: se le da el arte a pelo, sin recortar. -->
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180x180.png">
   <link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body>
@@ -397,7 +400,7 @@ input[type=text].fld{
 <!-- ===================== PIN ===================== -->
 <div id="pinview">
   <div class="pinbox">
-    <div class="mark"><img src="/icons/plsdash-128.png" alt="" width="60" height="60" decoding="async"></div>
+    <div class="mark"><img src="/icons/plsdash-128x128.png" alt="" width="60" height="60" decoding="async"></div>
     <h2>Validator Dashboard</h2>
     <p>Introduce tu PIN</p>
     <div class="pinerr" id="pinErr"></div>
