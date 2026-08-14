@@ -1,9 +1,16 @@
 /**
  * PLSDASH — VaultEasterEgg
  *
- * La tarjeta del valor total es una tapa. Se arrastra hacia la derecha y
- * debajo aparece un candado de combinación de cuatro ruedas. La combinación
- * correcta lleva al Validator Dashboard con la sesión ya abierta.
+ * La tarjeta del valor total es una puerta. Se arrastra hacia la derecha y
+ * debajo se descubre una nube de partículas que forma una esfera y se carga
+ * con el recorrido. Al completarlo, fogonazo y salto a /val/.
+ *
+ * ## No autentica
+ *
+ * Este módulo ya no pide ni comprueba el PIN, y no habla con
+ * `/api/val/auth`. Solo navega. Quien pide el PIN es el dial de /val/, que
+ * no se toca — y por eso la regla `val-auth-brute-force` de Cloudflare
+ * sigue cubriendo el único sitio por donde se entra.
  *
  * ## Quitarlo
  *
@@ -11,113 +18,38 @@
  * toca nada del resto de la página: envuelve el hero al arrancar y todo lo
  * suyo vive dentro de ese envoltorio.
  *
- * ## La validación es del servidor
- *
- * El PIN no se comprueba aquí. Los cuatro dígitos van a `/api/val/auth`, el
- * mismo endpoint que usa el teclado de /val/, y el servidor decide. Este
- * archivo no sabe cuál es el PIN ni puede saberlo.
- *
  * ## Arrastre horizontal
  *
  * Hacia la derecha y no hacia abajo: la tarjeta está arriba del todo y el
- * gesto vertical es el de recargar en móvil. Aun así se exige mantener
- * pulsado antes de arrastrar, porque un scroll que empieza en diagonal no
- * debe abrir nada.
+ * gesto vertical es el de recargar en móvil. `touch-action: pan-y pinch-zoom`
+ * le deja el eje vertical al navegador, así que los dos gestos no se disputan.
  */
 (function () {
   'use strict';
 
   const CONFIG = {
-    // Mismo endpoint que el teclado de /val/. No duplicar la lógica del PIN.
-    endpoint: '/api/val/auth',
     destino: '/val/',
-    // Si el panel se mueve a val.plsdash.com hay que cambiar `destino` y, sobre
-    // todo, que la cookie de sesión salga con Domain=.plsdash.com; si no, no
-    // viaja entre hostnames y el panel volverá a pedir el PIN.
-    // Desplazamiento horizontal mínimo antes de responder. Al ir en el eje
-    // contrario al scroll, el conflicto desaparece solo y no hace falta
-    // pulsación mantenida: basta con no dispararlo con un roce.
-    minArranque: 30,
-    umbralAsoma: 70,       // px visuales: empieza a verse la oscuridad
 
-    // Esfuerzo necesario para disparar la apertura. No es el hueco final: al
-    // cruzarlo la tapa se suelta y termina su recorrido sola, como una tapa
-    // corredera que engancha. Así el candado puede ser grande sin exigir un
-    // arrastre imposible en un móvil.
-    //
-    // 120 y no 140: los 30px de arranque se descuentan del recorrido, así que
-    // con 140 el disparo pedía 277px de dedo. Con 120 son 235px, que sí caben
-    // en la pantalla de un iPhone.
-    umbralAbierto: 120,
+    // Si el panel se mueve a val.plsdash.com hay que cambiar `destino` a la
+    // URL absoluta del subdominio: con VAL_HOST definido, `plsdash.com/val/`
+    // devuelve 404 y el gesto llevaría a una página en blanco. Ya no hace
+    // falta nada de cookies aquí — este módulo no abre sesión.
 
-    // Hueco final. Las ruedas necesitan 46px de ancho para el pulgar (Apple
-    // recomienda 44 como mínimo), y cuatro de ellas más el cuerpo no caben en
-    // 140px: con el candado escalado a 0,82 la zona táctil se quedaba en 21px
-    // y fallaba el dedo.
-    apertura: 244,
+    // Zona muerta antes de responder. Se descuenta del recorrido, así que la
+    // tarjeta arranca desde cero y no da un salto al engancharse.
+    zonaMuerta: 30,
 
-    // 0,68 y no el 0,55 pedido: con 0,55 el disparo se iba a más de 300px de
-    // dedo, más de lo que da la pantalla de un móvil. La resistencia
-    // progresiva se mantiene igual — el ratio efectivo baja de 0,66 a 0,58 a
-    // lo largo del tirón — así que sigue costando más cuanto más lejos.
-    resistencia: 0.68,
+    // Recorrido completo. Al llegar aquí se dispara el fogonazo; soltando
+    // antes, la tarjeta vuelve a su sitio y no pasa nada.
+    recorrido: 244,
+
+    msFogonazo: 300,
   };
 
   const hero = document.querySelector('.hero');
   if (!hero || !window.PointerEvent) return;
 
-  // ─────────────────────────────────────────────────────────── sonido
-  //
-  // Generado, sin archivos. El contexto se crea en el primer gesto para no
-  // pelearse con las políticas de autoplay.
-  let audio = null;
-  function ctx() {
-    if (audio === null) {
-      try { audio = new (window.AudioContext || window.webkitAudioContext)(); }
-      catch { audio = false; }
-    }
-    return audio || null;
-  }
-
-  function clack(fuerza = 1) {
-    const ac = ctx();
-    if (!ac) return;
-    const t = ac.currentTime;
-    // Ruido corto y filtrado: un golpe seco de metal, no un tono.
-    const n = ac.createBufferSource();
-    const buf = ac.createBuffer(1, 512, ac.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
-    n.buffer = buf;
-
-    const filtro = ac.createBiquadFilter();
-    filtro.type = 'bandpass';
-    filtro.frequency.value = 2400;
-    filtro.Q.value = 1.2;
-
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.055 * fuerza, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-
-    n.connect(filtro).connect(g).connect(ac.destination);
-    n.start(t); n.stop(t + 0.06);
-  }
-
-  function clunk() {
-    const ac = ctx();
-    if (!ac) return;
-    const t = ac.currentTime;
-    const o = ac.createOscillator();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(160, t);
-    o.frequency.exponentialRampToValueAtTime(52, t + 0.22);
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.075, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
-    o.connect(g).connect(ac.destination);
-    o.start(t); o.stop(t + 0.34);
-    clack(0.7);
-  }
+  const reduccion = window.matchMedia('(prefers-reduced-motion:reduce)');
 
   // ─────────────────────────────────────────────── estructura y estilos
   const css = document.createElement('style');
@@ -134,101 +66,14 @@
   position:absolute;inset:0;z-index:1;border-radius:24px;overflow:hidden;
   background:linear-gradient(150deg,#0a0710,#05040a 60%);
   box-shadow:inset 0 2px 14px rgba(0,0,0,.9),inset 0 0 60px rgba(0,0,0,.7);
-  display:flex;align-items:center;justify-content:flex-start;
-  padding-left:14px;opacity:0;pointer-events:none;
+  pointer-events:none;
 }
-.vault-cripta.visible{opacity:1}
-/* La oscuridad entra antes que el mecanismo: primero se intuye que hay algo. */
-.vault-cripta{transition:opacity .18s ease-out}
-.vault-cripta.activa{pointer-events:auto}
-@media(max-width:560px){ .vault-cripta{padding-left:9px} }
-
-/* ── el candado ── */
-/* Sin escalar: cualquier scale() encoge también la zona táctil, y era eso lo
-   que dejaba las ruedas en 21px de ancho. Se dibuja al tamaño que se toca.
-   --vp lo saca de detrás del borde izquierdo conforme la tapa se retira. */
-.candado{
-  display:flex;align-items:center;transform-origin:left center;
-  transform:translateX(calc((var(--vp,0) - 1) * 150px));
+.vault-cripta canvas{display:block;width:100%;height:100%;pointer-events:none}
+.vault-fogonazo{
+  position:fixed;inset:0;z-index:9999;background:#fff;opacity:0;
+  pointer-events:none;transition:opacity .13s linear;
 }
-
-.cuerpo{
-  position:relative;padding:17px 13px 15px;border-radius:13px;
-  background:linear-gradient(165deg,#3a3a42,#1c1c22 55%,#141419);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.16),
-    inset 0 -2px 6px rgba(0,0,0,.75),
-    0 10px 24px -8px rgba(0,0,0,.9);
-  border:1px solid #0c0c11;
-}
-/* Textura discreta: un tramado fino que rompe el plano sin dibujarse. */
-.cuerpo::after{
-  content:"";position:absolute;inset:0;border-radius:12px;pointer-events:none;
-  background:repeating-linear-gradient(92deg,rgba(255,255,255,.028) 0 1px,transparent 1px 3px);
-  mix-blend-mode:overlay;
-}
-/* Marcas de uso: dos rozaduras asimétricas, apenas visibles. */
-.cuerpo::before{
-  content:"";position:absolute;inset:0;border-radius:12px;pointer-events:none;
-  background:
-    linear-gradient(118deg,transparent 28%,rgba(255,255,255,.05) 29%,transparent 30%),
-    linear-gradient(74deg,transparent 61%,rgba(0,0,0,.4) 62%,transparent 63%);
-}
-
-.arco{
-  position:absolute;left:50%;transform:translateX(-50%);top:-32px;
-  width:66px;height:42px;z-index:-1;transition:none;
-}
-
-/* 46x84: por encima de los 44px que Apple recomienda como objetivo táctil
-   mínimo, en los dos ejes. El pulgar acierta sin mirar. */
-.ruedas{display:flex;gap:5px;position:relative}
-.rueda{
-  position:relative;width:46px;height:84px;border-radius:7px;overflow:hidden;
-  background:linear-gradient(180deg,#0b0b0f,#232329 22%,#33333c 50%,#232329 78%,#0b0b0f);
-  box-shadow:inset 0 0 0 1px rgba(0,0,0,.85),inset 0 0 10px rgba(0,0,0,.7);
-  cursor:ns-resize;touch-action:none;
-}
-@media(max-width:560px){ .rueda{width:44px;height:80px} }
-/* El cilindro se curva: oscuro arriba y abajo, claro en el centro. */
-.rueda::after{
-  content:"";position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(180deg,rgba(0,0,0,.92),rgba(0,0,0,0) 34%,rgba(0,0,0,0) 66%,rgba(0,0,0,.92));
-}
-.rueda-tira{
-  position:absolute;left:0;right:0;top:0;
-  display:flex;flex-direction:column;align-items:center;will-change:transform;
-}
-.rueda-tira span{
-  height:28px;line-height:28px;font-family:'JetBrains Mono',ui-monospace,monospace;
-  font-size:19px;font-weight:500;color:#c9c9d4;text-shadow:0 1px 0 rgba(0,0,0,.9);
-}
-@media(max-width:560px){ .rueda-tira span{height:26px;line-height:26px;font-size:18px} }
-
-/* Línea de lectura: por donde se lee la combinación. */
-.lectura{
-  position:absolute;left:-5px;right:-5px;top:50%;height:28px;transform:translateY(-50%);
-  pointer-events:none;border-top:1px solid rgba(255,255,255,.14);
-  border-bottom:1px solid rgba(0,0,0,.85);
-  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.01));
-}
-@media(max-width:560px){ .lectura{height:26px} }
-
-.vault-caja.temblor > .hero{animation:vault-temblor .4s}
-@keyframes vault-temblor{
-  0%,100%{transform:translateX(var(--vx,0))}
-  25%{transform:translateX(calc(var(--vx,0) - 3px))}
-  75%{transform:translateX(calc(var(--vx,0) + 3px))}
-}
-.candado.error{animation:vault-error .38s}
-@keyframes vault-error{
-  0%,100%{transform:scale(var(--vs,.92)) translateX(0)}
-  20%{transform:scale(var(--vs,.92)) translateX(-4px)}
-  60%{transform:scale(var(--vs,.92)) translateX(4px)}
-}
-@media(prefers-reduced-motion:reduce){
-  .vault-caja.temblor > .hero,.candado.error{animation:none}
-}`;
+.vault-fogonazo.on{opacity:1}`;
   document.head.appendChild(css);
 
   // Envolver el hero sin tocar el HTML de la página.
@@ -238,320 +83,254 @@
 
   const cripta = document.createElement('div');
   cripta.className = 'vault-cripta';
-  cripta.innerHTML = `
-    <div class="candado" aria-hidden="true">
-      <div class="cuerpo">
-        <svg class="arco" viewBox="0 0 66 42" fill="none">
-          <path d="M10 42V21a23 23 0 0 1 46 0v21" stroke="url(#vg)" stroke-width="9" stroke-linecap="round"/>
-          <defs><linearGradient id="vg" x1="0" y1="0" x2="0" y2="42">
-            <stop offset="0" stop-color="#6e6e7a"/><stop offset=".5" stop-color="#3d3d47"/>
-            <stop offset="1" stop-color="#232329"/>
-          </linearGradient></defs>
-        </svg>
-        <div class="ruedas"></div>
-        <div class="lectura"></div>
-      </div>
-    </div>`;
+  const lienzo = document.createElement('canvas');
+  cripta.appendChild(lienzo);
   caja.appendChild(cripta);
   caja.appendChild(hero);
 
-  const candado = cripta.querySelector('.candado');
-  const arco = cripta.querySelector('.arco');
-  const contenedorRuedas = cripta.querySelector('.ruedas');
+  const ctx = lienzo.getContext('2d');
 
-  // ───────────────────────────────────────────────────── las ruedas
-  const ALTO_DIGITO = window.matchMedia('(max-width:560px)').matches ? 26 : 28;
-  const REPETICIONES = 7;           // tira larga para poder girar sin saltos
-  const ruedas = [];
+  // ─────────────────────────────────────────────────── las partículas
+  //
+  // El prototipo usa 420 sobre un lienzo de densidad ×2. Es una web pública
+  // y hay iPhones viejos: en pantalla estrecha, o con una densidad que
+  // multiplica los píxeles a pintar, se bajan.
+  function cuantasParticulas() {
+    const ancho = window.innerWidth;
+    const dpr = window.devicePixelRatio || 1;
+    let n = ancho < 560 ? 240 : 420;
+    if (dpr >= 3) n = Math.round(n * 0.65);
+    else if (dpr > 2) n = Math.round(n * 0.8);
+    return Math.max(120, n);
+  }
 
-  for (let r = 0; r < 4; r++) {
-    const rueda = document.createElement('div');
-    rueda.className = 'rueda';
-    const tira = document.createElement('div');
-    tira.className = 'rueda-tira';
-    for (let i = 0; i < 10 * REPETICIONES; i++) {
-      const s = document.createElement('span');
-      s.textContent = String(i % 10);
-      tira.appendChild(s);
+  let N = 0, pts = [];
+  function sembrar() {
+    N = cuantasParticulas();
+    pts = [];
+    // Espiral de Fibonacci: reparto uniforme sobre la esfera sin agrupaciones.
+    for (let i = 0; i < N; i++) {
+      const t = Math.acos(1 - 2 * (i + 0.5) / N);
+      const ph = Math.PI * (1 + Math.sqrt(5)) * i;
+      pts.push({
+        x: Math.sin(t) * Math.cos(ph),
+        y: Math.sin(t) * Math.sin(ph),
+        z: Math.cos(t),
+        o: 0.35 + Math.random() * 0.65,   // opacidad propia
+        s: 0.25 + Math.random() * 0.75,   // radio en px CSS
+        f: Math.random() * 6.28,          // fase del temblor
+        w: 0.4 + Math.random(),           // ritmo del temblor
+      });
     }
-    rueda.appendChild(tira);
-    contenedorRuedas.appendChild(rueda);
-
-    const estado = {
-      el: rueda, tira,
-      pos: 10 * ALTO_DIGITO * Math.floor(REPETICIONES / 2), // centro de la tira
-      vel: 0, arrastrando: false, ultimoDigito: 0, anim: null,
-    };
-    ruedas.push(estado);
-    pintarRueda(estado);
-    engancharRueda(estado);
   }
 
-  function digitoDe(e) {
-    const idx = Math.round(e.pos / ALTO_DIGITO);
-    return ((idx % 10) + 10) % 10;
+  // Medidas del lienzo, en px CSS. `escala` adapta los tamaños del prototipo
+  // (pensados para una tarjeta de 190px de alto) a la tarjeta real.
+  let anchoCSS = 0, altoCSS = 0, escala = 1;
+
+  function medir() {
+    const r = hero.getBoundingClientRect();
+    if (!r.width || !r.height) return false;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    anchoCSS = r.width;
+    altoCSS = r.height;
+    escala = altoCSS / 190;
+    lienzo.width = Math.round(anchoCSS * dpr);
+    lienzo.height = Math.round(altoCSS * dpr);
+    // Todo el dibujo se hace en px CSS; el contexto se encarga de la densidad.
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return true;
   }
 
-  function pintarRueda(e) {
-    // El número seleccionado queda centrado en la ventana de lectura.
-    const centro = e.el.clientHeight / 2 - ALTO_DIGITO / 2;
-    e.tira.style.transform = `translateY(${centro - e.pos}px)`;
-
-    const d = digitoDe(e);
-    if (d !== e.ultimoDigito) { e.ultimoDigito = d; clack(0.85); }
+  function mezcla(a, b, t) {
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  }
+  const CIAN = [34, 211, 238], VIOLETA = [168, 85, 247], ROSA = [255, 92, 168];
+  function tono(t) {
+    const m = t < 0.5 ? mezcla(CIAN, VIOLETA, t / 0.5) : mezcla(VIOLETA, ROSA, (t - 0.5) / 0.5);
+    return 'rgb(' + (m[0] | 0) + ',' + (m[1] | 0) + ',' + (m[2] | 0) + ')';
   }
 
-  /**
-   * Física: velocidad con rozamiento, y al frenar un tirón hacia el número
-   * más cercano con algo de rebote. No una transición plana de 5 a 6.
-   */
-  function girar(e) {
-    if (e.anim) return;
-    const paso = () => {
-      e.anim = null;
-      if (e.arrastrando) return;
+  let giro = 0, deriva = 0;
 
-      if (Math.abs(e.vel) > 0.4) {
-        e.pos += e.vel;
-        e.vel *= 0.94;                       // rozamiento
-      } else {
-        const destino = Math.round(e.pos / ALTO_DIGITO) * ALTO_DIGITO;
-        const dist = destino - e.pos;
-        if (Math.abs(dist) < 0.35 && Math.abs(e.vel) < 0.35) {
-          e.pos = destino; e.vel = 0;
-          pintarRueda(e);
-          // Se comprueba al asentar, no al soltar: al soltar esta animación
-          // acaba de empezar y la comprobación se encontraría la rueda en
-          // movimiento y se marcharía sin intentar nada.
-          comprobar();
-          return;                            // encajada
-        }
-        // Muelle: acelera hacia el diente y se pasa un poco antes de asentar.
-        e.vel += dist * 0.22;
-        e.vel *= 0.62;
-        e.pos += e.vel;
+  function dibujar(x, p) {
+    ctx.clearRect(0, 0, anchoCSS, altoCSS);
+    deriva += 0.012;
+
+    // El centro va pegado al borde de la tarjeta, no fijo a la derecha: así
+    // la esfera se ve desde el primer píxel de rendija en vez de aparecer al
+    // final del recorrido.
+    const cx = x;
+    const cy = altoCSS / 2;
+    const R = (10 + p * 29) * escala;
+    const col = tono(p);
+    giro += 0.006 + p * 0.048;
+
+    if (p > 0.02) {
+      ctx.globalAlpha = 0.08 + p * 0.28;
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R * (0.6 + p * 0.8), 0, 6.284);
+      ctx.fill();
+    }
+
+    // Las partículas nacen dispersas y se recogen en esfera al cargar.
+    const disp = (1 - p) * (1 - p) * 35 * escala;
+    const ca = Math.cos(giro), sa = Math.sin(giro);
+    const rayos = p > 0.5;
+    const alargue = 1.4 + p * 0.8;
+
+    for (let i = 0; i < N; i++) {
+      const q = pts[i];
+      const rx = q.x * ca - q.z * sa;
+      const rz = q.x * sa + q.z * ca;
+      const pz = 1.9 / (1.9 + rz);              // perspectiva simple
+      const jx = Math.sin(q.f + deriva * q.w) * disp;
+      const jy = Math.cos(q.f * 1.7 + deriva * q.w) * disp * 0.7;
+      const px = cx + (rx * R + jx) * pz;
+      const py = cy + (q.y * R + jy) * pz;
+
+      ctx.globalAlpha = Math.min(1, (0.36 + p * 0.64) * q.o * pz);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(px, py, q.s * pz * (0.75 + p * 0.7) * escala, 0, 6.284);
+      ctx.fill();
+
+      if (rayos && (i & 3) === 0) {
+        ctx.globalAlpha = (p - 0.5) * 0.5 * q.o;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 0.4 * pz * escala;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(cx + (px - cx) * alargue, cy + (py - cy) * alargue);
+        ctx.stroke();
       }
-      pintarRueda(e);
-      e.anim = requestAnimationFrame(paso);
-    };
-    e.anim = requestAnimationFrame(paso);
+    }
+
+    if (p > 0.75) {
+      const k = (p - 0.75) / 0.25;
+      ctx.globalAlpha = k * 0.9;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(cx, cy, (1.5 + k * 4.5) * escala, 0, 6.284);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 1;
   }
 
-  function engancharRueda(e) {
-    let ultimaY = 0, ultimoT = 0;
+  // ───────────────────────────────────────────── arrastre de la tapa
+  let x = 0;                  // desplazamiento visual, px CSS
+  let arrastrando = false, armado = false, descartado = false, hecho = false;
+  let inicioX = 0, inicioY = 0, baseX = 0;
+  let raf = null, volviendo = false;
 
-    e.el.addEventListener('pointerdown', ev => {
-      if (!cripta.classList.contains('activa')) return;
-      ev.preventDefault();
-      e.el.setPointerCapture(ev.pointerId);
-      e.arrastrando = true;
-      e.vel = 0;
-      ultimaY = ev.clientY;
-      ultimoT = performance.now();
-      if (e.anim) { cancelAnimationFrame(e.anim); e.anim = null; }
-    });
-
-    e.el.addEventListener('pointermove', ev => {
-      if (!e.arrastrando) return;
-      const dy = ev.clientY - ultimaY;
-      const dt = Math.max(1, performance.now() - ultimoT);
-      e.pos -= dy;
-      e.vel = -dy * (16 / dt);               // px por fotograma
-      ultimaY = ev.clientY;
-      ultimoT = performance.now();
-      pintarRueda(e);
-    });
-
-    const soltar = ev => {
-      if (!e.arrastrando) return;
-      e.arrastrando = false;
-      try { e.el.releasePointerCapture(ev.pointerId); } catch {}
-      e.vel = Math.max(-38, Math.min(38, e.vel));
-      girar(e);
-    };
-    e.el.addEventListener('pointerup', soltar);
-    e.el.addEventListener('pointercancel', soltar);
-
-    // La rueda del ratón mueve un dígito, para no depender solo del arrastre.
-    e.el.addEventListener('wheel', ev => {
-      if (!cripta.classList.contains('activa')) return;
-      ev.preventDefault();
-      e.pos += Math.sign(ev.deltaY) * ALTO_DIGITO;
-      pintarRueda(e);
-      comprobar();
-    }, { passive: false });
+  function aplicar() {
+    hero.style.transform = x ? `translateX(${x}px)` : '';
+    if (!reduccion.matches) dibujar(x, Math.max(0, Math.min(1, x / CONFIG.recorrido)));
   }
 
-  // ────────────────────────────────────────── arrastre de la tapa
-  let px = 0;                 // desplazamiento visual actual
-  let arrastrando = false, descartado = false, inicioX = 0, inicioY = 0;
-  let abierto = false, comprobando = false;
-
-  function moverTapa(v) {
-    px = v;
-    hero.style.setProperty('--vx', v + 'px');
-    hero.style.transform = `translateX(${v}px)`;
-
-    // Cuánto se ha abierto, de 0 a 1. El candado va enganchado a esto: sale
-    // de detrás del borde izquierdo a un ritmo algo distinto al de la tapa,
-    // y ese desfase es lo que hace que parezca que estaba ahí debajo.
-    const progreso = Math.min(1, v / CONFIG.apertura);
-    cripta.style.setProperty('--vp', progreso.toFixed(3));
-
-    cripta.classList.toggle('visible', v > 12);
-    const listo = v >= CONFIG.apertura - 6;
-    cripta.classList.toggle('activa', listo);
+  // El bucle solo existe mientras hay gesto. En reposo, cero trabajo: ni un
+  // requestAnimationFrame pendiente. La vuelta a cero se hace aquí dentro y
+  // no en su propio rAF, para que no haya dos bucles pisándose.
+  function bucle() {
+    if (volviendo) {
+      x *= 0.82;
+      if (x < 0.5) { x = 0; volviendo = false; }
+    }
+    aplicar();
+    if (arrastrando || volviendo || hecho) raf = requestAnimationFrame(bucle);
+    else { raf = null; ctx.clearRect(0, 0, anchoCSS, altoCSS); }
   }
+  function arrancarBucle() { if (raf === null) raf = requestAnimationFrame(bucle); }
 
-  /**
-   * La tapa engancha y completa su recorrido sola, con un rebote corto al
-   * llegar. El CLACK cae al final del trayecto, no al cruzar el umbral.
-   */
-  function soltarTapa() {
-    const destino = Math.min(CONFIG.apertura, caja.clientWidth - 44);
-    let v = 0;
-    const animar = () => {
-      const dist = destino - px;
-      v = v * 0.62 + dist * 0.30;
-      if (Math.abs(dist) < 0.6 && Math.abs(v) < 0.6) {
-        moverTapa(destino);
-        clack(1);
-        return;
-      }
-      moverTapa(px + v);
-      requestAnimationFrame(animar);
-    };
-    animar();
-  }
+  function completar() {
+    if (hecho) return;
+    hecho = true;
+    arrastrando = false;
+    x = CONFIG.recorrido;
 
-  function cerrarTapa() {
-    abierto = false;
-    cripta.classList.remove('activa');
-    const animar = () => {
-      px *= 0.82;
-      if (px < 0.5) { moverTapa(0); hero.style.transform = ''; return; }
-      moverTapa(px);
-      requestAnimationFrame(animar);
-    };
-    animar();
+    // Con movimiento reducido no hay fogonazo: un destello a pantalla
+    // completa es justo lo que esa preferencia pide evitar.
+    if (reduccion.matches) { window.location.href = CONFIG.destino; return; }
+
+    const flash = document.createElement('div');
+    flash.className = 'vault-fogonazo';
+    document.body.appendChild(flash);
+    requestAnimationFrame(() => flash.classList.add('on'));
+    setTimeout(() => { window.location.href = CONFIG.destino; }, CONFIG.msFogonazo);
   }
 
   hero.addEventListener('pointerdown', ev => {
-    if (abierto || ev.target.closest('.vault-cripta')) return;
-    inicioX = ev.clientX; inicioY = ev.clientY;
+    if (hecho) return;
+    // En ratón se exige el botón principal. En táctil y lápiz no se filtra
+    // aquí: un `buttons` raro de un dispositivo concreto dejaría el gesto
+    // inservible, y el filtro que de verdad importa está en pointermove.
+    if (ev.pointerType === 'mouse' && ev.buttons !== 1) return;
+    if (!pts.length) sembrar();
+    if (!medir()) return;
+    arrastrando = true;
+    armado = false;
     descartado = false;
-    ctx();                                   // el contexto de audio nace aquí
+    inicioX = ev.clientX;
+    inicioY = ev.clientY;
+    baseX = x;
+    try { hero.setPointerCapture(ev.pointerId); } catch {}
+    arrancarBucle();
   });
 
   hero.addEventListener('pointermove', ev => {
-    if (abierto || descartado) return;
-    const dx = ev.clientX - inicioX;
-    const dy = ev.clientY - inicioY;
+    if (!arrastrando || hecho) return;
 
-    if (!arrastrando) {
-      // Bloqueo de eje: si el gesto se declara vertical antes de recorrer lo
-      // suficiente en horizontal, es un scroll y no se vuelve a mirar hasta
-      // que se levante el dedo. `touch-action: pan-y` ya deja ese scroll en
-      // manos del navegador, así que ni siquiera llegan más eventos.
-      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) { descartado = true; return; }
-      // Solo hacia la derecha, y solo pasado el mínimo: un roce no abre nada.
-      if (dx < CONFIG.minArranque) return;
-      arrastrando = true;
-      try { hero.setPointerCapture(ev.pointerId); } catch {}
+    // ESTO es lo que arreglaba el fallo de escritorio: en producción bastaba
+    // pasar el ratón por encima para que la tarjeta se moviera y se quedara
+    // enganchada. Sin botón pulsado, el gesto termina aquí.
+    if (!ev.buttons) { terminar(ev); return; }
+
+    let d = ev.clientX - inicioX;
+
+    if (!armado) {
+      if (descartado) return;
+      const dy = ev.clientY - inicioY;
+      // Si el gesto se declara vertical antes de recorrer lo suficiente en
+      // horizontal, es un scroll y no se vuelve a mirar hasta soltar.
+      if (Math.abs(dy) > Math.abs(d) && Math.abs(dy) > 10) { descartado = true; return; }
+      if (Math.abs(d) < CONFIG.zonaMuerta) return;
+      // La zona muerta se descuenta: el recorrido empieza en cero.
+      armado = true;
+      inicioX = ev.clientX;
+      d = 0;
     }
 
-    // Resistencia creciente: cuanto más lejos, más cuesta. Sacar una pieza
-    // pesada de su ranura, no deslizar una tarjeta. Se descuenta el mínimo de
-    // arranque para que el movimiento empiece desde cero y no dé un salto.
-    const bruto = Math.max(0, dx - CONFIG.minArranque);
-    const suave = bruto * CONFIG.resistencia * (1 - Math.min(0.3, bruto / 1500));
-    const tope = CONFIG.umbralAbierto;
-
-    if (suave >= tope && !abierto) {
-      abierto = true;
-      soltarTapa();                          // engancha y termina sola
-      return;
-    }
-    moverTapa(Math.min(suave, tope));
+    x = Math.max(0, Math.min(CONFIG.recorrido, baseX + d));
+    if (x >= CONFIG.recorrido) completar();
   });
 
-  const finTapa = ev => {
-    descartado = false;
+  function terminar(ev) {
     if (!arrastrando) return;
     arrastrando = false;
-    try { hero.releasePointerCapture(ev.pointerId); } catch {}
-    // Sin llegar al tope, la tapa vuelve a su sitio.
-    if (!abierto) cerrarTapa();
-  };
-  hero.addEventListener('pointerup', finTapa);
-  hero.addEventListener('pointercancel', finTapa);
+    descartado = false;
+    if (ev) { try { hero.releasePointerCapture(ev.pointerId); } catch {} }
+    // Soltando antes del final, la tarjeta vuelve a su sitio y no pasa nada.
+    if (!hecho && x > 0) volviendo = true;
+  }
+  hero.addEventListener('pointerup', terminar);
+  hero.addEventListener('pointercancel', terminar);
 
-  // Tocar fuera cierra la tapa.
-  document.addEventListener('pointerdown', ev => {
-    if (abierto && !caja.contains(ev.target)) cerrarTapa();
+  // Al volver a la portada desde /val/ (incluida la vuelta atrás del
+  // navegador, que puede servir la página de la caché) la tarjeta debe
+  // aparecer cerrada: no se recuerda ningún estado.
+  window.addEventListener('pageshow', () => {
+    hecho = false; arrastrando = false; volviendo = false;
+    x = 0;
+    hero.style.transform = '';
+    if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
+    if (anchoCSS) ctx.clearRect(0, 0, anchoCSS, altoCSS);
+    const f = document.querySelector('.vault-fogonazo');
+    if (f) f.remove();
   });
 
-  // ──────────────────────────────────────────────── validación
-  async function comprobar() {
-    if (comprobando || !abierto) return;
-    // Solo se intenta cuando las cuatro ruedas están quietas y encajadas.
-    if (ruedas.some(r => r.arrastrando || r.anim)) return;
-
-    const pin = ruedas.map(digitoDe).join('');
-    comprobando = true;
-
-    // El mecanismo cede: el arco se tensa mientras el servidor responde.
-    arco.style.transition = 'transform .18s ease-out';
-    arco.style.transform = 'translateX(-50%) translateY(-2px)';
-
-    let ok = false;
-    try {
-      const res = await fetch(CONFIG.endpoint, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ pin }),
-      });
-      ok = res.ok;
-    } catch { ok = false; }
-
-    if (ok) abrir(); else rechazar();
-    comprobando = false;
-  }
-
-  function abrir() {
-    clunk();
-    arco.style.transition = 'transform .55s cubic-bezier(.34,1.26,.64,1)';
-    arco.style.transform = 'translateX(-50%) translateY(-24px)';
-
-    // La tapa acusa el golpe: se mueve un poco más.
-    setTimeout(() => { moverTapa(CONFIG.umbralAbierto + 10); }, 90);
-
-    // Glitch mínimo, un parpadeo y ya. Nada de celebración.
-    setTimeout(() => {
-      document.documentElement.style.transition = 'opacity .12s';
-      document.documentElement.style.opacity = '.88';
-    }, 380);
-
-    setTimeout(() => { window.location.href = CONFIG.destino; }, 620);
-  }
-
-  function rechazar() {
-    // Como un candado de verdad: el arco lo intenta, no cede, y se queda.
-    arco.style.transition = 'transform .1s';
-    arco.style.transform = 'translateX(-50%) translateY(-4px)';
-    clack(1);
-    setTimeout(() => {
-      arco.style.transform = 'translateX(-50%)';
-      clack(1);
-      candado.classList.add('error');
-      caja.classList.add('temblor');
-    }, 130);
-    setTimeout(() => {
-      candado.classList.remove('error');
-      caja.classList.remove('temblor');
-      hero.style.transform = `translateX(${px}px)`;
-    }, 560);
-    // Ni mensaje ni pista. Las ruedas se quedan donde están.
-  }
+  window.addEventListener('resize', () => {
+    if (raf !== null) medir();
+  });
 })();

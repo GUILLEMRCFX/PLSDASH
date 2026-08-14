@@ -82,13 +82,30 @@ Contexto completo en `BRIEF-CLAUDE-CODE.md`.
 
 ### The Vault (`vault.js`)
 
-Easter egg de la portada. La tarjeta del valor total es una tapa: arrastrarla
-a la derecha revela un candado de combinación de cuatro ruedas, y la
-combinación correcta lleva a `/val/` con la sesión abierta.
+Easter egg de la portada. La tarjeta del valor total es una puerta:
+arrastrarla a la derecha descubre debajo una nube de partículas que forma una
+esfera y se carga con el recorrido (canvas 2D, sin librerías). Al completar
+los 244px, fogonazo blanco y salto a `/val/`.
 
-El PIN **no se comprueba en el cliente**. Los cuatro dígitos van al mismo
-`/api/val/auth` que usa el teclado, y el servidor decide; `vault.js` no sabe
-cuál es el PIN. El teclado sigue existiendo para quien entra por la URL.
+**No autentica.** El gesto solo navega; el PIN lo sigue pidiendo el dial de
+`/val/`, que es el único sitio que habla con `/api/val/auth` — y por eso la
+regla `val-auth-brute-force` de Cloudflare sigue cubriendo la única puerta.
+
+- 30px de zona muerta antes de responder, que se descuentan del recorrido.
+- El progreso está atado al dedo (`x / 244`); nada se anima solo. A la mitad
+  aparecen los rayos y a partir del 75% el núcleo blanco.
+- El centro de la esfera va en `cx = x`, pegado al borde de la tarjeta, para
+  que se vea desde el primer píxel de rendija y no solo al final.
+- Soltar antes del final devuelve la tarjeta a su sitio. Al volver desde
+  `/val/` aparece siempre cerrada: no se recuerda ningún estado.
+- El bucle de animación solo corre mientras hay gesto. En reposo no queda ni
+  un `requestAnimationFrame` pendiente.
+- El arrastre exige puntero pulsado (`ev.buttons` en cada `pointermove`). Sin
+  eso, en escritorio bastaba pasar el ratón por encima para abrirla.
+- Con `prefers-reduced-motion` no hay partículas ni fogonazo: la tarjeta se
+  desliza y ya está.
+- La densidad de partículas baja en pantalla estrecha y con `devicePixelRatio`
+  alto (de 420 a 156 en un móvil de densidad ×3).
 
 Se desactiva borrando la etiqueta `<script src="/vault.js">` de `index.html`.
 No toca nada más de la página: envuelve el hero al arrancar y todo lo suyo
@@ -153,12 +170,12 @@ Pages sirve los dos sitios:
 `val.plsdash.com`). Mientras no exista, el middleware no cambia nada y el
 panel sigue en `plsdash.com/val/`.
 
-> ⚠ **Hoy `VAL_HOST` debe seguir sin definir.** El Easter egg de la portada
-> (`vault.js`) manda el PIN a `/api/val/auth` desde `plsdash.com`, y esa ruta
-> devuelve 404 en cuanto el subdominio entra en vigor. El candado se limitaría
-> a rechazar todo sin decir por qué. Para mover el panel al subdominio
-> conservando el Vault hay que dejar pasar `/auth` desde el dominio principal
-> y emitir la cookie con `Domain=.plsdash.com`.
+> ⚠ **Antes de definir `VAL_HOST`, cambiar `destino` en `vault.js`.** El
+> Easter egg de la portada navega a `/val/`, y esa ruta devuelve 404 desde
+> `plsdash.com` en cuanto el subdominio entra en vigor: el gesto llevaría a
+> una página en blanco. Basta con apuntar `destino` a
+> `https://val.plsdash.com/`. Ya no hay nada de cookies que resolver aquí —
+> desde que el Vault dejó de autenticar, no abre sesión.
 
 Las rutas que pasan por Functions están en `_routes.json`; una ruta nueva del
 panel hay que añadirla ahí o se servirá sin pasar por el filtro.
