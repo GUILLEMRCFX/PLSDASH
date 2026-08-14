@@ -82,7 +82,7 @@
   .btn-primary:active{transform:translateY(0)}
   .btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--line)}
   .btn-ghost:hover{border-color:var(--line-2);background:var(--surface-2)}
-  .btn:focus-visible,.tool:focus-visible,.tab:focus-visible,.eye:focus-visible,.code-badge:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .btn:focus-visible,.tool:focus-visible,.tab:focus-visible,.code-badge:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
 
   /* ---------- HERO ---------- */
   .hero{position:relative;border:1px solid rgba(255,255,255,.10);border-radius:24px;padding:34px 34px 0;overflow:hidden;margin-bottom:16px;
@@ -147,17 +147,16 @@
   .tab{font-family:var(--body);font-weight:600;font-size:13px;color:var(--dim);background:none;border:none;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.16s}
   .tab.on{background:var(--surface-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
   .head-tools{display:flex;align-items:center;gap:8px}
-  .tool{display:inline-flex;align-items:center;gap:7px;font-family:var(--body);font-weight:500;font-size:12.5px;color:var(--dim);background:var(--bg-2);border:1px solid var(--line);padding:8px 12px;border-radius:10px;cursor:pointer;transition:.16s}
+  .tool{display:inline-flex;align-items:center;gap:7px;font-family:var(--body);font-weight:500;font-size:12.5px;color:var(--dim);background:var(--bg-2);border:1px solid var(--line);padding:8px 12px;border-radius:10px;cursor:pointer;transition:.16s;white-space:nowrap;flex-shrink:0}
   .tool:hover{color:var(--text);border-color:var(--line-2)}
   .tool svg{width:14px;height:14px}
   .tool.active{color:var(--text);border-color:var(--violet)}
 
-  .thead{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr 44px;gap:14px;padding:13px 22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--line)}
+  .thead{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr;gap:14px;padding:13px 22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--line)}
   .thead .r{text-align:right}
-  .row{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr 44px;gap:14px;padding:15px 22px;align-items:center;border-bottom:1px solid var(--line);transition:.15s}
+  .row{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr;gap:14px;padding:15px 22px;align-items:center;border-bottom:1px solid var(--line);transition:.15s}
   .row:last-child{border-bottom:none}
   .row:hover{background:rgba(255,255,255,.045)}
-  .row.hidden-tok{opacity:.38}
   .asset{display:flex;align-items:center;gap:13px;min-width:0}
   .logo{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:14px;color:#0C0710;flex-shrink:0;position:relative;box-shadow:0 0 0 1px rgba(255,255,255,.06);overflow:hidden}
   .logo img{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;z-index:2;background:#17101F}
@@ -170,9 +169,9 @@
   .num .q{color:var(--dim);font-size:11px;display:block;margin-top:2px}
   .val{font-family:var(--mono);font-size:14px;font-weight:600;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .val .d{font-size:11px;font-weight:500;margin-top:2px;display:block}
-  .eye{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:none;border:1px solid transparent;cursor:pointer;color:var(--faint);transition:.15s;margin-left:auto}
-  .eye:hover{background:var(--bg-2);border-color:var(--line);color:var(--text)}
-  .eye svg{width:16px;height:16px}
+  /* Nota del filtro de polvo, bajo la lista. Discreta a propósito: informa
+     de lo que no se está viendo sin competir con las filas. */
+  .dust-note{padding:13px 22px;font-family:var(--mono);font-size:11.5px;color:var(--faint);border-top:1px solid var(--line);text-align:center;letter-spacing:.02em}
 
   /* wallet group header (by-wallet view) */
   .wgroup{padding:16px 22px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)}
@@ -200,7 +199,7 @@
   .spinner{width:34px;height:34px;border-radius:50%;border:3px solid var(--line-2);border-top-color:var(--violet);margin:0 auto 16px;animation:spin .8s linear infinite}
   @keyframes spin{to{transform:rotate(360deg)}}
   /* skeleton rows */
-  .sk-row{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr 44px;gap:14px;padding:15px 22px;align-items:center;border-bottom:1px solid var(--line)}
+  .sk-row{display:grid;grid-template-columns:2.4fr 1.3fr 1.3fr 1.3fr;gap:14px;padding:15px 22px;align-items:center;border-bottom:1px solid var(--line)}
   .sk{background:linear-gradient(90deg,var(--surface-2) 25%,var(--bg-2) 37%,var(--surface-2) 63%);background-size:400% 100%;animation:shimmer 1.4s infinite;border-radius:6px;height:14px}
   .sk.circle{width:40px;height:40px;border-radius:50%}
   .sk-asset{display:flex;align-items:center;gap:13px}
@@ -208,7 +207,9 @@
 
   .note{margin-top:18px;font-size:11.5px;color:var(--faint);text-align:center;font-family:var(--mono);letter-spacing:.02em;line-height:1.6}
 
-  .hide-on-wallet{display:block}
+  /* Sin regla `display` positiva aquí: la llevaba y pisaba al `display:grid`
+     de .thead (misma especificidad, declarada después), y la cabecera de
+     columnas salía apilada en escritorio. Ocultar basta, que para eso está. */
   body[data-view="wallet"] .hide-on-wallet{display:none}
   /* En la vista Historial ocultamos la cabecera de tabla, las herramientas
      de tokens y el pie de "añadir token": no aplican al calendario. */
@@ -284,32 +285,6 @@
   .chart-foot a{color:var(--violet);text-decoration:none;font-size:12.5px;font-weight:600}
   .chart-foot a:hover{text-decoration:underline}
 
-  /* ---------- MERCADO / STATS ---------- */
-  body[data-view="market"] .thead,
-  body[data-view="market"] .head-tools,
-  body[data-view="market"] .foot{display:none}
-  .mkt-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .mkt-title{font-family:var(--display);font-weight:600;font-size:15px}
-  .mkt-sub{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:2px}
-  .mkt-sort{width:auto;min-width:170px;padding:9px 12px;font-family:var(--body);font-size:13px;cursor:pointer;letter-spacing:0}
-  .mkt-head{display:grid;grid-template-columns:34px 2.2fr 1.1fr .9fr 1.2fr 1.2fr 1.3fr;gap:12px;padding:12px 22px;font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--line)}
-  .mkt-head .r{text-align:right}
-  .mkt-row{display:grid;grid-template-columns:34px 2.2fr 1.1fr .9fr 1.2fr 1.2fr 1.3fr;gap:12px;padding:13px 22px;align-items:center;border-bottom:1px solid var(--line);cursor:pointer;transition:.15s}
-  .mkt-row:last-child{border-bottom:none}
-  .mkt-row:hover{background:var(--surface-2)}
-  .mkt-rank{font-family:var(--mono);font-size:12px;color:var(--faint);text-align:center;font-variant-numeric:tabular-nums}
-  .mkt-tok{display:flex;align-items:center;gap:11px;min-width:0}
-  .mkt-tok .nm{min-width:0}
-  .mkt-tok .nm b{font-weight:600;font-size:14px;display:block;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .mkt-tok .nm span{font-family:var(--mono);font-size:11px;color:var(--faint)}
-  .mkt-num{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-  .mkt-num.up{color:var(--mint)}.mkt-num.down{color:var(--red)}
-  .mkt-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:16px 22px;border-bottom:1px solid var(--line)}
-  .mkt-card{background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
-  .mkt-card h5{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:8px;font-weight:500}
-  .mkt-card .v{font-family:var(--display);font-size:21px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:9px}
-  .mkt-card .v .tk{width:24px;height:24px;font-size:10px}
-
   /* toast */
   .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw}
   .toast.show{transform:translateX(-50%) translateY(0)}
@@ -357,22 +332,16 @@
     .stats{grid-template-columns:1fr}
     .hero{padding:26px 22px 0;border-radius:20px}
     .thead{display:none}
-    .row{grid-template-columns:1fr auto 30px;gap:6px 12px;padding:14px 16px}
+    .row{grid-template-columns:1fr auto;gap:6px 12px;padding:14px 16px}
     .asset{grid-row:span 2;grid-column:1}
     .num.price{display:none}
     .num.bal{grid-column:2;grid-row:1;text-align:right;align-self:end}
     .num.bal .q{display:inline;color:var(--faint)}
     .val{grid-column:2;grid-row:2;align-self:start}
-    .eye{grid-column:3;grid-row:1/3}
     .panel-head{padding:16px}
     .total{margin-top:14px}
     .btn-primary .bt-txt,.btn-ghost .bt-txt{display:none}
     .btn-primary,.btn-ghost{padding:11px 13px}
-    /* Mercado en móvil: Token | 24h | Market cap (resto oculto). */
-    .mkt-head,.mkt-row{grid-template-columns:1.8fr .8fr 1.1fr;gap:10px;padding:13px 16px}
-    .mkt-c-rank,.mkt-c-price,.mkt-c-vol,.mkt-c-liq{display:none}
-    .mkt-bar{padding:14px 16px}
-    .mkt-cards{grid-template-columns:1fr;gap:10px;padding:14px 16px}
     .hist-bar{padding:14px 16px}
     .hist-detail,.hist-summary{padding-left:16px;padding-right:16px}
     /* En móvil no caben cantidades por celda: mostramos sólo los iconos
@@ -473,7 +442,6 @@
         <button class="tab on" onclick="setView('combined',this)">Combinado</button>
         <button class="tab" onclick="setView('wallet',this)">Por wallet</button>
         <button class="tab" onclick="setView('history',this)">Historial</button>
-        <button class="tab" onclick="setView('market',this)">Mercado</button>
       </div>
       <div class="head-tools">
         <div class="tf-seg" id="tfSeg" role="group" aria-label="Periodo del cambio de precio">
@@ -481,9 +449,9 @@
           <button onclick="setTimeframe('7d',this)">7D</button>
           <button onclick="setTimeframe('30d',this)">30D</button>
         </div>
-        <button class="tool" id="hideTool" onclick="toggleShowHidden(this)">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="2"/></svg>
-          <span id="hideLbl">Ocultos (0)</span>
+        <button class="tool" id="dustTool" onclick="toggleHideDust()" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <span>HIDE DUST</span>
         </button>
         <button class="tool" id="sortTool" onclick="cycleSort()">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -498,7 +466,6 @@
       <div class="r">Balance</div>
       <div class="r">Precio</div>
       <div class="r">Valor</div>
-      <div></div>
     </div>
 
     <!-- ROWS render target -->
@@ -649,12 +616,16 @@ const state = {
   code: null,            // código de portfolio en la nube (null = modo local)
   wallets: [],           // [{address, label}]
   customTokens: [],      // [address(lowercase)]
-  hidden: [],            // [tokenKey] — tokenKey = 'native' o address lowercase
   view: 'combined',
   sort: 'value',         // value | change | name
   timeframe: '24h',      // 24h | 7d | 30d (periodo del cambio de precio)
-  showHidden: false,
+  hideDust: false,       // filtro de vista: esconde posiciones < UMBRAL_DUST_USD
 };
+
+/* Por debajo de este valor de posición (cantidad × precio) un token se
+   considera polvo. Es el valor de la posición, no el precio unitario: 50 $
+   de un token que cotiza a 0,0000001 $ no es polvo. */
+const UMBRAL_DUST_USD = 1;
 
 // Cambio extendido (7d/30d) por token, calculado con velas de GeckoTerminal.
 const extCache = new Map();   // priceAddr -> {pct7, pct30, ts}
@@ -946,8 +917,20 @@ async function refresh(){
 /* ============================================================
    RENDER
    ============================================================ */
-function visibleTokens(){
-  return tokensCombined.filter(t=>!state.hidden.includes(t.key));
+/* HIDE DUST es un filtro de vista, nunca de contabilidad: el total, el
+   cambio del periodo y las estadísticas siguen calculándose sobre
+   `tokensCombined` entero. Esto solo decide qué filas se pintan.
+
+   Un token sin precio no se considera polvo: su posición vale lo que valga,
+   y no lo sabemos. Esconder lo que no se puede medir sería mentir. */
+function esDust(t){
+  return t.price!=null && t.value < UMBRAL_DUST_USD;
+}
+function tokensDelPolvo(){
+  return tokensCombined.filter(esDust);
+}
+function tokensParaLista(){
+  return state.hideDust ? tokensCombined.filter(t=>!esDust(t)) : tokensCombined;
 }
 function sortTokens(list){
   const s=[...list];
@@ -956,9 +939,6 @@ function sortTokens(list){
   else s.sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
   return s;
 }
-
-function eyeOpenSvg(){return '<svg viewBox="0 0 24 24" fill="none"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="2.6" stroke="currentColor" stroke-width="2"/></svg>';}
-function eyeOffSvg(){return '<svg viewBox="0 0 24 24" fill="none"><path d="m2 2 20 20M9.6 5.1A9.6 9.6 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3 3.6M6 6.5A17 17 0 0 0 2 12s4 7 10 7a9.5 9.5 0 0 0 4-.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';}
 
 function logoHtml(t,size){
   const initial=escapeHtml((t.symbol||'?')[0]||'?').toUpperCase();
@@ -972,7 +952,6 @@ function chartBtnHtml(t){
   return `<button class="chartbtn" data-pair="${escapeHtml(t.pair)}" data-sym="${escapeHtml(t.symbol||'')}" title="Ver gráfico" aria-label="Ver gráfico de ${escapeHtml(t.symbol||'token')}"><svg viewBox="0 0 24 24" fill="none"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 14l3-4 3 3 4-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>`;
 }
 function rowHtml(t){
-  const hidden=state.hidden.includes(t.key);
   const chg=tokenChange(t);
   const chgCls=chg==null?'':(chg>=0?'up':'down');
   const chgStyle=chg==null?'style="color:var(--faint)"':'';
@@ -980,7 +959,7 @@ function rowHtml(t){
   const priceTxt=t.price==null?'—':fmtPrice(t.price);
   const valTxt=t.price==null?'—':fmtUsd(t.value);
   const custom=t.custom?'<span class="custom-tag">custom</span>':'';
-  return `<div class="row ${hidden?'hidden-tok':''}" data-key="${escapeHtml(t.key)}">
+  return `<div class="row" data-key="${escapeHtml(t.key)}">
     <div class="asset">${logoHtml(t)}
       <div class="nm"><b>${escapeHtml(t.name||'Token')}</b><span>${escapeHtml(t.symbol||'?')}${custom}</span></div>
       ${chartBtnHtml(t)}
@@ -988,13 +967,24 @@ function rowHtml(t){
     <div class="num bal">${fmtAmount(t.balance)} <span class="q">${escapeHtml(t.symbol||'')}</span></div>
     <div class="num price">${priceTxt}</div>
     <div class="val">${valTxt}<span class="d ${chgCls}" ${chgStyle}>${chgTxt}</span></div>
-    <button class="eye" data-key="${escapeHtml(t.key)}" title="${hidden?'Mostrar':'Ocultar'}" aria-label="${hidden?'Mostrar token':'Ocultar token'}">${hidden?eyeOffSvg():eyeOpenSvg()}</button>
   </div>`;
 }
 
+/* Aviso de lo que el filtro está escondiendo. Sin filtro activo, o sin nada
+   que esconder, no se pinta nada. */
+function dustNoteHtml(){
+  if(!state.hideDust)return '';
+  const polvo=tokensDelPolvo();
+  if(!polvo.length)return '';
+  const suma=polvo.reduce((s,t)=>s+t.value,0);
+  const plural=polvo.length===1?'token oculto':'tokens ocultos';
+  return `<div class="dust-note">${polvo.length} ${plural} · ${fmtUsd(suma)}</div>`;
+}
+
 function render(){
-  // --- Mercado: vista global, no depende del portfolio ---
-  if(state.view==='market'){updateHeader();renderWalletBar();loadMarket();return;}
+  // Antes de cualquier salida temprana: el botón refleja el estado guardado
+  // aunque todavía no haya nada que pintar.
+  updateDustLabel();
   // --- estado vacío ---
   if(!state.wallets.length){
     if(state.view==='history'){loadHistory();updateHeader();renderWalletBar();return;}
@@ -1021,15 +1011,17 @@ function render(){
   }
 
   const rows=$('rows');
-  const list=state.showHidden?tokensCombined:visibleTokens();
+  const list=tokensParaLista();
 
   if(state.view==='combined'){
     const sorted=sortTokens(list);
-    rows.innerHTML=sorted.length?sorted.map(rowHtml).join(''):emptyHoldingsHtml();
+    rows.innerHTML=(sorted.length?sorted.map(rowHtml).join(''):emptyHoldingsHtml())+dustNoteHtml();
   }else{
     // Por wallet: agrupar.
     let html='';
-    const total=visibleTokens().reduce((s,t)=>s+t.value,0);
+    // El porcentaje de cada wallet se mide contra el total real, no contra
+    // lo que se esté viendo: el filtro de polvo no toca la contabilidad.
+    const total=tokensCombined.reduce((s,t)=>s+t.value,0);
     for(const w of state.wallets){
       const addr=lc(w.address);
       const wtokens=list.filter(t=>t.perWallet[addr]>0).map(t=>{
@@ -1046,24 +1038,23 @@ function render(){
       </div>`;
       html+=sorted.length?sorted.map(rowHtml).join(''):'<div class="state-block" style="padding:26px"><p>Sin tokens con balance en esta wallet.</p></div>';
     }
-    rows.innerHTML=html;
+    rows.innerHTML=html+dustNoteHtml();
   }
 
   updateHeader();
   renderStats();
   renderWalletBar();
-  updateHideLabel();
   if(state.timeframe!=='24h')ensureExtendedChanges();   // carga 7d/30d en segundo plano
 }
 
 function updateHeader(){
-  const total=visibleTokens().reduce((s,t)=>s+t.value,0);
+  const total=tokensCombined.reduce((s,t)=>s+t.value,0);
   const [w,c]=total.toFixed(2).split('.');
   $('totalVal').innerHTML=(total>=0?'$':'-$')+Math.abs(+w).toLocaleString('en-US')+'<span class="cents">.'+c+'</span>';
 
   // Cambio del portfolio en el periodo seleccionado (24h / 7d / 30d).
   let prev=0,has=false;
-  for(const t of visibleTokens()){
+  for(const t of tokensCombined){
     const chg=tokenChange(t);
     if(chg!=null&&t.price!=null){has=true;prev+=t.value/(1+chg/100);}
     else prev+=t.value;
@@ -1079,11 +1070,11 @@ function updateHeader(){
   const up=diff>=0;
   const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
-  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${visibleTokens().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
+  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${tokensCombined.length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
 }
 
 function renderStats(){
-  const vis=visibleTokens().filter(t=>t.value>0);
+  const vis=tokensCombined.filter(t=>t.value>0);
   // Cambio del periodo seleccionado.
   $('st24Title').textContent='Cambio '+state.timeframe;
   $('stBestTitle').textContent=state.timeframe==='24h'?'Mejor activo hoy':('Mejor activo '+state.timeframe);
@@ -1137,10 +1128,10 @@ function renderWalletBar(){
   bar.innerHTML=html;
 }
 
-function updateHideLabel(){
-  const n=state.hidden.filter(k=>tokensCombined.some(t=>t.key===k)).length;
-  $('hideLbl').textContent=state.showHidden?'Mostrando ocultos':`Ocultos (${n})`;
-  $('hideTool').classList.toggle('active',state.showHidden);
+function updateDustLabel(){
+  const b=$('dustTool');
+  b.classList.toggle('active',state.hideDust);
+  b.setAttribute('aria-pressed',state.hideDust?'true':'false');
 }
 
 /* ---------- estados (vacío / carga / error) ---------- */
@@ -1159,7 +1150,7 @@ function emptyHoldingsHtml(){
 function renderEmptyHoldings(){$('rows').innerHTML=emptyHoldingsHtml();}
 function renderSkeleton(){
   let s='';
-  for(let i=0;i<5;i++)s+=`<div class="sk-row"><div class="sk-asset"><div class="sk circle"></div><div style="flex:1"><div class="sk" style="width:90px;margin-bottom:7px"></div><div class="sk" style="width:50px;height:10px"></div></div></div><div class="sk" style="width:70px;justify-self:end"></div><div class="sk" style="width:70px;justify-self:end"></div><div class="sk" style="width:70px;justify-self:end"></div><div></div></div>`;
+  for(let i=0;i<5;i++)s+=`<div class="sk-row"><div class="sk-asset"><div class="sk circle"></div><div style="flex:1"><div class="sk" style="width:90px;margin-bottom:7px"></div><div class="sk" style="width:50px;height:10px"></div></div></div><div class="sk" style="width:70px;justify-self:end"></div><div class="sk" style="width:70px;justify-self:end"></div><div class="sk" style="width:70px;justify-self:end"></div></div>`;
   $('rows').innerHTML=s;
 }
 function renderError(msg){
@@ -1209,16 +1200,8 @@ async function addCustomToken(addr){
   refresh();
   return {ok:true};
 }
-function toggleTokenVisibility(key){
-  const i=state.hidden.indexOf(key);
-  if(i>=0)state.hidden.splice(i,1);
-  else state.hidden.push(key);
-  savePortfolio();
-  render();
-}
-
 /* ============================================================
-   VISTA / ORDEN / OCULTOS
+   VISTA / ORDEN / POLVO
    ============================================================ */
 function setView(v,el){
   state.view=v;
@@ -1226,7 +1209,6 @@ function setView(v,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
   if(v==='history')loadHistory();
-  else if(v==='market')loadMarket();
   else render();
 }
 function cycleSort(){
@@ -1236,8 +1218,9 @@ function cycleSort(){
   $('sortLbl').textContent=labels[state.sort];
   render();
 }
-function toggleShowHidden(){
-  state.showHidden=!state.showHidden;
+function toggleHideDust(){
+  state.hideDust=!state.hideDust;
+  savePortfolio();   // se recuerda entre visitas, como el orden
   render();
 }
 
@@ -1284,7 +1267,7 @@ async function fetchExtendedChange(priceAddr,pair,livePrice){
 }
 async function ensureExtendedChanges(){
   if(state.timeframe==='24h'||extLoading)return;
-  const need=visibleTokens().filter(t=>t.pair&&t.price!=null).filter(t=>{
+  const need=tokensCombined.filter(t=>t.pair&&t.price!=null).filter(t=>{
     const c=extCache.get(t.priceAddr);return !c||Date.now()-c.ts>EXT_TTL;
   });
   if(!need.length)return;
@@ -1307,122 +1290,6 @@ function openChart(pair,sym){
   $('chartModal').classList.add('show');
 }
 function closeChart(){$('chartModal').classList.remove('show');$('chartWrap').innerHTML='';}
-
-/* ============================================================
-   MERCADO / STATS — principales tokens de PulseChain
-   Fuente: GeckoTerminal (pools de PulseChain) → precio, cambio 24h,
-   volumen 24h, liquidez y market cap (FDV cuando no hay circulante).
-   Es una vista global (no depende del portfolio). Al tocar una fila
-   se abre el gráfico en vivo del token.
-   ============================================================ */
-const marketState={tokens:[],loading:false,error:false,loaded:false,sort:'mcap',ts:0};
-
-// USD compacto para cifras grandes (market cap, volumen, liquidez).
-function fmtBigUsd(n){
-  if(n==null||isNaN(n)||n===0)return '—';
-  const a=Math.abs(n);
-  if(a>=1e12)return '$'+(n/1e12).toFixed(2)+'T';
-  if(a>=1e9)return '$'+(n/1e9).toFixed(2)+'B';
-  if(a>=1e6)return '$'+(n/1e6).toFixed(2)+'M';
-  if(a>=1e3)return '$'+(n/1e3).toFixed(1)+'K';
-  return '$'+n.toFixed(0);
-}
-
-async function loadMarket(force){
-  if(marketState.loading)return;
-  if(marketState.loaded&&!force&&Date.now()-marketState.ts<60000){renderMarket();return;}
-  marketState.loading=true;marketState.error=false;
-  renderMarket();
-  try{
-    const out=[],seen=new Set();
-    // Dos páginas de pools (≈40) deduplicadas por token base.
-    for(const page of [1,2]){
-      const r=await fetch(`${GECKOTERMINAL_API}/networks/${CHAIN_ID}/pools?include=base_token&page=${page}`);
-      if(!r.ok)throw 0;
-      const j=await r.json();
-      const inc={};
-      for(const it of (j.included||[]))inc[it.id]=it.attributes||{};
-      for(const p of (j.data||[])){
-        const a=p.attributes||{};
-        const baseId=p.relationships&&p.relationships.base_token&&p.relationships.base_token.data&&p.relationships.base_token.data.id;
-        const tok=inc[baseId]||{};
-        const addr=lc(tok.address||(baseId?baseId.split('_').pop():'')||'');
-        if(!isAddr(addr)||seen.has(addr))continue;
-        seen.add(addr);
-        const img=tok.image_url&&!/missing/i.test(tok.image_url)?tok.image_url:null;
-        out.push({
-          address:addr,
-          name:tok.name||a.name||'Token',
-          symbol:tok.symbol||'?',
-          logo:img,
-          price:parseFloat(a.base_token_price_usd)||null,
-          change24:a.price_change_percentage&&a.price_change_percentage.h24!=null?parseFloat(a.price_change_percentage.h24):null,
-          vol24:parseFloat(a.volume_usd&&a.volume_usd.h24)||0,
-          liq:parseFloat(a.reserve_in_usd)||0,
-          mcap:parseFloat(a.market_cap_usd)||parseFloat(a.fdv_usd)||0,
-          pair:a.address||null,
-        });
-      }
-    }
-    marketState.tokens=out;marketState.loaded=true;marketState.ts=Date.now();
-  }catch(e){console.error(e);marketState.error=true;}
-  finally{marketState.loading=false;renderMarket();}
-}
-
-function mktSetSort(v){marketState.sort=v;renderMarket();}
-
-function mktRowHtml(t,rank){
-  const chg=t.change24;
-  const chgCls=chg==null?'':(chg>=0?'up':'down');
-  const grad=gradientFor(t.address);
-  const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
-  return `<div class="mkt-row" data-pair="${escapeHtml(t.pair||'')}" data-sym="${escapeHtml(t.symbol||'')}">
-    <div class="mkt-rank mkt-c-rank">${rank}</div>
-    <div class="mkt-tok"><div class="logo" style="width:34px;height:34px;font-size:12px;background:${grad}">${img}<span class="ini">${escapeHtml((t.symbol||'?')[0].toUpperCase())}</span></div><div class="nm"><b>${escapeHtml(t.name||'Token')}</b><span>${escapeHtml(t.symbol||'?')}</span></div></div>
-    <div class="mkt-num mkt-c-price">${t.price!=null?fmtPrice(t.price):'—'}</div>
-    <div class="mkt-num ${chgCls}">${chg==null?'—':fmtPct(chg)}</div>
-    <div class="mkt-num mkt-c-vol">${fmtBigUsd(t.vol24)}</div>
-    <div class="mkt-num mkt-c-liq">${fmtBigUsd(t.liq)}</div>
-    <div class="mkt-num">${fmtBigUsd(t.mcap)}</div>
-  </div>`;
-}
-
-function renderMarket(){
-  const rows=$('rows');
-  const sel=k=>marketState.sort===k?'selected':'';
-  const bar=`<div class="mkt-bar">
-    <div><div class="mkt-title">Mercado · PulseChain</div><div class="mkt-sub">${marketState.loaded?(marketState.tokens.length+' tokens principales'):'Cargando…'}</div></div>
-    <select class="mkt-sort field" onchange="mktSetSort(this.value)" aria-label="Ordenar mercado">
-      <option value="mcap" ${sel('mcap')}>Market cap</option>
-      <option value="volume" ${sel('volume')}>Volumen 24h</option>
-      <option value="change" ${sel('change')}>Cambio 24h</option>
-      <option value="price" ${sel('price')}>Precio</option>
-    </select></div>`;
-  if(marketState.loading&&!marketState.loaded){
-    rows.innerHTML=bar+`<div class="state-block"><div class="spinner"></div><p>Cargando el mercado de PulseChain…</p></div>`;return;
-  }
-  if(marketState.error&&!marketState.tokens.length){
-    rows.innerHTML=bar+`<div class="state-block error"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div><h3>No se pudo cargar el mercado</h3><p>GeckoTerminal no respondió. Inténtalo de nuevo.</p><button class="btn btn-ghost" onclick="loadMarket(true)">Reintentar</button></div>`;return;
-  }
-  const list=[...marketState.tokens];
-  if(marketState.sort==='mcap')list.sort((a,b)=>b.mcap-a.mcap);
-  else if(marketState.sort==='volume')list.sort((a,b)=>b.vol24-a.vol24);
-  else if(marketState.sort==='change')list.sort((a,b)=>(b.change24==null?-1e9:b.change24)-(a.change24==null?-1e9:a.change24));
-  else list.sort((a,b)=>(b.price||0)-(a.price||0));
-  // Métricas globales del mercado.
-  const totalVol=list.reduce((s,t)=>s+(t.vol24||0),0);
-  const totalLiq=list.reduce((s,t)=>s+(t.liq||0),0);
-  const gainer=[...list].filter(t=>t.change24!=null).sort((a,b)=>b.change24-a.change24)[0];
-  const gainerHtml=gainer?`<span class="tk" style="background:${gradientFor(gainer.address)}">${gainer.logo?`<img src="${escapeHtml(gainer.logo)}" onerror="this.remove()">`:''}${escapeHtml((gainer.symbol||'?')[0].toUpperCase())}</span><span>${escapeHtml(gainer.symbol||'?')} <span class="up" style="font-size:15px">${fmtPct(gainer.change24)}</span></span>`:'—';
-  const cards=`<div class="mkt-cards">
-    <div class="mkt-card"><h5>Volumen 24h</h5><div class="v">${fmtBigUsd(totalVol)}</div></div>
-    <div class="mkt-card"><h5>Liquidez total</h5><div class="v">${fmtBigUsd(totalLiq)}</div></div>
-    <div class="mkt-card"><h5>Mayor subida 24h</h5><div class="v">${gainerHtml}</div></div>
-  </div>`;
-  const head=`<div class="mkt-head"><div class="mkt-c-rank">#</div><div>Token</div><div class="r mkt-c-price">Precio</div><div class="r">24h</div><div class="r mkt-c-vol">Volumen 24h</div><div class="r mkt-c-liq">Liquidez</div><div class="r">Market cap</div></div>`;
-  const body=list.map((t,i)=>mktRowHtml(t,i+1)).join('');
-  rows.innerHTML=bar+cards+head+body+`<div class="hist-note">Datos de mercado vía GeckoTerminal · el market cap usa FDV cuando no hay circulante. Toca un token para ver su gráfico.</div>`;
-}
 
 /* ============================================================
    HISTORIAL — calendario de transacciones (Blockscout v2)
@@ -1712,15 +1579,17 @@ function histSelectDay(key){
    PERSISTENCIA — localStorage (caché) + KV (fuente de verdad)
    ============================================================ */
 function serialize(){
-  return {wallets:state.wallets,customTokens:state.customTokens,hidden:state.hidden,
-    view:state.view,sort:state.sort,v:1};
+  return {wallets:state.wallets,customTokens:state.customTokens,
+    view:state.view,sort:state.sort,hideDust:state.hideDust,v:1};
 }
 function applyData(d){
   if(!d)return;
   state.wallets=Array.isArray(d.wallets)?d.wallets.filter(w=>isAddr(w.address)).map(w=>({address:lc(w.address),label:(w.label||'').toString().slice(0,24)})):[];
   state.customTokens=Array.isArray(d.customTokens)?d.customTokens.filter(isAddr).map(lc):[];
-  state.hidden=Array.isArray(d.hidden)?d.hidden:[];
   if(d.sort)state.sort=d.sort;
+  state.hideDust=d.hideDust===true;
+  // `d.hidden` (la lista de tokens ocultos a mano) ya no se lee: esa función
+  // se retiró y esos tokens vuelven a verse y a contar en el total.
 }
 function saveLocal(){
   try{localStorage.setItem(LS_KEY,JSON.stringify({code:state.code,data:serialize()}));}catch(e){}
@@ -1904,14 +1773,10 @@ function updateCodeBadge(){
 }
 function goHome(){if(location.pathname!=='/'){location.href='/';}}
 
-/* ---------- eventos de fila (ojo) por delegación ---------- */
+/* ---------- eventos de fila por delegación ---------- */
 $('rows').addEventListener('click',e=>{
-  const eye=e.target.closest('.eye');
-  if(eye){toggleTokenVisibility(eye.dataset.key);return;}
   const cb=e.target.closest('.chartbtn');
-  if(cb){openChart(cb.dataset.pair,cb.dataset.sym);return;}
-  const mr=e.target.closest('.mkt-row');
-  if(mr){if(mr.dataset.pair)openChart(mr.dataset.pair,mr.dataset.sym);else toast('Este token no tiene gráfico disponible');}
+  if(cb)openChart(cb.dataset.pair,cb.dataset.sym);
 });
 
 /* ============================================================
