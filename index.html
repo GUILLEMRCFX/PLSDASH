@@ -595,7 +595,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 /* ============================================================
@@ -703,8 +703,13 @@ function fmtPct(p){
 
 function toast(msg,isErr){
   const t=$('toast');
-  t.textContent=msg;
+  // Un aviso de error interrumpe; uno normal espera su turno.
+  t.setAttribute('aria-live',isErr?'assertive':'polite');
+  // La clase antes que el texto: en reposo el aviso está `visibility:hidden`,
+  // y un cambio de contenido dentro de una región oculta no se anuncia. Al
+  // hacerlo visible primero, el lector sí lee el mensaje.
   t.className='toast show'+(isErr?' err':'');
+  t.textContent=msg;
   clearTimeout(t._t);
   clearTimeout(t._limpiar);
   t._t=setTimeout(()=>{
