@@ -286,8 +286,17 @@
   .chart-foot a:hover{text-decoration:underline}
 
   /* toast */
-  .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);transition:transform .3s cubic-bezier(.2,.8,.2,1);max-width:90vw}
-  .toast.show{transform:translateX(-50%) translateY(0)}
+  /* En reposo se oculta de verdad, no se empuja fuera de la ventana. El
+     translateY(140%) de antes movía 140% de SU altura (36px) cuando había que
+     salvar `bottom` + altura + área segura: asomaban 14px del borde superior
+     por debajo de todo, en escritorio y en móvil.
+     La transición de `visibility` va con retardo al ocultar, para que el
+     deslizamiento de salida se vea entero antes de desaparecer. */
+  .toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translateX(-50%) translateY(140%);background:var(--surface-2);border:1px solid var(--line-2);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13.5px;z-index:200;box-shadow:0 12px 40px -8px rgba(0,0,0,.6);max-width:90vw;
+    visibility:hidden;opacity:0;pointer-events:none;
+    transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .3s,visibility 0s linear .3s}
+  .toast.show{transform:translateX(-50%) translateY(0);visibility:visible;opacity:1;
+    transition:transform .3s cubic-bezier(.2,.8,.2,1),opacity .3s,visibility 0s}
   .toast.err{border-color:rgba(255,92,122,.4)}
 
   /* modal */
@@ -586,7 +595,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
 /* ============================================================
@@ -694,10 +703,22 @@ function fmtPct(p){
 
 function toast(msg,isErr){
   const t=$('toast');
-  t.textContent=msg;
+  // Un aviso de error interrumpe; uno normal espera su turno.
+  t.setAttribute('aria-live',isErr?'assertive':'polite');
+  // La clase antes que el texto: en reposo el aviso está `visibility:hidden`,
+  // y un cambio de contenido dentro de una región oculta no se anuncia. Al
+  // hacerlo visible primero, el lector sí lee el mensaje.
   t.className='toast show'+(isErr?' err':'');
+  t.textContent=msg;
   clearTimeout(t._t);
-  t._t=setTimeout(()=>t.className='toast'+(isErr?' err':''),3200);
+  clearTimeout(t._limpiar);
+  t._t=setTimeout(()=>{
+    t.className='toast'+(isErr?' err':'');
+    // El texto se va cuando termina el deslizamiento de salida. Antes se
+    // quedaba dentro para siempre, y era lo que ensanchaba la pastilla que
+    // asomaba por abajo: vacía mide 38px, con un aviso dentro pasa de 100.
+    t._limpiar=setTimeout(()=>{ t.textContent=''; },320);
+  },3200);
 }
 
 /* ============================================================
