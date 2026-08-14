@@ -3,7 +3,7 @@
  *
  * Rutas (carpeta /functions): /api/portfolio/<code>
  *   GET  → devuelve la config guardada del portfolio (404 si no existe).
- *   PUT  → guarda { wallets, customTokens, hidden, ... } como JSON.
+ *   PUT  → guarda { wallets, customTokens, sort, hideDust, ... } como JSON.
  *
  * Requiere un binding de KV llamado PLSDASH_KV (ver README).
  *

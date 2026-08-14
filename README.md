@@ -13,7 +13,11 @@ direcciones públicas).
 
 - **Multi-wallet** con etiquetas (Main, Cold, …) y vistas *Combinado* / *Por wallet*.
 - **Tokens personalizados**: pega un contrato `0x…` y se valida contra DexScreener.
-- **Mostrar/ocultar** tokens (los ocultos no cuentan en el total).
+- **HIDE DUST**: esconde de la lista las posiciones que valen menos de 1 $
+  (umbral en `UMBRAL_DUST_USD`). Es por valor de la posición, no por precio
+  unitario. **Filtro de vista, nunca de contabilidad**: el total, el cambio del
+  periodo y las estadísticas se siguen calculando sobre la cartera entera, y
+  bajo la lista se dice cuánto se está escondiendo. Se recuerda entre visitas.
 - **Datos en vivo** cada 30s: balances on-chain + precios y logos oficiales.
 - **Código de portfolio (sin login)**: sincroniza entre dispositivos vía
   `plsdash.com/p/<code>`. `localStorage` es caché; **Cloudflare KV** es la
