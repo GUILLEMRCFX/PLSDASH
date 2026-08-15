@@ -143,6 +143,95 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
   cascara.frustumCulled = false;
   grupo.add(cascara);
 
+  const anillosMats = [];
+
+  // ── puntos de la malla ──
+  // Un cuadrilátero de cara a la cámara por punto, con degradado radial. Sin
+  // esto la malla se ve desnuda: son los que le dan grano y hacen que la cara
+  // de atrás se lea como profundidad y no como líneas sueltas. No codifican
+  // nada, así que pueden ser todos los que hagan falta.
+  const uTamPunto = { value: cfg.punto };
+  const matPuntos = new THREE.ShaderMaterial({
+    uniforms: { ...uniformes, uFrescura, uEnergia, uTam: uTamPunto,
+      uColor: { value: CIAN.clone() } },
+    vertexShader: /* glsl */`
+      #include <common>
+      ${UNIFORMS_DEFORMACION}
+      ${FUNCION_DEFORMACION}
+      attribute vec3 aDir;
+      attribute float aBrillo;
+      uniform float uTam;
+      varying vec2 vP;
+      varying float vB;
+      void main(){
+        vP = position.xy;
+        vB = aBrillo;
+        vec4 mv = modelViewMatrix * vec4(deformar(aDir), 1.0);
+        mv.xy += position.xy * (0.010 + aBrillo * 0.020) * uTam;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColor;
+      uniform float uFrescura;
+      uniform float uEnergia;
+      varying vec2 vP;
+      varying float vB;
+      void main(){
+        float d = length(vP) * 2.0;
+        if (d > 1.0) discard;
+        float a = pow(1.0 - d, 2.0);
+        vec3 col = mix(uColor, vec3(1.0), a * a * 0.75) * a * vB * (0.9 + uEnergia * 1.1);
+        col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
+        gl_FragColor = vec4(col, a * vB * 1.5);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  {
+    const g = new THREE.InstancedBufferGeometry();
+    const plano = new THREE.PlaneGeometry(1, 1);
+    g.index = plano.index;
+    for (const k in plano.attributes) g.setAttribute(k, plano.attributes[k]);
+    g.instanceCount = celdas.nPuntos;
+    g.setAttribute('aDir', new THREE.InstancedBufferAttribute(celdas.puntos, 3));
+    g.setAttribute('aBrillo', new THREE.InstancedBufferAttribute(celdas.brilloPunto, 1));
+    const malla = new THREE.Mesh(g, matPuntos);
+    malla.frustumCulled = false;
+    grupo.add(malla);
+  }
+
+  // ── anillos de ambiente ──
+  // Decorativos, y nada más. No orbitan nada ni miden nada: están para dar
+  // escala y aire alrededor de la esfera, como en la referencia. Van fuera del
+  // grupo para que no giren con la malla.
+  {
+    const anillos = new THREE.Group();
+    for (const [radio, inclinacion, alfa] of [[1.14, 0.05, 0.22], [1.24, -0.09, 0.14], [1.36, 0.13, 0.08]]) {
+      const pts = [];
+      const N = 128;
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2, b = ((i + 1) / N) * Math.PI * 2;
+        pts.push(Math.cos(a) * radio, 0, Math.sin(a) * radio,
+                 Math.cos(b) * radio, 0, Math.sin(b) * radio);
+      }
+      const g = new LineSegmentsGeometry();
+      g.setPositions(new Float32Array(pts));
+      const m = new LineMaterial({
+        color: 0x2ad4f0, linewidth: 1, transparent: true,
+        opacity: alfa, depthWrite: false, blending: THREE.AdditiveBlending,
+      });
+      anillosMats.push(m);
+      const l = new LineSegments2(g, m);
+      l.frustumCulled = false;
+      l.rotation.set(inclinacion, 0, inclinacion * 1.6);
+      anillos.add(l);
+    }
+    // Casi de canto: se leen como elipses finas alrededor, no como órbitas.
+    anillos.rotation.x = 1.36;
+    escena.add(anillos);
+  }
+
   // ── atmósfera ──
   // El bloom no solo ilumina la geometría: derrama luz FUERA de ella, y ese
   // halo alrededor de la silueta es la mitad del aspecto. Sin postprocesado
@@ -413,6 +502,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
     matAtmosfera.uniforms.uSilueta.value = silueta / 2.0;   // el plano mide 2 de semilado
 
     matAristas.resolution.set(ancho * dpr, alto * dpr);
+    for (const m of anillosMats) m.resolution.set(ancho * dpr, alto * dpr);
     if (composer) composer.setSize(ancho, alto);
   }
   const observador = new ResizeObserver(medir);

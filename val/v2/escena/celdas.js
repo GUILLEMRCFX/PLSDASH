@@ -127,9 +127,29 @@ export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815 } = {
   cascara.setAttribute('position', new THREE.Float32BufferAttribute(vertsCascara, 3));
   cascara.setAttribute('aTono', new THREE.Float32BufferAttribute(tonos, 1));
 
+  // Puntos de la malla: las esquinas de las celdas (los vértices de Voronoi) y
+  // los centros. Son textura, no dato — no representan nada y por eso pueden
+  // ser tantos como haga falta. Es lo que separa una malla desnuda de algo que
+  // parece tener grano.
+  const puntos = new Float32Array((centros.length + nCeldas) * 3);
+  const brilloPunto = new Float32Array(centros.length + nCeldas);
+  centros.forEach((c, i) => {
+    puntos[i * 3] = c.x; puntos[i * 3 + 1] = c.y; puntos[i * 3 + 2] = c.z;
+    // Las esquinas brillan más que los centros: marcan la estructura.
+    brilloPunto[i] = 0.55 + aleatorio() * 0.45;
+  });
+  for (let s = 0; s < nCeldas; s++) {
+    const o = centros.length + s;
+    puntos[o * 3] = semillas[s].x; puntos[o * 3 + 1] = semillas[s].y; puntos[o * 3 + 2] = semillas[s].z;
+    brilloPunto[o] = 0.12 + aleatorio() * 0.30;
+  }
+
   return {
     cascara,
     aristas: new Float32Array(aristas),
+    puntos,
+    brilloPunto,
+    nPuntos: brilloPunto.length,
     nCeldas,
     nSegmentos: aristas.length / 6,
     nTriangulos: vertsCascara.length / 9,

@@ -21,9 +21,9 @@
  * escritorio lo pone el bloom— desaparece del todo.
  */
 export const ESCALONES = {
-  alto:  { celdas: 320, dprMax: 2,   bloom: true,  grosor: 1.4, halo: 1.00, intensidad: 1.25, atmosfera: 0.34 },
-  medio: { celdas: 230, dprMax: 2,   bloom: false, grosor: 1.8, halo: 1.30, intensidad: 1.55, atmosfera: 0.55 },
-  bajo:  { celdas: 150, dprMax: 1.5, bloom: false, grosor: 2.1, halo: 1.50, intensidad: 1.70, atmosfera: 0.65 },
+  alto:  { celdas: 460, dprMax: 2,   bloom: true,  grosor: 1.3, halo: 1.00, intensidad: 1.25, atmosfera: 0.34, punto: 1.00 },
+  medio: { celdas: 320, dprMax: 2,   bloom: false, grosor: 1.7, halo: 1.30, intensidad: 1.55, atmosfera: 0.55, punto: 1.15 },
+  bajo:  { celdas: 210, dprMax: 1.5, bloom: false, grosor: 2.0, halo: 1.50, intensidad: 1.70, atmosfera: 0.65, punto: 1.30 },
 };
 
 /**
