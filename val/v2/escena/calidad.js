@@ -15,48 +15,63 @@
  */
 
 /**
- * `intensidad` y `atmosfera` compensan la falta de bloom. Sin ellas el escalón
- * sin postprocesado no parece la versión ligera, parece la versión rota.
+ * Los escalones ya NO cambian el aspecto, solo el coste.
  *
- * `celdasFinas` es la retícula secundaria: un segundo Voronoi mucho más denso
- * que se dibuja tenue por debajo. Los tres niveles de línea —fina, principal y
- * la cadena naranja— son la mitad del efecto; con todas al mismo grosor y
- * brillo la esfera se lee plana.
+ * Antes había dos familias —una con bloom y otra compensando su ausencia— y
+ * eso abría una brecha entre escritorio y móvil por construcción. Al quitar el
+ * postprocesado (se ve mejor sin él: ver el comentario en esfera.js) todos
+ * usan la misma técnica, y lo único que varía es cuánta geometría se dibuja y
+ * a qué resolución.
+ *
+ * `grosor`, `halo` y `punto` sí siguen subiendo en los escalones pequeños,
+ * pero no por el bloom: en una pantalla de 390px la esfera ocupa muchos menos
+ * píxeles, y una línea de 1,3px que en escritorio se lee bien allí sería un
+ * pelo. Es corrección de tamaño, no de técnica.
  */
 export const ESCALONES = {
   alto:  { celdas: 620, celdasFinas: 1700, puntosInterior: 1500, dprMax: 2,
-           bloom: true,  grosor: 1.35, grosorFino: 0.7, ganFina: 0.30,
-           halo: 1.00, intensidad: 1.25, atmosfera: 0.10, punto: 1.00 },
+           bloom: false, grosor: 1.35, grosorFino: 0.7, ganFina: 0.30,
+           halo: 1.00, intensidad: 1.50, atmosfera: 0.18, punto: 1.00 },
   medio: { celdas: 430, celdasFinas: 1100, puntosInterior: 950, dprMax: 2,
            bloom: false, grosor: 1.60, grosorFino: 0.8, ganFina: 0.32,
-           halo: 1.30, intensidad: 1.55, atmosfera: 0.18, punto: 1.15 },
+           halo: 1.30, intensidad: 1.60, atmosfera: 0.20, punto: 1.15 },
   bajo:  { celdas: 300, celdasFinas: 700,  puntosInterior: 550, dprMax: 1.5,
            bloom: false, grosor: 1.90, grosorFino: 0.9, ganFina: 0.34,
            halo: 1.50, intensidad: 1.70, atmosfera: 0.22, punto: 1.30 },
 };
 
 /**
- * Sin bloom, el resplandor lo tiene que poner la propia arista. Por eso los
- * escalones bajos llevan la línea más gruesa y el halo más ancho: es lo que
- * evita que móvil parezca la versión rota en vez de la versión ligera.
+ * Escalón inicial.
+ *
+ * Lo que cuesta aquí es rellenar píxeles, no calcular: la escena es geometría
+ * pequeña con mucho solape aditivo. Por eso la decisión se toma sobre el
+ * TAMAÑO y la DENSIDAD de la pantalla, no sobre el número de núcleos de CPU
+ * —que es un indicador pésimo de la GPU y dejaba en `medio` a cualquier
+ * escritorio de cuatro núcleos con tarjeta de sobra—.
+ *
+ * Si se acaba eligiendo demasiado alto, el vigilante lo corrige en marcha.
  */
 export function elegirEscalon() {
-  if (typeof navigator === 'undefined') return 'medio';
+  if (typeof window === 'undefined') return 'medio';
 
-  const dpr = window.devicePixelRatio || 1;
-  const ancho = Math.min(window.innerWidth, window.innerHeight);
-  const nucleos = navigator.hardwareConcurrency || 4;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const corto = Math.min(window.innerWidth, window.innerHeight);
+  const largo = Math.max(window.innerWidth, window.innerHeight);
   // `deviceMemory` no existe en Safari; su ausencia no se interpreta como poca.
   const memoria = navigator.deviceMemory || 8;
 
-  if (ancho < 480 || memoria <= 4 || nucleos <= 4) {
-    // Pantalla de móvil y densidad alta es la combinación más cara que hay:
-    // el área a rellenar crece con el cuadrado del dpr.
-    return (dpr >= 3 && nucleos <= 4) ? 'bajo' : 'medio';
-  }
-  if (ancho < 900) return 'medio';
+  // Móvil. Se evita apoyarse en `deviceMemory`: Safari no lo implementa, así
+  // que en un iPhone —el aparato para el que existe el escalón bajo— nunca
+  // dispararía y `bajo` quedaría inalcanzable. Se decide por tamaño, que sí es
+  // fiable, y lo demás lo corrige el vigilante midiendo fotogramas de verdad
+  // en vez de adivinando el aparato.
+  if (corto < 380) return 'bajo';
+  if (corto < 480) return 'medio';
+  if (corto < 700 || largo < 900) return 'medio';
+  if (memoria <= 4) return 'medio';
   return 'alto';
 }
+
 
 /**
  * Mide el tiempo de fotograma y degrada si no llega. Ignora los primeros

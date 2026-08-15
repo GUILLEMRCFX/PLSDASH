@@ -35,10 +35,6 @@ import * as THREE from '../vendor/three.module.js';
 import { LineSegments2 } from '../vendor/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from '../vendor/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/jsm/lines/LineMaterial.js';
-import { EffectComposer } from '../vendor/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from '../vendor/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from '../vendor/jsm/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from '../vendor/jsm/postprocessing/OutputPass.js';
 
 import { construirCeldas, campoInterior } from './celdas.js';
 import { ESCALONES, elegirEscalon, Vigilante } from './calidad.js';
@@ -103,9 +99,13 @@ function instanciar(base, n) {
   return g;
 }
 
-export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
+export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null } = {}) {
   const nombreEscalon = escalon || elegirEscalon();
   let cfg = { ...ESCALONES[nombreEscalon] };
+  // `bloom` fuerza el postprocesado con independencia del escalón. Existe para
+  // poder comparar la misma pantalla con y sin él y medir cuánta diferencia
+  // hace de verdad, que es la única forma de decidir si en móvil compensa.
+  if (bloom !== null) cfg.bloom = !!bloom;
   const reducido = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
 
   // ─────────────────────────────────────────────── renderer y escena
@@ -475,22 +475,43 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
   }
 
   // ─────────────────────────────────────────────── postprocesado
-  let composer = null, bloom = null;
-  function montarBloom() {
+  //
+  // APAGADO EN TODOS LOS ESCALONES, y no por rendimiento: se ve peor.
+  //
+  // El bloom tenía sentido cuando las primitivas eran planas. Desde que cada
+  // arista lleva su degradado y cada punto su núcleo con halo, el
+  // postprocesado vuelve a difuminar lo que ya brillaba y el resultado es
+  // lechoso: medido a 1440 y a 390, el brillo medio pasa de 19 a 59 y el área
+  // de halo del 12% al 78%. El negro entre las celdas se vuelve gris, los
+  // puntos se disuelven y los aros naranjas viran a blanco.
+  //
+  // El efecto secundario bueno es que escritorio y móvil pasan a usar
+  // exactamente la misma técnica, así que la brecha entre ambos desaparece de
+  // raíz en vez de compensarse.
+  //
+  // El camino se deja montado y accesible con `bloom: true` (o `?bloom=1`)
+  // para poder volver a mirarlo, pero los módulos se cargan solo si se pide:
+  // así no se descargan los ~28 KB del postprocesado en el caso normal.
+  let composer = null, pasoBloom = null;
+  async function montarBloom() {
     if (composer) return;
+    const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = await Promise.all([
+      import('../vendor/jsm/postprocessing/EffectComposer.js'),
+      import('../vendor/jsm/postprocessing/RenderPass.js'),
+      import('../vendor/jsm/postprocessing/UnrealBloomPass.js'),
+      import('../vendor/jsm/postprocessing/OutputPass.js'),
+    ]);
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(escena, camara));
-    // Umbral alto: el bloom es una capa de más sobre lo que ya brilla, no lo
-    // que crea el aspecto. Si baja, la escena entera florece y móvil —que no
-    // lo tiene— pasa a parecer la versión rota.
-    bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.34, 0.55, 0.62);
-    composer.addPass(bloom);
+    pasoBloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.34, 0.55, 0.62);
+    composer.addPass(pasoBloom);
     composer.addPass(new OutputPass());
+    composer.setSize(ancho, alto);
   }
   function desmontarBloom() {
     if (!composer) return;
     composer.dispose?.();
-    composer = null; bloom = null;
+    composer = null; pasoBloom = null;
   }
   if (cfg.bloom) montarBloom();
 
@@ -600,8 +621,11 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
   // ─────────────────────────────────────────────── bucle
   const vigilante = new Vigilante(() => degradar());
   function degradar() {
-    if (cfg.bloom) { cfg.bloom = false; desmontarBloom(); return true; }
-    if (cfg.dprMax > 1.25) { cfg.dprMax = Math.max(1.25, cfg.dprMax - 0.5); medir(); return true; }
+    // Sin bloom que apagar, lo único barato que queda es bajar la resolución.
+    // La geometría no se toca: rehacerla a mitad de sesión daría un tirón y
+    // cambiaría el dibujo de las celdas delante del usuario.
+    if (composer) { desmontarBloom(); return true; }
+    if (cfg.dprMax > 1.0) { cfg.dprMax = Math.max(1.0, cfg.dprMax - 0.25); medir(); return true; }
     return false;
   }
 
