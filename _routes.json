@@ -1,5 +1,15 @@
 {
   "version": 1,
-  "include": ["/", "/index.html", "/val", "/val/*", "/api/*"],
-  "exclude": []
+  "include": [
+    "/",
+    "/index.html",
+    "/val",
+    "/val/*",
+    "/api/*"
+  ],
+  "exclude": [
+    "/val/v2/vendor/*",
+    "/val/v2/escena/*",
+    "/val/v2/datos-falsos.js"
+  ]
 }
