@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>PLSDASH · núcleo</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  :root{ --fondo:#03070f; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--fondo);color:#7fd4ea;
+    font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    overflow:hidden;
+  }
+  /* Un halo muy tenue detrás del lienzo: separa la esfera del negro puro sin
+     competir con ella. */
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:radial-gradient(58% 52% at 50% 46%,rgba(10,44,66,.13),transparent 72%);
+  }
+  #escena{
+    position:fixed;inset:0;z-index:1;
+    /* La esfera se lleva el gesto entero: aquí no hay nada que desplazar.
+       Cuando esté dentro del panel habrá que revisarlo. */
+    touch-action:none;
+  }
+  #escena canvas{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+<div id="escena"></div>
+
+<script type="importmap">
+{ "imports": { "three": "/val/v2/vendor/three.module.js" } }
+</script>
+
+<script type="module">
+  import { crearEsfera } from './escena/esfera.js';
+  import { estadoFalso } from './datos-falsos.js';
+
+  // El parámetro ?escalon= fuerza un escalón de calidad, para poder comparar
+  // la versión con bloom y la de móvil en la misma máquina.
+  const forzado = new URLSearchParams(location.search).get('escalon');
+  const nFalsos = Number(new URLSearchParams(location.search).get('n')) || undefined;
+
+  const esfera = crearEsfera(document.getElementById('escena'), {
+    escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
+  });
+
+  // Los datos entran por la puerta de siempre. La esfera no sabe que son
+  // inventados, y cuando dejen de serlo no habrá que tocarla.
+  esfera.actualizar(estadoFalso(nFalsos));
+
+  window.__esfera = esfera;
+</script>
+</body>
+</html>
