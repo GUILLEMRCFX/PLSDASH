@@ -15,15 +15,24 @@
  */
 
 /**
- * `intensidad` y `atmosfera` son la compensación por no tener bloom. Sin ellas
- * el escalón sin postprocesado no parece la versión ligera, parece la versión
- * rota: las aristas se quedan en un gris fino y el halo de la silueta —que en
- * escritorio lo pone el bloom— desaparece del todo.
+ * `intensidad` y `atmosfera` compensan la falta de bloom. Sin ellas el escalón
+ * sin postprocesado no parece la versión ligera, parece la versión rota.
+ *
+ * `celdasFinas` es la retícula secundaria: un segundo Voronoi mucho más denso
+ * que se dibuja tenue por debajo. Los tres niveles de línea —fina, principal y
+ * la cadena naranja— son la mitad del efecto; con todas al mismo grosor y
+ * brillo la esfera se lee plana.
  */
 export const ESCALONES = {
-  alto:  { celdas: 460, dprMax: 2,   bloom: true,  grosor: 1.3, halo: 1.00, intensidad: 1.25, atmosfera: 0.34, punto: 1.00 },
-  medio: { celdas: 320, dprMax: 2,   bloom: false, grosor: 1.7, halo: 1.30, intensidad: 1.55, atmosfera: 0.55, punto: 1.15 },
-  bajo:  { celdas: 210, dprMax: 1.5, bloom: false, grosor: 2.0, halo: 1.50, intensidad: 1.70, atmosfera: 0.65, punto: 1.30 },
+  alto:  { celdas: 620, celdasFinas: 1700, puntosInterior: 1500, dprMax: 2,
+           bloom: true,  grosor: 1.35, grosorFino: 0.7, ganFina: 0.30,
+           halo: 1.00, intensidad: 1.25, atmosfera: 0.10, punto: 1.00 },
+  medio: { celdas: 430, celdasFinas: 1100, puntosInterior: 950, dprMax: 2,
+           bloom: false, grosor: 1.60, grosorFino: 0.8, ganFina: 0.32,
+           halo: 1.30, intensidad: 1.55, atmosfera: 0.18, punto: 1.15 },
+  bajo:  { celdas: 300, celdasFinas: 700,  puntosInterior: 550, dprMax: 1.5,
+           bloom: false, grosor: 1.90, grosorFino: 0.9, ganFina: 0.34,
+           halo: 1.50, intensidad: 1.70, atmosfera: 0.22, punto: 1.30 },
 };
 
 /**
