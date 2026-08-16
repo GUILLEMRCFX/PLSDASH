@@ -12,23 +12,31 @@
  *     frescura: 0..1,
  *   })
  *
- * Las POSICIONES DE LOS NODOS NO VIENEN DE LOS DATOS. Se reparten en espiral
- * de Fibonacci a partir del índice, y son deliberadamente arbitrarias: los
- * validadores corren todos en la misma máquina, así que cualquier posición que
- * pareciera significar algo estaría mintiendo. Lo que sí codifican es tamaño y
- * brillo, que salen de los datos.
- *
  * ## Las capas, de dentro a fuera
  *
  *   campo interior   cientos de puntos DENTRO del volumen → profundidad
  *   malla fina       retícula secundaria, muy tenue       → fondo
- *   cáscara          celdas translúcidas                  → volumen
+ *   cáscara          caras translúcidas                   → volumen
  *   malla principal  la retícula marcada                  → estructura
- *   vértices         puntos con su propio halo            → grano y resplandor
+ *   vértices         puntos con núcleo duro               → grano y resplandor
  *   cadena + nodos   los validadores, en naranja          → lo único con dato
  *
  * La jerarquía entre los tres niveles de línea es la mitad del efecto: con
  * todas al mismo grosor y brillo la esfera se lee plana.
+ *
+ * ## Dos geometrías intercambiables
+ *
+ * `setGeometria('voronoi' | 'geodesica')` cambia SOLO la malla; el campo
+ * interior, los nodos, la cadena y el resplandor son los mismos en las dos.
+ * Es provisional, para poder decidir mirándolas en vez de imaginándolas.
+ *
+ * ## Sobre el grosor de las líneas
+ *
+ * `LineSegments2` NO usa el `gl.lineWidth` de WebGL, que efectivamente se
+ * ignora y siempre da un píxel. Construye un quad indexado por segmento
+ * (`LineSegmentsGeometry`) y lo expande en espacio de pantalla desde el vertex
+ * shader, así que `linewidth` es un uniform propio en píxeles CSS y el grosor
+ * es real y controlable. Sigue siendo una llamada de dibujo por malla.
  */
 
 import * as THREE from '../vendor/three.module.js';
@@ -36,17 +44,19 @@ import { LineSegments2 } from '../vendor/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from '../vendor/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/jsm/lines/LineMaterial.js';
 
-import { construirCeldas, campoInterior } from './celdas.js';
+import { construirCeldas, construirGeodesica, campoInterior } from './celdas.js';
 import { ESCALONES, elegirEscalon, Vigilante } from './calidad.js';
 import { crearUniformsDeformacion, inyectar, UNIFORMS_DEFORMACION, FUNCION_DEFORMACION } from './deformacion.js';
 
 const CIAN     = new THREE.Color(0x2ad4f0);
 const CIAN_OSC = new THREE.Color(0x0b4a68);
 const NARANJA  = new THREE.Color(0xff8a3d);
-const FONDO    = 0x03070f;
+// Negro puro. Cualquier gris azulado de fondo se come el contraste justo donde
+// la nitidez se juega: entre las celdas.
+const FONDO    = 0x000000;
 
 /** Direcciones repartidas por la esfera. Arbitrarias a propósito. */
-function direccionesNodos(n) {
+function direccionesFibonacci(n) {
   const out = [];
   const phi = Math.PI * (1 + Math.sqrt(5));
   for (let i = 0; i < n; i++) {
@@ -62,6 +72,28 @@ function direccionesNodos(n) {
 }
 
 /**
+ * Las mismas direcciones, pero clavadas en el vértice más cercano de la malla.
+ * Así el nodo se apoya en la estructura en vez de flotar sobre ella. Se
+ * descartan los repetidos: con subdivisión suficiente sobran vértices para
+ * muchos más de diez validadores, así que el recuento nunca se ve limitado.
+ */
+function ajustarAVertices(dirs, vertices) {
+  const usados = new Set();
+  const n = vertices.length / 3;
+  return dirs.map(d => {
+    let mejor = -2, mejorId = -1;
+    for (let i = 0; i < n; i++) {
+      if (usados.has(i)) continue;
+      const p = d.x * vertices[i * 3] + d.y * vertices[i * 3 + 1] + d.z * vertices[i * 3 + 2];
+      if (p > mejor) { mejor = p; mejorId = i; }
+    }
+    if (mejorId < 0) return d.clone();
+    usados.add(mejorId);
+    return new THREE.Vector3(vertices[mejorId * 3], vertices[mejorId * 3 + 1], vertices[mejorId * 3 + 2]);
+  });
+}
+
+/**
  * Los números de los nodos, dibujados una vez en un canvas y usados como
  * atlas. Cada instancia toma su casilla según su índice, así que los N anillos
  * numerados se pintan en UNA llamada de dibujo. La alternativa —un sprite con
@@ -70,23 +102,26 @@ function direccionesNodos(n) {
 function atlasNumeros(n) {
   const COL = Math.max(1, Math.ceil(Math.sqrt(n)));
   const FIL = Math.max(1, Math.ceil(n / COL));
-  const S = 64;
+  // 128 y no 64: el número se amplía bastante en pantalla y a 64 el borde
+  // llegaba blando. Es el mismo coste de subida, una sola vez.
+  const S = 128;
   const cv = document.createElement('canvas');
   cv.width = COL * S; cv.height = FIL * S;
   const g = cv.getContext('2d');
   g.clearRect(0, 0, cv.width, cv.height);
   g.fillStyle = '#ffffff';
-  g.font = '700 34px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.font = '700 68px ui-monospace, SFMono-Regular, Menlo, monospace';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   for (let i = 0; i < n; i++) {
     const c = i % COL, f = Math.floor(i / COL);
-    g.fillText(String(i + 1).padStart(2, '0'), c * S + S / 2, f * S + S / 2 + 1);
+    g.fillText(String(i + 1).padStart(2, '0'), c * S + S / 2, f * S + S / 2 + 2);
   }
   const tex = new THREE.CanvasTexture(cv);
   tex.minFilter = THREE.LinearFilter;
   tex.magFilter = THREE.LinearFilter;
   tex.generateMipmaps = false;
+  tex.anisotropy = 1;
   return { tex, COL, FIL };
 }
 
@@ -99,24 +134,24 @@ function instanciar(base, n) {
   return g;
 }
 
-export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null } = {}) {
+export function crearEsfera(contenedor, { escalon = null, semilla, geometria = 'voronoi' } = {}) {
   const nombreEscalon = escalon || elegirEscalon();
-  let cfg = { ...ESCALONES[nombreEscalon] };
-  // `bloom` fuerza el postprocesado con independencia del escalón. Existe para
-  // poder comparar la misma pantalla con y sin él y medir cuánta diferencia
-  // hace de verdad, que es la única forma de decidir si en móvil compensa.
-  if (bloom !== null) cfg.bloom = !!bloom;
+  const cfg = { ...ESCALONES[nombreEscalon] };
   const reducido = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
 
   // ─────────────────────────────────────────────── renderer y escena
   const renderer = new THREE.WebGLRenderer({
-    antialias: nombreEscalon !== 'bajo',
+    // Siempre activo, también en el escalón bajo. Sin postprocesado se dibuja
+    // directamente al framebuffer por defecto, que es justo donde el MSAA
+    // funciona — y es lo que quita los escalones de las siluetas. Es de lo más
+    // barato que se puede comprar en nitidez.
+    antialias: true,
     powerPreference: 'high-performance',
     alpha: false,
+    stencil: false,
+    depth: true,
   });
   renderer.setClearColor(FONDO, 1);
-  // ACES hace que lo muy brillante caiga a blanco en vez de recortarse en cian
-  // plano. Es la mitad del resplandor que no pone el bloom.
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   contenedor.appendChild(renderer.domElement);
@@ -127,66 +162,53 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
   const grupo = new THREE.Group();
   escena.add(grupo);
 
-  const uniformes = crearUniformsDeformacion(THREE);
+  const uniformes = crearUniformsDeformacion();
   uniformes.uRespiracion.value = reducido ? 0 : 1;
   const uFrescura = { value: 1 };
   const uEnergia  = { value: 0.5 };
-  const materialesLinea = [];              // para repartirles `resolution`
+  const materialesLinea = [];
 
-  // ─────────────────────────────────────────────── geometría
-  const celdas = construirCeldas(THREE, { nCeldas: cfg.celdas, semilla, variacion: 1 });
-  // La malla fina es un segundo Voronoi independiente, mucho más denso. Que
-  // sea otro y no una subdivisión del primero es lo que impide que las dos
-  // retículas rimen y acaben leyéndose como una sola.
-  const fina = construirCeldas(THREE, {
-    nCeldas: cfg.celdasFinas, semilla: (semilla || 20260815) + 7717, variacion: 0.75,
-  });
-  const campo = campoInterior(cfg.puntosInterior);
+  // ─────────────────────────────────────────────── materiales
+  function materialCascara() {
+    return new THREE.ShaderMaterial({
+      uniforms: { ...uniformes, uFrescura, uEnergia, uColor: { value: CIAN_OSC.clone() } },
+      vertexShader: /* glsl */`
+        #include <common>
+        ${UNIFORMS_DEFORMACION}
+        ${FUNCION_DEFORMACION}
+        attribute float aTono;
+        varying float vTono; varying float vBorde;
+        void main(){
+          vTono = aTono;
+          vec3 p = deformar(position);
+          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          vec3 nVista = normalize(normalMatrix * normalize(p));
+          vBorde = 1.0 - abs(dot(nVista, normalize(-mv.xyz)));
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: /* glsl */`
+        uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
+        varying float vTono; varying float vBorde;
+        void main(){
+          float borde = pow(vBorde, 3.0);
+          float matiz = 0.55 + vTono * 0.45;
+          // Muy tenue: la cáscara insinúa volumen y enciende la silueta. Si
+          // aporta de más, el negro entre celdas deja de ser negro y toda la
+          // nitidez se va con él.
+          vec3 col = uColor * matiz * (0.004 + borde * 0.20) * (0.5 + uEnergia * 0.7);
+          col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
+          gl_FragColor = vec4(col, 1.0);
+        }`,
+      transparent: true, depthWrite: false,
+      blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    });
+  }
 
-  // ── cáscara translúcida ──
-  // Aditiva y sin escribir profundidad: las caras de atrás SUMAN luz a las de
-  // delante en vez de quedar ocultas. Eso da la translucidez sin pagar
-  // transparencia real, que sería mucho más cara.
-  const matCascara = new THREE.ShaderMaterial({
-    uniforms: { ...uniformes, uFrescura, uEnergia, uColor: { value: CIAN_OSC.clone() } },
-    vertexShader: /* glsl */`
-      #include <common>
-      ${UNIFORMS_DEFORMACION}
-      ${FUNCION_DEFORMACION}
-      attribute float aTono;
-      varying float vTono;
-      varying float vBorde;
-      void main(){
-        vTono = aTono;
-        vec3 p = deformar(position);
-        vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        vec3 nVista = normalize(normalMatrix * normalize(p));
-        vBorde = 1.0 - abs(dot(nVista, normalize(-mv.xyz)));
-        gl_Position = projectionMatrix * mv;
-      }`,
-    fragmentShader: /* glsl */`
-      uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
-      varying float vTono; varying float vBorde;
-      void main(){
-        float borde = pow(vBorde, 2.6);
-        float matiz = 0.55 + vTono * 0.45;
-        vec3 col = uColor * matiz * (0.006 + borde * 0.22) * (0.5 + uEnergia * 0.7);
-        col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
-        gl_FragColor = vec4(col, 1.0);
-      }`,
-    transparent: true, depthWrite: false,
-    blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-  });
-  const cascara = new THREE.Mesh(celdas.cascara, matCascara);
-  cascara.frustumCulled = false;
-  grupo.add(cascara);
-
-  // ── puntos ──
-  // El mismo material sirve para el campo interior y para los vértices de la
-  // retícula. Cada punto lleva núcleo duro Y halo ancho en el mismo
-  // cuadrilátero: eso es un bloom por punto, en la misma pasada, y es de donde
-  // sale el resplandor. Antes lo ponía un aro uniforme pegado al contorno, y
-  // se notaba postizo.
+  /**
+   * Puntos: núcleo DURO con borde de un par de píxeles y un halo corto detrás.
+   * La versión anterior era una caída exponencial desde el centro y se leía
+   * como mancha difusa; esto se lee como punto.
+   */
   function materialPuntos(color, tamBase, tamVar, ganancia) {
     return new THREE.ShaderMaterial({
       uniforms: { ...uniformes, uFrescura, uEnergia,
@@ -202,12 +224,10 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
         varying vec2 vP; varying float vB;
         void main(){
           vP = position.xy; vB = aBrillo;
-          // El campo interior no está sobre la superficie, así que se deforma
-          // su dirección y se conserva el radio: la nube acompaña al bulto sin
-          // salirse del volumen.
+          // El campo interior no está sobre la superficie: se deforma su
+          // dirección y se conserva el radio, así la nube no se sale.
           float radio = length(aDir);
-          vec3 p = deformar(aDir) * radio;
-          vec4 mv = modelViewMatrix * vec4(p, 1.0);
+          vec4 mv = modelViewMatrix * vec4(deformar(aDir) * radio, 1.0);
           mv.xy += position.xy * (uBase + aBrillo * uVar) * uTam;
           gl_Position = projectionMatrix * mv;
         }`,
@@ -217,10 +237,11 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
         void main(){
           float d = length(vP) * 2.0;
           if (d > 1.0) discard;
-          float nucleo = pow(1.0 - d, 2.4);
-          float halo   = exp(-d * 2.6) * 0.30;
+          // Disco sólido con caída corta: núcleo, no mancha.
+          float nucleo = 1.0 - smoothstep(0.30, 0.46, d);
+          float halo   = exp(-d * 3.6) * 0.20;
           float i = nucleo + halo;
-          vec3 col = mix(uColor, vec3(1.0), nucleo * nucleo * 0.8) * vB * uGan * (0.7 + uEnergia * 0.8);
+          vec3 col = mix(uColor, vec3(1.0), nucleo * 0.45) * vB * uGan * (0.75 + uEnergia * 0.75);
           col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
           gl_FragColor = vec4(col, i * vB * uGan);
         }`,
@@ -228,21 +249,6 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
     });
   }
 
-  const planoUnidad = new THREE.PlaneGeometry(1, 1);
-  function nube(pos, brillo, material) {
-    const g = instanciar(planoUnidad, brillo.length);
-    g.setAttribute('aDir', new THREE.InstancedBufferAttribute(pos, 3));
-    g.setAttribute('aBrillo', new THREE.InstancedBufferAttribute(brillo, 1));
-    const m = new THREE.Mesh(g, material);
-    m.frustumCulled = false;
-    grupo.add(m);
-    return m;
-  }
-
-  // Campo interior: la pieza que quita la sensación de cáscara hueca.
-  nube(campo.pos, campo.brillo, materialPuntos(CIAN, 0.006, 0.020, 0.85));
-
-  // ── líneas, en tres niveles ──
   function materialLinea(color, grosor, ganancia) {
     const m = new LineMaterial({
       color: 0xffffff, linewidth: grosor,
@@ -252,9 +258,6 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
       uCian: { value: color.clone() },
       uIntensidad: { value: cfg.intensidad * ganancia } });
 
-    // La deformación se aplica a los DOS extremos. Como `deformar` es función
-    // pura de la posición en reposo, dos aristas que comparten vértice siguen
-    // unidas sin guardar ninguna adyacencia.
     m.vertexShader = inyectar(m.vertexShader)
       .replace('vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );',
                'vec4 start = modelViewMatrix * vec4( deformar(instanceStart), 1.0 );')
@@ -266,43 +269,93 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
         uniform float uFrescura; uniform float uEnergia; uniform float uIntensidad;
         uniform vec3 uCian;`)
       .replace('gl_FragColor = vec4( diffuseColor.rgb, alpha );',
+        // Núcleo estrecho y duro: el quad es más ancho que la línea visible, y
+        // esa banda de más es la que antialía el borde por sí sola. Subir el
+        // exponente afina la línea sin adelgazar el quad, que es lo que la
+        // deja limpia en vez de gris.
         `float d = abs(vUv.y);
-         float nucleo = exp(-d * d * 6.0);
-         float halo   = exp(-d * 2.1) * 0.30;
-         vec3 col = mix(uCian, vec3(1.0), nucleo * 0.32) * (0.6 + uEnergia * 0.7);
+         float nucleo = exp(-d * d * 11.0);
+         float halo   = exp(-d * 2.6) * 0.20;
+         // El centro casi a blanco: una línea estrecha y muy brillante se lee
+         // afilada; una estrecha y tenue se lee simplemente débil.
+         vec3 col = mix(uCian, vec3(1.0), nucleo * 0.24) * (0.6 + uEnergia * 0.7);
          col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
-         gl_FragColor = vec4(col, alpha * (nucleo + halo) * 0.85 * uIntensidad);`);
+         gl_FragColor = vec4(col, alpha * (nucleo + halo) * uIntensidad);`);
     materialesLinea.push(m);
     return m;
   }
 
-  function malla(posiciones, material, orden = 0) {
+  const planoUnidad = new THREE.PlaneGeometry(1, 1);
+  const matCascara  = materialCascara();
+  const matFina     = materialLinea(CIAN, cfg.grosorFino, cfg.ganFina);
+  const matPrincipal= materialLinea(CIAN, cfg.grosor, 1);
+  const matVertices = materialPuntos(CIAN, 0.0075, 0.014, 1.45);
+  const matCampo    = materialPuntos(CIAN, 0.005, 0.015, 0.62);
+  const matCadena   = materialLinea(NARANJA, cfg.grosor * 1.25, 1.75);
+
+  function nube(pos, brillo, material, destino) {
+    const g = instanciar(planoUnidad, brillo.length);
+    g.setAttribute('aDir', new THREE.InstancedBufferAttribute(pos, 3));
+    g.setAttribute('aBrillo', new THREE.InstancedBufferAttribute(brillo, 1));
+    const m = new THREE.Mesh(g, material);
+    m.frustumCulled = false;
+    destino.add(m);
+    return m;
+  }
+
+  function malla(posiciones, material, destino) {
     const g = new LineSegmentsGeometry();
     g.setPositions(posiciones);
     const l = new LineSegments2(g, material);
     l.frustumCulled = false;
-    l.renderOrder = orden;
-    grupo.add(l);
+    destino.add(l);
     return l;
   }
 
-  // Nivel 2 — malla fina de fondo. Muy tenue: su trabajo es que se perciba
-  // estructura por debajo de la retícula marcada, no competir con ella.
-  malla(fina.aristas, materialLinea(CIAN, cfg.grosorFino, cfg.ganFina));
-  // Nivel 1 — retícula principal.
-  malla(celdas.aristas, materialLinea(CIAN, cfg.grosor, 1));
+  // ─────────────────────────────────────────────── las dos mallas
+  //
+  // Se construyen las dos al arrancar y se alterna la visibilidad. Cuesta unas
+  // decenas de milisegundos más al cargar, pero el cambio es instantáneo, que
+  // es justo lo que hace falta para poder compararlas.
+  function montarMalla(datos) {
+    const g = new THREE.Group();
+    malla(datos.aristasFinas, matFina, g);       // nivel 2, fondo
+    g.add(Object.assign(new THREE.Mesh(datos.cascara, matCascara), { frustumCulled: false }));
+    malla(datos.aristas, matPrincipal, g);       // nivel 1, estructura
+    nube(datos.puntos, datos.brilloPunto, matVertices, g);
+    grupo.add(g);
+    return g;
+  }
 
-  // Vértices de la retícula, con su halo.
-  nube(celdas.puntos, celdas.brilloPunto, materialPuntos(CIAN, 0.009, 0.017, 1.25));
+  const vor = construirCeldas(THREE, { nCeldas: cfg.celdas, semilla, variacion: 1 });
+  const vorFina = construirCeldas(THREE, {
+    nCeldas: cfg.celdasFinas, semilla: (semilla || 20260815) + 7717, variacion: 0.75,
+  });
+  const geo = construirGeodesica(THREE, { detalle: cfg.geoDetalle, semilla });
+  const geoFina = construirGeodesica(THREE, { detalle: cfg.geoDetalleFino, semilla: (semilla || 20260815) + 31 });
+
+  const MALLAS = {
+    voronoi:   { ...vor, aristasFinas: vorFina.aristas, nSegmentosFinos: vorFina.nSegmentos, vertices: null },
+    geodesica: { ...geo, aristasFinas: geoFina.aristas, nSegmentosFinos: geoFina.nSegmentos },
+  };
+
+  const grupos = {
+    voronoi:   montarMalla(MALLAS.voronoi),
+    geodesica: montarMalla(MALLAS.geodesica),
+  };
+
+  let tipo = (geometria === 'geodesica') ? 'geodesica' : 'voronoi';
+
+  // Campo interior: común a las dos, fuera de los grupos conmutables.
+  const campo = campoInterior(cfg.puntosInterior);
+  nube(campo.pos, campo.brillo, matCampo, grupo);
 
   // ── atmósfera ──
-  // Queda muy floja a propósito. Antes hacía todo el resplandor y se notaba:
-  // un aro azul uniforme pegado al contorno. Ahora el brillo lo ponen los
-  // puntos, y esto solo asienta la silueta sobre el fondo.
-  const uAtmosfera = { value: cfg.atmosfera };
+  // Muy floja: el resplandor lo ponen los puntos y las aristas. Esto solo
+  // asienta la silueta, y de más lavaría el negro del fondo.
   const matAtmosfera = new THREE.ShaderMaterial({
-    uniforms: { uAtmosfera, uFrescura, uEnergia, uColor: { value: CIAN.clone() },
-      uSilueta: { value: 0.545 } },
+    uniforms: { uAtmosfera: { value: cfg.atmosfera }, uFrescura, uEnergia,
+      uColor: { value: CIAN.clone() }, uSilueta: { value: 0.545 } },
     vertexShader: /* glsl */`
       varying vec2 vP;
       void main(){
@@ -317,8 +370,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
       varying vec2 vP;
       void main(){
         float r = length(vP);
-        float dentro = smoothstep(uSilueta - 0.055, uSilueta - 0.005, r);
-        float fuera  = exp(-pow(max(0.0, r - uSilueta) / 0.10, 2.0));
+        float dentro = smoothstep(uSilueta - 0.05, uSilueta - 0.005, r);
+        float fuera  = exp(-pow(max(0.0, r - uSilueta) / 0.07, 2.0));
         float g = dentro * fuera * uAtmosfera * (0.45 + uEnergia * 0.75);
         vec3 col = uColor * g;
         col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
@@ -335,9 +388,9 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
   // ── anillos de ambiente ──
   {
     const anillos = new THREE.Group();
-    for (const [radio, inclinacion, alfa] of [[1.14, 0.05, 0.16], [1.24, -0.09, 0.10], [1.36, 0.13, 0.06]]) {
+    for (const [radio, inclinacion, alfa] of [[1.14, 0.05, 0.14], [1.24, -0.09, 0.09], [1.36, 0.13, 0.05]]) {
       const pts = [];
-      const N = 128;
+      const N = 160;
       for (let i = 0; i < N; i++) {
         const a = (i / N) * Math.PI * 2, b = ((i + 1) / N) * Math.PI * 2;
         pts.push(Math.cos(a) * radio, 0, Math.sin(a) * radio,
@@ -345,7 +398,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
       }
       const g = new LineSegmentsGeometry();
       g.setPositions(new Float32Array(pts));
-      const m = new LineMaterial({ color: 0x2ad4f0, linewidth: 1, transparent: true,
+      const m = new LineMaterial({ color: 0x2ad4f0, linewidth: 0.9, transparent: true,
         opacity: alfa, depthWrite: false, blending: THREE.AdditiveBlending });
       materialesLinea.push(m);
       const l = new LineSegments2(g, m);
@@ -359,15 +412,13 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
 
   // ─────────────────────────────────────────── nodos de validador
   //
-  // Anillos con el número dentro, encadenados por una línea naranja.
-  //
   // ⚠ LA CADENA ES ADORNO, NO UN DATO. No representa ninguna conexión: los
-  // validadores corren todos en la misma máquina y no se hablan entre ellos.
-  // Une los nodos por orden de índice, que además es un orden arbitrario.
-  // Queda escrito aquí para que nadie —nosotros dentro de unos meses
-  // incluidos— la lea como si dijera algo sobre la topología.
+  // validadores corren todos en la misma máquina y no se hablan entre ellos, y
+  // además une los nodos por orden de índice, que es arbitrario. Queda escrito
+  // aquí para que nadie —nosotros dentro de unos meses incluidos— la lea como
+  // si dijera algo sobre la topología.
   let nNodos = 0, mallaNodos = null, mallaCadena = null, atlas = null;
-  const matCadena = materialLinea(NARANJA, cfg.grosor * 1.25, 1.75);
+  let intensidades = [];
 
   const matNodo = new THREE.ShaderMaterial({
     uniforms: { ...uniformes, uFrescura, uEnergia,
@@ -394,10 +445,10 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
       varying vec2 vP; varying float vI; varying float vIdx;
       void main(){
         float r = length(vP) * 2.0;
-        float aro  = smoothstep(0.58, 0.66, r) * (1.0 - smoothstep(0.74, 0.82, r));
-        // El resplandor sale del propio nodo, no de un contorno externo.
-        float glow = exp(-pow((r - 0.68) / 0.30, 2.0)) * 0.28;
-        // Número: se muestrea la casilla del atlas que toca a este índice.
+        // Aro fino y de bordes cortos: el ancho de transición marca lo afilado
+        // que se ve el anillo.
+        float aro  = smoothstep(0.60, 0.645, r) * (1.0 - smoothstep(0.715, 0.76, r));
+        float glow = exp(-pow((r - 0.68) / 0.26, 2.0)) * 0.24;
         float col = mod(vIdx, uRejilla.x);
         float fil = floor(vIdx / uRejilla.x);
         vec2 uvLocal = vP / 0.40 + 0.5;
@@ -426,13 +477,18 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
     nNodos = n;
     if (n === 0) return;
 
-    const dirs = direccionesNodos(n);
+    // En la geodésica los nodos se clavan en vértices reales de la malla; en
+    // el Voronoi se quedan en las direcciones de Fibonacci.
+    const base = direccionesFibonacci(n);
+    const verts = MALLAS[tipo].vertices;
+    const dirs = verts ? ajustarAVertices(base, verts) : base;
+
     const aDir = new Float32Array(n * 3);
     const aInt = new Float32Array(n);
     const aIdx = new Float32Array(n);
     dirs.forEach((d, i) => {
       aDir[i * 3] = d.x; aDir[i * 3 + 1] = d.y; aDir[i * 3 + 2] = d.z;
-      aInt[i] = 0.5; aIdx[i] = i;
+      aInt[i] = intensidades[i] ?? 0.5; aIdx[i] = i;
     });
 
     if (atlas) atlas.tex.dispose();
@@ -449,11 +505,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
     mallaNodos.renderOrder = 3;
     grupo.add(mallaNodos);
 
-    // La cadena: arcos de círculo máximo entre nodos consecutivos, cerrando el
-    // ciclo. Se trocea para que siga la curvatura en vez de atravesar la
-    // esfera por dentro, y va un pelo por fuera de la superficie.
     if (n >= 2) {
-      const TROZOS = 12;
+      const TROZOS = 14;
       const pts = [];
       const a = new THREE.Vector3(), b = new THREE.Vector3();
       const p = new THREE.Vector3(), q = new THREE.Vector3();
@@ -474,76 +527,45 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
     }
   }
 
-  // ─────────────────────────────────────────────── postprocesado
-  //
-  // APAGADO EN TODOS LOS ESCALONES, y no por rendimiento: se ve peor.
-  //
-  // El bloom tenía sentido cuando las primitivas eran planas. Desde que cada
-  // arista lleva su degradado y cada punto su núcleo con halo, el
-  // postprocesado vuelve a difuminar lo que ya brillaba y el resultado es
-  // lechoso: medido a 1440 y a 390, el brillo medio pasa de 19 a 59 y el área
-  // de halo del 12% al 78%. El negro entre las celdas se vuelve gris, los
-  // puntos se disuelven y los aros naranjas viran a blanco.
-  //
-  // El efecto secundario bueno es que escritorio y móvil pasan a usar
-  // exactamente la misma técnica, así que la brecha entre ambos desaparece de
-  // raíz en vez de compensarse.
-  //
-  // El camino se deja montado y accesible con `bloom: true` (o `?bloom=1`)
-  // para poder volver a mirarlo, pero los módulos se cargan solo si se pide:
-  // así no se descargan los ~28 KB del postprocesado en el caso normal.
-  let composer = null, pasoBloom = null;
-  async function montarBloom() {
-    if (composer) return;
-    const [{ EffectComposer }, { RenderPass }, { UnrealBloomPass }, { OutputPass }] = await Promise.all([
-      import('../vendor/jsm/postprocessing/EffectComposer.js'),
-      import('../vendor/jsm/postprocessing/RenderPass.js'),
-      import('../vendor/jsm/postprocessing/UnrealBloomPass.js'),
-      import('../vendor/jsm/postprocessing/OutputPass.js'),
-    ]);
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(escena, camara));
-    pasoBloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.34, 0.55, 0.62);
-    composer.addPass(pasoBloom);
-    composer.addPass(new OutputPass());
-    composer.setSize(ancho, alto);
+  function aplicarTipo() {
+    grupos.voronoi.visible   = tipo === 'voronoi';
+    grupos.geodesica.visible = tipo === 'geodesica';
+    if (nNodos) construirNodos(nNodos);   // las posiciones cambian con la malla
   }
-  function desmontarBloom() {
-    if (!composer) return;
-    composer.dispose?.();
-    composer = null; pasoBloom = null;
-  }
-  if (cfg.bloom) montarBloom();
+  aplicarTipo();
 
-  // ─────────────────────────────────────────────── tamaño
-  let ancho = 1, alto = 1;
+  // ─────────────────────────────────────────────── tamaño y zoom
+  let ancho = 1, alto = 1, distanciaBase = 3.05, zoom = 1;
+  const ZOOM_MIN = 0.72, ZOOM_MAX = 2.2;
+
+  function aplicarCamara() {
+    camara.position.z = distanciaBase / zoom;
+    camara.updateProjectionMatrix();
+    const d = camara.position.z;
+    const silueta = 1 / Math.sqrt(Math.max(1e-4, 1 - 1 / (d * d)));
+    matAtmosfera.uniforms.uSilueta.value = silueta / 2.0;
+  }
+
   function medir() {
     const r = contenedor.getBoundingClientRect();
     ancho = Math.max(1, Math.round(r.width));
     alto  = Math.max(1, Math.round(r.height));
+    // Topado a 2: pasar a 3 multiplica por 2,25 los píxeles a rellenar sin que
+    // se aprecie. La nitidez no está aquí, está en las líneas y el contraste.
     const dpr = Math.min(window.devicePixelRatio || 1, cfg.dprMax);
     renderer.setPixelRatio(dpr);
     renderer.setSize(ancho, alto, false);
     camara.aspect = ancho / alto;
 
-    // El encuadre se calcula, no se fija a ojo. `fov` es el VERTICAL, así que
-    // en pantalla estrecha y alta el ángulo horizontal es mucho menor y la
-    // esfera se sale por los lados aunque quepa de sobra por arriba.
+    // `fov` es el VERTICAL: en pantalla estrecha y alta el ángulo horizontal
+    // es mucho menor y la esfera se saldría por los lados.
     const MARGEN = 1.18;
     const vFov = camara.fov * Math.PI / 180;
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camara.aspect);
-    const d = Math.max(MARGEN / Math.tan(vFov / 2), MARGEN / Math.tan(hFov / 2));
-    camara.position.z = d;
-    camara.updateProjectionMatrix();
-
-    // Radio aparente de la silueta: una esfera de radio 1 a distancia d se
-    // proyecta algo mayor que 1 por la perspectiva, y la atmósfera tiene que
-    // engancharse justo ahí.
-    const silueta = 1 / Math.sqrt(Math.max(1e-4, 1 - 1 / (d * d)));
-    matAtmosfera.uniforms.uSilueta.value = silueta / 2.0;
+    distanciaBase = Math.max(MARGEN / Math.tan(vFov / 2), MARGEN / Math.tan(hFov / 2));
+    aplicarCamara();
 
     for (const m of materialesLinea) m.resolution.set(ancho * dpr, alto * dpr);
-    if (composer) composer.setSize(ancho, alto);
   }
   const observador = new ResizeObserver(medir);
   observador.observe(contenedor);
@@ -552,53 +574,58 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
   // ─────────────────────────────────────────────── interacción
   let girX = 0, girY = 0, velX = 0, velY = 0;
   let arrastrando = false, ultX = 0, ultY = 0;
-  const objetivoPuntero = new THREE.Vector3(0, 0, 1);
-  let objetivoFuerza = 0;
-
-  const rayo = new THREE.Raycaster();
-  const esferaMat = new THREE.Sphere(new THREE.Vector3(0, 0, 0), 1);
-  const golpe = new THREE.Vector3();
-  const invQ = new THREE.Quaternion();
-
-  function apuntar(ev) {
-    const r = renderer.domElement.getBoundingClientRect();
-    const nx = ((ev.clientX - r.left) / r.width) * 2 - 1;
-    const ny = -((ev.clientY - r.top) / r.height) * 2 + 1;
-    rayo.setFromCamera({ x: nx, y: ny }, camara);
-    if (!rayo.ray.intersectSphere(esferaMat, golpe)) { objetivoFuerza = 0; return; }
-    // El puntero se guarda en espacio del OBJETO: la esfera gira, y en espacio
-    // de mundo el bulto se quedaría clavado en la pantalla en vez de viajar
-    // con la superficie.
-    invQ.copy(grupo.quaternion).invert();
-    objetivoPuntero.copy(golpe).normalize().applyQuaternion(invQ);
-    objetivoFuerza = 1;
-  }
+  const punteros = new Map();
+  let pellizcoPrevio = 0;
 
   const lienzo = renderer.domElement;
+
   lienzo.addEventListener('pointerdown', ev => {
     if (ev.pointerType === 'mouse' && ev.buttons !== 1) return;
-    arrastrando = true; ultX = ev.clientX; ultY = ev.clientY;
+    punteros.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (punteros.size === 1) { arrastrando = true; ultX = ev.clientX; ultY = ev.clientY; }
+    else { arrastrando = false; pellizcoPrevio = 0; }
     try { lienzo.setPointerCapture(ev.pointerId); } catch {}
-    apuntar(ev);
   });
+
   lienzo.addEventListener('pointermove', ev => {
-    // Sin botón pulsado no hay arrastre.
-    if (arrastrando && !ev.buttons) arrastrando = false;
+    if (!punteros.has(ev.pointerId)) return;
+    // Sin botón pulsado no hay gesto: sobrevolar no debe mover nada.
+    if (!ev.buttons) { punteros.delete(ev.pointerId); arrastrando = false; return; }
+    punteros.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+    if (punteros.size >= 2) {
+      // Pellizco: la distancia entre los dos primeros dedos manda el zoom.
+      const [a, b] = [...punteros.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pellizcoPrevio > 0 && dist > 0) {
+        zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * (dist / pellizcoPrevio)));
+        aplicarCamara();
+      }
+      pellizcoPrevio = dist;
+      return;
+    }
+
     if (arrastrando) {
       velY += (ev.clientX - ultX) * 0.00042;
       velX += (ev.clientY - ultY) * 0.00042;
       ultX = ev.clientX; ultY = ev.clientY;
     }
-    apuntar(ev);
   });
+
   const soltar = ev => {
-    arrastrando = false;
+    punteros.delete(ev.pointerId);
+    if (punteros.size < 2) pellizcoPrevio = 0;
+    if (punteros.size === 0) arrastrando = false;
     try { lienzo.releasePointerCapture(ev.pointerId); } catch {}
-    if (ev.pointerType !== 'mouse') objetivoFuerza = 0;
   };
   lienzo.addEventListener('pointerup', soltar);
   lienzo.addEventListener('pointercancel', soltar);
-  lienzo.addEventListener('pointerleave', () => { objetivoFuerza = 0; });
+
+  lienzo.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * Math.exp(-ev.deltaY * 0.0012)));
+    aplicarCamara();
+  }, { passive: false });
 
   // ─────────────────────────────────────────────── estado de la app
   let energiaObjetivo = 0.5, frescuraObjetivo = 1;
@@ -606,12 +633,11 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
   function actualizar(estado) {
     if (!estado) return;
     const lista = estado.nodos || [];
+    intensidades = lista.map(v => Math.max(0, Math.min(1, v.intensidad ?? 0.5)));
     if (lista.length !== nNodos) construirNodos(lista.length);
-    if (mallaNodos) {
+    else if (mallaNodos) {
       const att = mallaNodos.geometry.getAttribute('aInt');
-      for (let i = 0; i < lista.length; i++) {
-        att.array[i] = Math.max(0, Math.min(1, lista[i].intensidad ?? 0.5));
-      }
+      for (let i = 0; i < intensidades.length; i++) att.array[i] = intensidades[i];
       att.needsUpdate = true;
     }
     if (estado.energia  != null) energiaObjetivo  = Math.max(0, Math.min(1, estado.energia));
@@ -619,15 +645,13 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
   }
 
   // ─────────────────────────────────────────────── bucle
-  const vigilante = new Vigilante(() => degradar());
-  function degradar() {
-    // Sin bloom que apagar, lo único barato que queda es bajar la resolución.
-    // La geometría no se toca: rehacerla a mitad de sesión daría un tirón y
-    // cambiaría el dibujo de las celdas delante del usuario.
-    if (composer) { desmontarBloom(); return true; }
+  const vigilante = new Vigilante(() => {
+    // Lo único barato que queda es bajar resolución. La geometría no se toca:
+    // rehacerla a mitad de sesión daría un tirón y cambiaría el dibujo delante
+    // del usuario.
     if (cfg.dprMax > 1.0) { cfg.dprMax = Math.max(1.0, cfg.dprMax - 0.25); medir(); return true; }
     return false;
-  }
+  });
 
   let raf = null, ultimo = performance.now(), visible = true, reloj = 0;
   let fps = 0, muestrasFps = 0, acumFps = 0, fotogramas = 0;
@@ -654,15 +678,12 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
     grupo.rotation.set(girX, girY, 0);
 
     const k = 1 - Math.exp(-dt * 7);
-    uniformes.uFuerza.value += (objetivoFuerza - uniformes.uFuerza.value) * k;
-    uniformes.uPuntero.value.lerp(objetivoPuntero, k);
     uEnergia.value  += (energiaObjetivo  - uEnergia.value)  * k * 0.5;
     uFrescura.value += (frescuraObjetivo - uFrescura.value) * k * 0.5;
 
-    if (composer) composer.render(); else renderer.render(escena, camara);
+    renderer.render(escena, camara);
   }
 
-  // En reposo, cero trabajo.
   const alVer = new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { threshold: 0 });
   alVer.observe(contenedor);
   const alCambiarPestana = () => { visible = !document.hidden; ultimo = performance.now(); };
@@ -672,21 +693,34 @@ export function crearEsfera(contenedor, { escalon = null, semilla, bloom = null 
 
   return {
     actualizar,
-    info: () => ({
-      escalon: nombreEscalon, bloom: !!composer, fps, fotogramas,
-      celdas: celdas.nCeldas, segmentos: celdas.nSegmentos,
-      celdasFinas: fina.nCeldas, segmentosFinos: fina.nSegmentos,
-      puntosInterior: campo.n, vertices: celdas.nPuntos,
-      triangulos: celdas.nTriangulos, msGeometria: celdas.ms + fina.ms,
-      nodos: nNodos, dpr: renderer.getPixelRatio(), ancho, alto, visible,
-      fuerza: uniformes.uFuerza.value, respiracion: uniformes.uRespiracion.value,
-      llamadas: renderer.info.render.calls, reducido,
-    }),
+    /** Provisional: para comparar las dos mallas mirándolas. */
+    setGeometria(t) {
+      const nuevo = (t === 'geodesica') ? 'geodesica' : 'voronoi';
+      if (nuevo === tipo) return tipo;
+      tipo = nuevo;
+      aplicarTipo();
+      return tipo;
+    },
+    getGeometria: () => tipo,
+    info: () => {
+      const m = MALLAS[tipo];
+      return {
+        escalon: nombreEscalon, geometria: tipo, fps, fotogramas,
+        celdas: m.nCeldas, segmentos: m.nSegmentos, segmentosFinos: m.nSegmentosFinos,
+        vertices: m.nPuntos, triangulos: m.nTriangulos,
+        detalle: m.detalle ?? null,
+        puntosInterior: campo.n,
+        msGeometria: vor.ms + vorFina.ms + geo.ms + geoFina.ms,
+        nodos: nNodos, dpr: renderer.getPixelRatio(), zoom: +zoom.toFixed(2),
+        ancho, alto, visible, respiracion: uniformes.uRespiracion.value,
+        llamadas: renderer.info.render.calls, reducido,
+        antialias: renderer.getContext().getContextAttributes().antialias,
+      };
+    },
     destruir() {
       cancelAnimationFrame(raf);
       observador.disconnect(); alVer.disconnect();
       document.removeEventListener('visibilitychange', alCambiarPestana);
-      desmontarBloom();
       if (atlas) atlas.tex.dispose();
       renderer.dispose();
       renderer.domElement.remove();
