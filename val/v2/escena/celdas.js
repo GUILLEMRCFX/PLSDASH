@@ -35,30 +35,85 @@ function generador(semilla) {
   };
 }
 
-/** Semillas en espiral de Fibonacci, con jitter para desordenar el patrón. */
-function sembrar(THREE, n, aleatorio) {
+/**
+ * Densidad de siembra: una función suave de la posición, entre 0 y 1.
+ *
+ * Es lo que hace que las celdas tengan tamaños DISTINTOS. Repartiendo las
+ * semillas de forma uniforme salen todas parecidas y la esfera se lee como un
+ * balón de fútbol. Sembrando más en unas zonas que en otras, unas celdas
+ * quedan apretadas y otras anchas, que es lo que da aspecto orgánico.
+ *
+ * Suma de senos en vez de ruido de librería: suave, reproducible y sin
+ * dependencias.
+ */
+function densidad(x, y, z) {
+  const a = Math.sin(x * 2.3 + y * 1.7) * Math.cos(z * 2.9 - x * 1.1);
+  const b = Math.sin(y * 3.7 - z * 2.1) * Math.cos(x * 1.9 + y * 2.6);
+  return 0.20 + 0.80 * Math.min(1, Math.max(0, 0.5 + 0.32 * a + 0.24 * b));
+}
+
+/**
+ * Semillas por muestreo con rechazo sobre esa densidad. Se parte de puntos
+ * uniformes de verdad (no de una espiral) porque la espiral impone su propio
+ * orden y se acaba viendo por debajo de todo lo demás.
+ */
+function sembrar(THREE, n, aleatorio, variacion = 1) {
   const puntos = [];
-  const phi = Math.PI * (1 + Math.sqrt(5));
-  // El empujón es una fracción del espaciado típico: lo justo para que no se
-  // vea la espiral, no tanto como para dejar celdas degeneradas.
-  const sacudida = 0.62 / Math.sqrt(n);
-  for (let i = 0; i < n; i++) {
-    const t = Math.acos(1 - 2 * (i + 0.5) / n);
-    const a = phi * i;
-    puntos.push(new THREE.Vector3(
-      Math.sin(t) * Math.cos(a) + (aleatorio() - 0.5) * sacudida,
-      Math.sin(t) * Math.sin(a) + (aleatorio() - 0.5) * sacudida,
-      Math.cos(t) + (aleatorio() - 0.5) * sacudida,
-    ).normalize());
+  let intentos = 0;
+  while (puntos.length < n && intentos < n * 200) {
+    intentos++;
+    // Punto uniforme sobre la esfera: z uniforme y ángulo uniforme.
+    const z = aleatorio() * 2 - 1;
+    const ang = aleatorio() * Math.PI * 2;
+    const r = Math.sqrt(Math.max(0, 1 - z * z));
+    const x = r * Math.cos(ang), y = r * Math.sin(ang);
+    const p = 1 - variacion + variacion * densidad(x, y, z);
+    if (aleatorio() > p) continue;
+    puntos.push(new THREE.Vector3(x, y, z));
+  }
+  // Red de seguridad: si la densidad fuese muy restrictiva, se completa
+  // uniforme antes que devolver menos celdas de las pedidas.
+  while (puntos.length < n) {
+    const z = aleatorio() * 2 - 1;
+    const ang = aleatorio() * Math.PI * 2;
+    const r = Math.sqrt(Math.max(0, 1 - z * z));
+    puntos.push(new THREE.Vector3(r * Math.cos(ang), r * Math.sin(ang), z));
   }
   return puntos;
 }
 
-export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815 } = {}) {
+/**
+ * Campo de puntos DENTRO del volumen, no solo en la superficie.
+ *
+ * Es lo que quita la sensación de cáscara hueca: se ven cientos de puntos por
+ * detrás y por dentro de la malla, con brillos distintos, y eso es lo que da
+ * profundidad. Se sesga hacia fuera —la mayoría cerca de la superficie— para
+ * que el centro no se convierta en una mancha.
+ */
+export function campoInterior(n, semillaNum = 991) {
+  const aleatorio = generador(semillaNum);
+  const pos = new Float32Array(n * 3);
+  const brillo = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const z = aleatorio() * 2 - 1;
+    const ang = aleatorio() * Math.PI * 2;
+    const rr = Math.sqrt(Math.max(0, 1 - z * z));
+    const radio = 0.30 + 0.68 * Math.pow(aleatorio(), 0.55);
+    pos[i * 3]     = rr * Math.cos(ang) * radio;
+    pos[i * 3 + 1] = rr * Math.sin(ang) * radio;
+    pos[i * 3 + 2] = z * radio;
+    // Brillos muy repartidos: unos pocos destacan y la mayoría son polvo.
+    const t = aleatorio();
+    brillo[i] = 0.06 + Math.pow(t, 2.6) * 0.94;
+  }
+  return { pos, brillo, n };
+}
+
+export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815, variacion = 1 } = {}) {
   const t0 = performance.now();
 
   const aleatorio = generador(semilla);
-  const semillas = sembrar(THREE, nCeldas, aleatorio);
+  const semillas = sembrar(THREE, nCeldas, aleatorio, variacion);
 
   // Índice de cada semilla por identidad: ConvexHull conserva el mismo objeto
   // Vector3 que se le pasa, así que sirve como clave.
@@ -127,9 +182,29 @@ export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815 } = {
   cascara.setAttribute('position', new THREE.Float32BufferAttribute(vertsCascara, 3));
   cascara.setAttribute('aTono', new THREE.Float32BufferAttribute(tonos, 1));
 
+  // Puntos de la malla: las esquinas de las celdas (los vértices de Voronoi) y
+  // los centros. Son textura, no dato — no representan nada y por eso pueden
+  // ser tantos como haga falta. Es lo que separa una malla desnuda de algo que
+  // parece tener grano.
+  const puntos = new Float32Array((centros.length + nCeldas) * 3);
+  const brilloPunto = new Float32Array(centros.length + nCeldas);
+  centros.forEach((c, i) => {
+    puntos[i * 3] = c.x; puntos[i * 3 + 1] = c.y; puntos[i * 3 + 2] = c.z;
+    // Las esquinas brillan más que los centros: marcan la estructura.
+    brilloPunto[i] = 0.55 + aleatorio() * 0.45;
+  });
+  for (let s = 0; s < nCeldas; s++) {
+    const o = centros.length + s;
+    puntos[o * 3] = semillas[s].x; puntos[o * 3 + 1] = semillas[s].y; puntos[o * 3 + 2] = semillas[s].z;
+    brilloPunto[o] = 0.12 + aleatorio() * 0.30;
+  }
+
   return {
     cascara,
     aristas: new Float32Array(aristas),
+    puntos,
+    brilloPunto,
+    nPuntos: brilloPunto.length,
     nCeldas,
     nSegmentos: aristas.length / 6,
     nTriangulos: vertsCascara.length / 9,

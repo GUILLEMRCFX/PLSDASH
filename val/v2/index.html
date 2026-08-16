@@ -46,8 +46,10 @@
   const forzado = new URLSearchParams(location.search).get('escalon');
   const nFalsos = Number(new URLSearchParams(location.search).get('n')) || undefined;
 
+  const pb = new URLSearchParams(location.search).get('bloom');
   const esfera = crearEsfera(document.getElementById('escena'), {
     escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
+    bloom: pb === null ? null : pb === '1',
   });
 
   // Los datos entran por la puerta de siempre. La esfera no sabe que son
