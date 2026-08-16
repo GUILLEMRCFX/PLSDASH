@@ -616,6 +616,14 @@ const GECKOTERMINAL_API = 'https://api.geckoterminal.com/api/v2';
 const CHAIN_ID          = 'pulsechain';
 const REFRESH_MS        = 30000;
 
+// El precio de PLS sale de aquí, no del lote de DexScreener: es el mismo
+// endpoint que usan el panel de validador y el recolector del NUC, así que los
+// tres enseñan la misma cifra del mismo instante. Devuelve el bloque entero
+// del par de WPLS (precio, cambio, par, logo, símbolo, nombre) porque de ese
+// par la portada saca también el logo del PLS y el `pairAddress`, que es lo
+// que alimenta el gráfico en vivo y el cambio a 7d/30d.
+const PRECIO_API = '/api/precio';
+
 // WPLS — usado para precio del PLS nativo (PLS no es PRC-20).
 const WPLS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27';
 const LS_KEY = 'plsdash:portfolio';
@@ -809,8 +817,48 @@ async function discoverWalletTokens(address){
    Agrupamos en lotes de 30 direcciones (endpoint multi-token) para
    respetar el rate limit (300 req/min) y cacheamos 25s.
    ============================================================ */
+/* Precio de PLS desde /api/precio. Deja la entrada de WPLS en `priceCache`
+   con la misma forma que la deja el lote, para que de aquí en adelante no
+   haya que distinguir de dónde vino. Devuelve true si lo consiguió. */
+async function fetchPrecioPLS(){
+  const c=priceCache.get(WPLS);
+  if(c&&c.price!=null&&(Date.now()-c.ts)<=PRICE_TTL)return true;
+  try{
+    const r=await fetch(PRECIO_API);
+    if(!r.ok)return false;                          // 503 = ni fuente ni respaldo
+    const d=await r.json();
+    if(!d||d.disponible===false||!(d.precio>0))return false;
+    // `obsoleto` se acepta: es el último precio bueno, y si la Function ha
+    // tenido que tirar de él es porque DexScreener está caído — con lo que el
+    // lote tampoco habría traído nada mejor.
+    priceCache.set(WPLS,{
+      price:d.precio,
+      change24:d.cambio24!=null?Number(d.cambio24):null,
+      logo:d.logo||null,
+      name:d.nombre||null,
+      symbol:d.simbolo||null,
+      pair:d.par||null,
+      ts:Date.now()
+    });
+    return true;
+  }catch(e){return false;}
+}
+
 async function fetchPrices(addresses){
-  const need=[...new Set(addresses.map(lc))].filter(a=>{
+  let lista=[...new Set(addresses.map(lc))];
+
+  // WPLS sale del lote y se pide a /api/precio, que es el único sitio donde
+  // vive el precio de PLS.
+  //
+  // ⚠ RESPALDO, NO SEGUNDO CAMINO. Si /api/precio no responde, WPLS vuelve al
+  //   lote exactamente como antes de que existiera. La portada es pública y la
+  //   fila del PLS es la más importante de la tabla: no puede empeorar por un
+  //   endpoint que se añadió para el panel privado. Mientras la Function
+  //   conteste —que es siempre salvo que Pages esté caído— el precio del PLS
+  //   viene de un solo sitio, que es de lo que se trata.
+  if(lista.includes(WPLS)&&await fetchPrecioPLS())lista=lista.filter(a=>a!==WPLS);
+
+  const need=lista.filter(a=>{
     const c=priceCache.get(a);
     return !c || (Date.now()-c.ts)>PRICE_TTL;
   });

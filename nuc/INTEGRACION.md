@@ -1,5 +1,100 @@
 # Integración en `push.py` (NUC)
 
+> **Si vienes solo a activar el precio, haz «Subir el precio al NUC» y nada
+> más.** Lo de abajo es contexto y cosas ya hechas.
+
+---
+
+# Subir el precio al NUC — pasos cortos
+
+`push.py` vive en `/home/guillem/` del NUC, no en este repo, así que no puedo
+verlo: **los pasos van anclados a texto que buscar, no a números de línea.**
+
+Hoy `snapshots.precio_pls` está a `NULL` en las 197 filas que hay. No es que
+falle: es que el `INSERT` todavía no lleva la columna. Esto lo arregla.
+
+### 1. Copiar el módulo
+
+```bash
+scp nuc/precio_y_bloques.py guillem@NUC:/home/guillem/
+```
+
+### 2. Probarlo suelto, antes de tocar `push.py`
+
+```bash
+ssh guillem@NUC
+cd /home/guillem && python3 -c "from precio_y_bloques import precio_pls; print(precio_pls())"
+```
+
+Tiene que imprimir un número, tipo `3.1e-05`. Si imprime `None`, para aquí: han
+fallado los dos caminos (la Function y DexScreener) y no tiene sentido seguir.
+Si antes del número imprime `la Function no respondió …; voy a DexScreener`, el
+precio es bueno igual —está usando el respaldo— pero avísame.
+
+### 3. Importar en `push.py`
+
+Busca la zona de `import` de arriba del todo y añade:
+
+```python
+from precio_y_bloques import precio_pls
+```
+
+⚠ **Solo `precio_pls`.** No importes ni llames a `revisar_bloques`: `/api/val/ganancia`
+ya registra los bloques desde Cloudflare y saldrían duplicados, cada copia con
+un `ts` distinto.
+
+### 4. Pedir el precio justo antes de escribir
+
+Busca `INSERT INTO snapshots`. En la línea de **encima**, añade:
+
+```python
+precio = precio_pls()   # None si fallan la Function y DexScreener → NULL
+```
+
+### 5. Meter la columna en ese mismo `INSERT`
+
+Tres retoques en la misma sentencia:
+
+1. En la lista de columnas, añade `precio_pls` al final.
+2. En el `VALUES`, añade **un `?` más**.
+3. En la lista de parámetros, añade `precio` al final.
+
+Debe quedar así (15 columnas → 16):
+
+```python
+d1(
+    "INSERT INTO snapshots ("
+    "  ts, ganado, balance_total, activos, pls_hora, apr,"
+    "  disco_pct, disco_libre_gb, temp_cpu, temp_nvme, ram_pct,"
+    "  peers, sincronizado, epoch, salud, precio_pls"
+    ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+    [ts, ganado, balance_total, activos, pls_hora, apr,
+     disco_pct, disco_libre_gb, temp_cpu, temp_nvme, ram_pct,
+     peers, sincronizado, epoch, salud, precio],
+)
+```
+
+**Cuenta los `?`: tienen que ser 16, los mismos que columnas y que parámetros.**
+Si no cuadran, D1 rechaza la fila entera y se pierde el snapshot completo, no
+solo el precio.
+
+### 6. Esperar al cron
+
+Los snapshots son horarios, en punto. La siguiente fila ya debería llevar
+precio; no hace falta reiniciar nada si el cron llama al script.
+
+### 7. Comprobar que ha entrado
+
+```sql
+SELECT ts, datetime(ts,'unixepoch'), precio_pls
+FROM snapshots ORDER BY ts DESC LIMIT 3;
+```
+
+La fila de arriba tiene que traer un número. Si sigue `NULL`, mira el log del
+cron: `precio_pls()` deja dicho por cuál de los dos caminos ha fallado.
+
+---
+
 Tres cambios. El módulo `precio_y_bloques.py` va en la misma carpeta que
 `push.py` (`/home/guillem/`).
 
@@ -98,7 +193,7 @@ activado y de nodo aún sincronizando, que **no** deben rechazarse.
 ## 1. Importar
 
 ```python
-from precio_y_bloques import precio_pls, revisar_bloques
+from precio_y_bloques import precio_pls
 ```
 
 ## 2. Guardar el precio en cada snapshot
@@ -160,17 +255,26 @@ Ese número resolvió un descuadre: con el registro completo (109.600) salían 4
 bloques observados donde el modelo predecía 1, probabilidad del 2,3%. Con los
 activos se esperan 2,5 y ver 4 tiene un 24% de probabilidad. Azar normal.
 
-## 3. Revisar bloques en cada ejecución
+## 3. Revisar bloques en cada ejecución — ❌ NO SE INTEGRA
 
-Al final del ciclo, después de escribir el snapshot:
+> **No llames a `revisar_bloques()`.** `/api/val/ganancia` ya registra los
+> bloques desde Cloudflare, reconciliados contra la cadena. Si además los
+> anotara el NUC saldrían duplicados, y cada copia con un `ts` distinto, que es
+> peor que no tenerlos: el contador de bloques quedaría inflado y el registro
+> de vida con eventos repetidos.
+>
+> El código se queda en el módulo por si algún día se decide al revés, pero hoy
+> **no se llama**. Lo que sigue describe qué haría, no qué hay que hacer.
+
+Al final del ciclo, después de escribir el snapshot, haría falta:
 
 ```python
-revisar_bloques(d1)
+revisar_bloques(d1)   # ← NO
 ```
 
-Se apoya en la tabla `meta` para recordar la última epoch revisada, así que es
-seguro llamarlo en cada pasada del cron. Devuelve cuántos bloques nuevos ha
-anotado, por si se quiere registrar en el log.
+Se apoya en la tabla `meta` para recordar la última epoch revisada, así que
+sería seguro llamarlo en cada pasada del cron. Devuelve cuántos bloques nuevos
+ha anotado, por si se quisiera registrar en el log.
 
 ---
 

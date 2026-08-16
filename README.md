@@ -39,6 +39,7 @@ direcciones públicas).
 ```
 /index.html                          → la app completa (HTML+CSS+JS)
 /functions/api/portfolio/[code].js   → Pages Function: GET/PUT del portfolio en KV
+/functions/api/precio.js             → Pages Function: el precio de PLS, para todos
 /_routes.json                        → las Functions sólo corren en /api/*
 /_redirects                          → /p/<code> sirve index.html (SPA)
 /README.md
@@ -62,6 +63,35 @@ direcciones públicas).
 - `GET /api/portfolio/<code>` → JSON guardado, o `404` (con cuerpo `null`) si no existe.
 - `PUT /api/portfolio/<code>` → guarda `{ wallets, customTokens, hidden, ... }`.
   Valida que sea JSON con forma razonable y < 100KB. Maneja CORS.
+
+### `GET /api/precio` — el precio de PLS, en un solo sitio
+
+`/functions/api/precio.js`. Lo consumen la portada, `/val/` y `push.py` en el
+NUC, para que los tres enseñen la misma cifra del mismo instante en vez de tres
+lecturas sueltas de DexScreener.
+
+Devuelve el bloque entero del par de WPLS con más liquidez **donde WPLS es el
+token base** (`priceUsd` es el precio de la base: en un par HEX/WPLS traería el
+del HEX):
+
+```json
+{ "disponible": true, "obsoleto": false, "precio": 0.000031, "cambio24": -3.4,
+  "par": "0x…", "logo": "https://…", "simbolo": "WPLS", "nombre": "Wrapped Pulse",
+  "ts": 1786899601 }
+```
+
+No solo el precio: la portada saca de ese mismo par el logo del PLS y el
+`pairAddress`, que es lo que alimenta el gráfico en vivo y el cambio a 7d/30d.
+
+**Dos capas de caché.** `caches.default` a 60 s es el camino caliente. KV
+(`precio:pls`) guarda el **último precio bueno** y se reescribe como mucho cada
+5 min — el plan gratuito son 1.000 escrituras/día y escribir en cada fallo de
+caché de 60 s daría 1.440.
+
+**Cuando DexScreener falla** se sirve ese último precio bueno con `obsoleto:
+true` y `edad_s`. Si no hay ni fuente ni respaldo, **`503` con `disponible:
+false`** — nunca un cero de relleno. Ese 503 es lo que hace que la portada
+vuelva a pedir WPLS en su lote y que el NUC llame a DexScreener por su cuenta.
 
 ## Validator Dashboard (`/api/val/*`)
 
@@ -125,7 +155,8 @@ vive dentro de ese envoltorio.
 - **`snapshots.precio_pls`** guarda el precio de PLS en cada snapshot horario,
   para poder ver su evolución. No se puede reconstruir después: ninguna API
   sirve el precio de una hora concreta pasado el momento. `NULL` significa que
-  DexScreener no respondió — un hueco honesto, nunca un cero.
+  fallaron los dos caminos —`/api/precio` y DexScreener directo— un hueco
+  honesto, nunca un cero.
 - **`barridos`** es la fuente de verdad de las retiradas, y de ella salen los
   totales, el contador de bloques y la gráfica por ciclos.
 - **`meta`** lleva los cursores: hasta dónde llega la siembra de `barridos` y
@@ -238,9 +269,14 @@ El frontend habla con `/api/portfolio/<code>`, servido por la Function local.
   balance y metadatos en una sola llamada. Fallback: si el explorer falla, los
   *custom tokens* se leen por RPC (`balanceOf` selector `0x70a08231`,
   `decimals` selector `0x313ce567`). Ampliable a una lista de tokens populares.
-- **PLS nativo** vía `eth_getBalance`; su precio se toma de **WPLS** en DexScreener.
-- **Rate limits:** los precios se piden en lotes de 30 (endpoint multi-token de
-  DexScreener) y se cachean ~25s para respetar el límite de 300 req/min.
+- **PLS nativo** vía `eth_getBalance`; su precio **no** sale del lote, sino de
+  `/api/precio` — la Function que lo sirve para todo PLSDASH (portada, panel de
+  validador y el recolector del NUC), para que los tres enseñen la misma cifra.
+  Si la Function no contesta, WPLS vuelve al lote como antes: es un respaldo,
+  no un segundo camino.
+- **Rate limits:** el resto de precios se piden en lotes de 30 (endpoint
+  multi-token de DexScreener) y se cachean ~25s para respetar el límite de 300
+  req/min.
 - **Logos:** se usa `pairs[].info.imageUrl`; si falta o falla la carga, se cae a
   un avatar generado (gradiente derivado del address + inicial del símbolo).
 - Se respeta `prefers-reduced-motion`.

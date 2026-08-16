@@ -56,6 +56,14 @@ export async function onRequest({ request, env, next }) {
     return (esVal || esPreview) ? next() : noEncontrado();
   }
 
+  // El precio lo piden los dos sitios: la portada para la fila del PLS y el
+  // panel para su cabecera. Por eso NO cuelga de `/api/val/` —atarlo al panel
+  // obligaría a la portada a pedirlo a otro hostname, con CORS de por medio—
+  // y por eso hay que dejarlo pasar aquí explícitamente: el bloque de abajo
+  // devuelve 404 a todo lo que no reconoce, y sin esta línea el panel se
+  // quedaría sin precio el mismo día que se defina VAL_HOST.
+  if (url.pathname === '/api/precio') return next();
+
   if (esVal) {
     // El subdominio sirve el panel en la raíz. Se pide al servidor de
     // estáticos directamente en lugar de a next(): `/val/*` también pasa por
