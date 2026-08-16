@@ -1,0 +1,161 @@
+/**
+ * PLSDASH v2 — lenguaje visual de los paneles.
+ *
+ * Estos dos paneles son la referencia del resto, así que las reglas están
+ * escritas para reutilizarse, no para resolver estos dos casos.
+ *
+ * Los principios, y el porqué:
+ *
+ *   · Negro puro de fondo. Cualquier degradado, por tenue que sea, levanta el
+ *     nivel de negro y se lleva por delante el contraste — que es donde se
+ *     juega la sensación de nitidez, la misma razón por la que la escena de la
+ *     esfera va sobre #000.
+ *   · Dos colores y ya: cian para los datos, naranja para lo que reclama
+ *     atención. Sin verde de «todo bien»: si nada está naranja, todo está
+ *     bien. Un semáforo de tres luces obliga a leer el color antes que el
+ *     número, y aquí manda el número.
+ *   · Bordes de 1px y nada más. Ni sombras, ni degradados de relleno, ni
+ *     tarjetas flotando: la profundidad la da la escena 3D, y si los paneles
+ *     compiten con ella el conjunto se ensucia.
+ *   · Las etiquetas son pequeñas y apagadas a propósito. Se leen cuando se
+ *     buscan; el resto del tiempo se apartan.
+ */
+
+:root {
+  --negro:      #000;
+  --cian:       #2ad4f0;
+  --cian-suave: #7fd4ea;
+  --apagado:    #4a6b78;
+  --naranja:    #ff8a3d;
+  --borde:      rgba(42, 212, 240, .14);
+  --borde-vivo: rgba(42, 212, 240, .28);
+
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* ─────────────────────────────────────────────── panel */
+
+.panel {
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  background: transparent;          /* nada de relleno: el fondo es la escena */
+  padding: 16px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+
+/* Estado que no se puede pasar por alto. Se usa cuando el dato no es de fiar
+   —el NUC lleva rato sin reportar—, que es justo el caso en el que un panel
+   silencioso hace más daño que no tener panel. Barra superior, borde entero y
+   la palabra en naranja: se ve desde el otro lado de la habitación. */
+.panel[data-alerta] { border-color: rgba(255, 138, 61, .55); }
+.panel[data-alerta]::before {
+  content: '';
+  position: absolute; left: -1px; right: -1px; top: -1px; height: 3px;
+  background: var(--naranja);
+  border-radius: 10px 10px 0 0;
+}
+
+.p-cab {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+}
+.p-cab h2 {
+  margin: 0;
+  font: 400 11px/1 var(--mono);
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--apagado);
+}
+.p-marca {
+  font: 400 10.5px/1 var(--mono);
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--cian); opacity: .8;
+}
+.p-marca.alerta { color: var(--naranja); opacity: 1; }
+
+/* ─────────────────────────────────────────────── cifras */
+
+/* La cifra principal del panel. Grande, cian, y con la etiqueta debajo:
+   el número primero y la explicación después, no al revés. */
+.cifra { display: flex; flex-direction: column; gap: 5px; }
+
+.c-num {
+  font: 400 34px/1 var(--mono);
+  color: var(--cian);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;   /* que no bailen al actualizarse */
+  word-break: break-word;
+}
+.c-num .u,                              /* unidad: PLS, $ */
+.c-num .de {                            /* «/10» de «10 de 10» */
+  font-size: .45em; color: var(--apagado); letter-spacing: .06em;
+  margin-left: .28em;
+}
+/* El «%» no es una unidad que acompañe: forma parte del número. A .45em
+   parecía un superíndice y hacía dudar de si el 99,90 era el dato o no. */
+.c-num .u.pct {
+  font-size: .62em; color: var(--cian); opacity: .75; margin-left: .06em;
+}
+.c-num.alerta { color: var(--naranja); }
+
+.c-eti {
+  font: 400 10.5px/1.4 var(--mono);
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--apagado);
+}
+.c-sub {
+  font: 400 11.5px/1.45 var(--mono);
+  color: var(--cian-suave); opacity: .72;
+}
+.c-sub.alerta { color: var(--naranja); opacity: 1; }
+
+/* Fila de cifras secundarias: mismo lenguaje, la mitad de tamaño. */
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 15px 16px;
+}
+.rejilla .c-num { font-size: 19px; }
+.rejilla .c-num .u { font-size: .52em; }
+
+/* ─────────────────────────────────────────────── segundo plano */
+
+/* Lo que se consulta, no lo que se mira. Separado por una línea, más pequeño
+   y más apagado que todo lo de arriba. */
+.p-fondo {
+  margin: 0; padding-top: 14px;
+  border-top: 1px solid var(--borde);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 10px 14px;
+}
+.p-fondo > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.p-fondo dt {
+  font: 400 9.5px/1 var(--mono);
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--apagado); opacity: .75;
+}
+.p-fondo dd {
+  margin: 0;
+  font: 400 13px/1.2 var(--mono);
+  color: var(--cian-suave);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.p-fondo dd.alerta { color: var(--naranja); }
+
+/* Aviso dentro del panel. Va debajo de la cabecera y ocupa el ancho entero:
+   si hay algo que decir, se dice donde se lee, no en una esquina. */
+.p-aviso {
+  font: 400 11.5px/1.45 var(--mono);
+  color: var(--naranja);
+  border: 1px solid rgba(255, 138, 61, .3);
+  border-radius: 7px;
+  padding: 9px 11px;
+}
+
+.vacio {
+  font: 400 11.5px/1.45 var(--mono);
+  color: var(--apagado);
+}

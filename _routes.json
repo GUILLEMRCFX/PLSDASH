@@ -10,6 +10,8 @@
   "exclude": [
     "/val/v2/vendor/*",
     "/val/v2/escena/*",
-    "/val/v2/datos-falsos.js"
+    "/val/v2/paneles/*",
+    "/val/v2/datos-falsos.js",
+    "/val/compartido/*"
   ]
 }
