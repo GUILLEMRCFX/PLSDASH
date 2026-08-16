@@ -75,20 +75,38 @@
   // inventados, y cuando dejen de serlo no habrá que tocarla.
   esfera.actualizar(estadoFalso(nFalsos));
 
-  const nav = document.getElementById('geo');
-  function pintarBotones() {
-    const activo = esfera.getGeometria();
-    for (const b of nav.querySelectorAll('button')) b.classList.toggle('on', b.dataset.geo === activo);
-  }
-  nav.addEventListener('click', ev => {
-    const b = ev.target.closest('button');
-    if (!b) return;
-    esfera.setGeometria(b.dataset.geo);
-    pintarBotones();
-  });
-  pintarBotones();
-
+  // Se expone ANTES de nada. Si algo de lo de abajo fallase, `__esfera` sigue
+  // estando en la consola y se puede diagnosticar desde ahí.
   window.__esfera = esfera;
+
+  const nav = document.getElementById('geo');
+
+  // Si el navegador sirviese un `esfera.js` viejo de su caché, esta API no
+  // existiría y los botones dejarían de responder SIN decir nada. Antes de
+  // seguir se comprueba, y si falta se dice en pantalla en vez de fallar en
+  // silencio, que es lo que cuesta media hora de buscar por el sitio
+  // equivocado.
+  const apiOk = typeof esfera.setGeometria === 'function'
+             && typeof esfera.getGeometria === 'function';
+
+  if (!apiOk) {
+    nav.innerHTML = '<span style="padding:9px 14px;font-size:11px;color:#ff8a3d">'
+      + 'módulo desactualizado · recarga forzada (Ctrl/Cmd + Shift + R)</span>';
+    console.error('[val/v2] esfera.js no expone setGeometria/getGeometria: '
+      + 'el navegador está sirviendo una versión antigua del módulo.');
+  } else {
+    const pintarBotones = () => {
+      const activo = esfera.getGeometria();
+      for (const b of nav.querySelectorAll('button')) b.classList.toggle('on', b.dataset.geo === activo);
+    };
+    nav.addEventListener('click', ev => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      esfera.setGeometria(b.dataset.geo);
+      pintarBotones();
+    });
+    pintarBotones();
+  }
 </script>
 </body>
 </html>

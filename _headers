@@ -1,0 +1,22 @@
+# Cabeceras de caché. Solo para /val/v2/*: el sitio público no se toca.
+#
+# El panel nuevo son módulos ES que se importan por ruta fija. Si el navegador
+# se queda con una copia vieja de `escena/esfera.js` mientras sirve el
+# `index.html` nuevo, la página carga pero la mitad de la API no existe: los
+# botones dejan de responder sin dar ningún error visible. Es exactamente el
+# fallo de «producción sirve la versión anterior», pero dentro de una sola
+# página.
+#
+# `no-cache` NO significa no guardar: significa revalidar siempre. El ETag
+# sigue ahorrando la descarga cuando el fichero no ha cambiado, así que el
+# coste es una petición condicional y la ganancia es que quedarse con una
+# versión vieja deja de ser posible.
+
+/val/v2/*
+  Cache-Control: no-cache
+
+# El vendor sí es inmutable: `three.module.js` pesa 1,3 MB y solo cambia si se
+# sube de versión a mano, en cuyo caso cambia el fichero entero. Revalidarlo en
+# cada carga sería tirar la única descarga que de verdad importa.
+/val/v2/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
