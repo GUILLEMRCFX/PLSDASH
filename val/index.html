@@ -726,7 +726,18 @@ input[type=text].fld{
 </div>
 </div>
 
-<script>
+<script type="module">
+// La lógica de ganancias vive en un módulo compartido con /val/v2/: costó tres
+// rondas afinarla y duplicarla garantizaría que los dos paneles acaben dando
+// cifras distintas. Ruta absoluta porque este fichero se sirve tanto en
+// `/val/` como en la raíz del subdominio.
+import {
+  ganadoEntre,
+  gananciaAcumulada as calcGananciaAcumulada,
+  diarioReal        as calcDiarioReal,
+  ritmoDiario       as calcRitmoDiario,
+} from '/val/compartido/ganancias.js';
+
 (function(){
   'use strict';
 
@@ -986,44 +997,7 @@ input[type=text].fld{
   // La ganancia real se recompone recorriendo la serie: cada bajada es un
   // barrido, y lo que había justo antes es lo que se llevó.
   function gananciaAcumulada() {
-    const excedente = estado?.validadores?.ganado_total ?? 0;
-
-    // La cadena es la fuente buena: recoge también lo barrido antes de que el
-    // recolector arrancara, que la serie de snapshots no puede ver.
-    if (ganancia && ganancia.total > 0) {
-      return {
-        total: ganancia.total + excedente,
-        barrido: ganancia.total,
-        barridos: ganancia.barridos,
-        bloques: ganancia.bloques,
-        excedente,
-        fuente: ganancia.obsoleto ? 'cadena (dato en caché)' : 'cadena',
-        completo: true,
-      };
-    }
-
-    // Sin explorador se recompone de los snapshots: cada bajada es un barrido
-    // y lo que había justo antes es lo que se llevó. Solo alcanza desde que se
-    // empezó a registrar, así que es un suelo.
-    if (serie.length < 2) return null;
-
-    let barrido = 0;
-    let barridos = 0;
-    for (let i = 1; i < serie.length; i++) {
-      if (serie[i].ganado < serie[i - 1].ganado) {
-        barrido += serie[i - 1].ganado;
-        barridos++;
-      }
-    }
-
-    return {
-      total: barrido + excedente + serie[0].ganado,
-      barrido,
-      barridos,
-      excedente,
-      fuente: 'snapshots',
-      completo: serie[0].ts <= ACTIVACION_TS + 3600,
-    };
+    return calcGananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
   }
 
   // Ganado por día, recompuesto de la serie.
@@ -1033,32 +1007,7 @@ input[type=text].fld{
   // ignorando los ~26.768 que se barrieron esa tarde. Aquí cada tramo suma lo
   // que subió, y cuando hubo barrido suma lo acumulado después de él.
   function diarioReal() {
-    const porDia = new Map();
-    for (let i = 1; i < serie.length; i++) {
-      const anterior = serie[i - 1].ganado;
-      const actual = serie[i].ganado;
-      // Tras un barrido se pierde el tramo entre el último snapshot y el
-      // instante del barrido: queda algo por debajo, nunca por encima.
-      const ganado = actual >= anterior ? actual - anterior : actual;
-      const fecha = new Date(serie[i].ts * 1000).toISOString().slice(0, 10);
-
-      const d = porDia.get(fecha) || { fecha, ganado_dia: 0, desde: serie[i].ts, hasta: serie[i].ts };
-      d.ganado_dia += ganado;
-      d.desde = Math.min(d.desde, serie[i - 1].ts);
-      d.hasta = Math.max(d.hasta, serie[i].ts);
-      porDia.set(fecha, d);
-    }
-
-    return [...porDia.values()]
-      .map(d => ({
-        ...d,
-        // Horas de la jornada realmente cubiertas. El primer día registrado
-        // casi nunca está entero, y contarlo como completo hunde cualquier
-        // media: el 8-ago solo se midió desde las 13:53.
-        horas: (d.hasta - d.desde) / 3600,
-        completo: (d.hasta - d.desde) / 3600 >= 23,
-      }))
-      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+    return calcDiarioReal(serie);
   }
 
   // Ritmo de recompensas. `pls_dia` de KV es la media desde la activación, y
@@ -1071,30 +1020,9 @@ input[type=text].fld{
   // pille una infla el ritmo, y una que no la pille lo desinfla. Por eso se
   // marca como provisional mientras la ventana sea de horas y no de días.
   function ritmoDiario() {
-    const hoy = new Date().toISOString().slice(0, 10);
-    const cerrados = diarioReal()
-      .filter(d => d.fecha !== hoy && d.completo && d.ganado_dia > 0).slice(-7);
-    if (cerrados.length >= 2) {
-      return {
-        pls_dia: cerrados.reduce((a, d) => a + d.ganado_dia, 0) / cerrados.length,
-        base: `media de ${cerrados.length} días`,
-        provisional: false,
-      };
-    }
-
-    // Sin días enteros se mide sobre los snapshots, sumando tramo a tramo para
-    // que los barridos no resten.
-    const s = snapshots24h;
-    if (s.length >= 2) {
-      const horas = (s[s.length - 1].ts - s[0].ts) / 3600;
-      let acumulado = 0;
-      for (let i = 1; i < s.length; i++) acumulado += ganadoEntre(s[i - 1].ganado, s[i].ganado);
-      if (horas >= 2 && acumulado > 0) {
-        return { pls_dia: (acumulado / horas) * 24, base: `medido en ${fmt(horas, 0)} h`, provisional: true };
-      }
-    }
-
-    return { pls_dia: estado.validadores.pls_dia, base: 'media desde la activación', provisional: true };
+    return calcRitmoDiario({
+      serie, snapshots24h, plsDiaKV: estado.validadores.pls_dia, fmt,
+    });
   }
 
   // El número principal alterna entre PLS y dólares al tocarlo. La elección
@@ -1293,20 +1221,8 @@ input[type=text].fld{
     renderChart();
   }
 
-  // Ganado entre dos lecturas consecutivas.
-  //
-  // `ganado` sube mientras se acumula y cae a cero cuando el protocolo barre
-  // el excedente, así que una bajada no es un error: es un barrido, y lo
-  // ganado en ese tramo es lo que se haya acumulado después de él.
-  //
-  // Aquí vivía un filtro que descartaba toda fila que rompiera la monotonía,
-  // escrito cuando los barridos se tomaban por datos corruptos. Descartaba
-  // cada lectura posterior a un barrido y hundía el ritmo calculado.
-  function ganadoEntre(anterior, actual) {
-    const a = Number(anterior), c = Number(actual);
-    if (!Number.isFinite(a) || !Number.isFinite(c)) return 0;
-    return c >= a ? c - a : c;
-  }
+  // `ganadoEntre` viene del módulo compartido: una bajada no es un error, es
+  // un barrido, y lo ganado en ese tramo es lo acumulado después de él.
 
   // Cada barra es un ciclo de barrido completo (~8,1 h), no una hora suelta:
   // así se compara ciclo contra ciclo, que es la unidad real en la que el
