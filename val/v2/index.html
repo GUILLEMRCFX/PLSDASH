@@ -7,19 +7,15 @@
 <title>PLSDASH · núcleo</title>
 <link rel="icon" href="/favicon.ico">
 <style>
-  :root{ --fondo:#03070f; }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{
-    margin:0;background:var(--fondo);color:#7fd4ea;
+    /* Negro puro. Cualquier degradado de fondo, por tenue que sea, levanta el
+       nivel de negro entre las celdas y con él se va el contraste — que es
+       donde de verdad se juega la sensación de nitidez. */
+    margin:0;background:#000;color:#7fd4ea;
     font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
     overflow:hidden;
-  }
-  /* Un halo muy tenue detrás del lienzo: separa la esfera del negro puro sin
-     competir con ella. */
-  body::before{
-    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-    background:radial-gradient(58% 52% at 50% 46%,rgba(10,44,66,.13),transparent 72%);
   }
   #escena{
     position:fixed;inset:0;z-index:1;
@@ -28,10 +24,33 @@
     touch-action:none;
   }
   #escena canvas{display:block;width:100%;height:100%}
+
+  /* Conmutador PROVISIONAL de geometría. Existe solo para poder decidir entre
+     las dos mallas mirándolas; se quita cuando esté decidido. */
+  #geo{
+    position:fixed;z-index:5;left:50%;transform:translateX(-50%);
+    bottom:calc(18px + env(safe-area-inset-bottom,0px));
+    display:flex;gap:2px;padding:3px;border-radius:11px;
+    background:rgba(10,18,26,.72);border:1px solid rgba(42,212,240,.22);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  }
+  #geo button{
+    font:inherit;font-size:11.5px;letter-spacing:.10em;text-transform:uppercase;
+    color:#5d7f8d;background:none;border:0;border-radius:8px;
+    padding:9px 15px;cursor:pointer;transition:.14s;
+    min-height:38px;                     /* objetivo táctil en móvil */
+  }
+  #geo button.on{color:#04121a;background:#2ad4f0}
+  #geo button:not(.on):hover{color:#a8e6f5}
 </style>
 </head>
 <body>
 <div id="escena"></div>
+
+<nav id="geo" aria-label="Geometría de la malla (provisional)">
+  <button type="button" data-geo="voronoi" class="on">Voronoi</button>
+  <button type="button" data-geo="geodesica">Geodésica</button>
+</nav>
 
 <script type="importmap">
 { "imports": { "three": "/val/v2/vendor/three.module.js" } }
@@ -41,20 +60,33 @@
   import { crearEsfera } from './escena/esfera.js';
   import { estadoFalso } from './datos-falsos.js';
 
-  // El parámetro ?escalon= fuerza un escalón de calidad, para poder comparar
-  // la versión con bloom y la de móvil en la misma máquina.
-  const forzado = new URLSearchParams(location.search).get('escalon');
-  const nFalsos = Number(new URLSearchParams(location.search).get('n')) || undefined;
+  const q = new URLSearchParams(location.search);
+  // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
+  // máquina lo que en otro caso decidiría la heurística.
+  const forzado = q.get('escalon');
+  const nFalsos = Number(q.get('n')) || undefined;
 
-  const pb = new URLSearchParams(location.search).get('bloom');
   const esfera = crearEsfera(document.getElementById('escena'), {
     escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
-    bloom: pb === null ? null : pb === '1',
+    geometria: q.get('geo') === 'geodesica' ? 'geodesica' : 'voronoi',
   });
 
   // Los datos entran por la puerta de siempre. La esfera no sabe que son
   // inventados, y cuando dejen de serlo no habrá que tocarla.
   esfera.actualizar(estadoFalso(nFalsos));
+
+  const nav = document.getElementById('geo');
+  function pintarBotones() {
+    const activo = esfera.getGeometria();
+    for (const b of nav.querySelectorAll('button')) b.classList.toggle('on', b.dataset.geo === activo);
+  }
+  nav.addEventListener('click', ev => {
+    const b = ev.target.closest('button');
+    if (!b) return;
+    esfera.setGeometria(b.dataset.geo);
+    pintarBotones();
+  });
+  pintarBotones();
 
   window.__esfera = esfera;
 </script>
