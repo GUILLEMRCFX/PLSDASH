@@ -44,6 +44,12 @@ export function panelEstadoGlobal(datos) {
     ? '<dd class="alerta">No</dd>'
     : `<dd${n.optimistic ? ' class="alerta"' : ''}>${n.optimistic ? 'Optimistic' : 'Verified'}</dd>`;
 
+  // Un estado no puede viajar solo en el color: un «8» no dice por sí mismo
+  // que sean pocos peers, y quien no distinga el naranja no ve nada. El color
+  // acompaña a la palabra, no la sustituye. («Verified»/«No» de sincronía ya
+  // se explican solos, por eso allí no hace falta añadir nada.)
+  const pocosPeers = Number(n.peers) < 10;
+
   return `
     <section class="panel"${alerta ? ' data-alerta' : ''} aria-labelledby="pg-t">
       <header class="p-cab">
@@ -78,7 +84,7 @@ export function panelEstadoGlobal(datos) {
 
       <dl class="p-fondo">
         <div><dt>Epoch</dt><dd>${fmt(n.epoch_actual)}</dd></div>
-        <div><dt>Peers</dt><dd${Number(n.peers) < 10 ? ' class="alerta"' : ''}>${fmt(n.peers)}</dd></div>
+        <div><dt>Peers</dt><dd${pocosPeers ? ' class="alerta"' : ''}>${fmt(n.peers)}${pocosPeers ? ' · pocos' : ''}</dd></div>
         <div><dt>Sincronía</dt>${sincronia}</div>
       </dl>
     </section>`;

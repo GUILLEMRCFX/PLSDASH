@@ -18,15 +18,59 @@
  *     tarjetas flotando: la profundidad la da la escena 3D, y si los paneles
  *     compiten con ella el conjunto se ensucia.
  *   · Las etiquetas son pequeñas y apagadas a propósito. Se leen cuando se
- *     buscan; el resto del tiempo se apartan.
+ *     buscan; el resto del tiempo se apartan. Apagadas, no ilegibles: ver
+ *     abajo, todo texto pasa el contraste de WCAG.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * DÓNDE NOS APARTAMOS DE LA GUÍA DE VISUALIZACIÓN, Y POR QUÉ
+ *
+ * Estos paneles se revisaron contra la guía `dataviz`. Cuatro decisiones van
+ * en contra de lo que recomienda. Están tomadas a sabiendas — que dentro de
+ * unos meses no parezcan un descuido.
+ *
+ * 1. NO HAY UNA CIFRA DE ENTRADA ÚNICA. La guía pide una sola cifra grande por
+ *    vista, la que abre el panel. Aquí hay dos del mismo tamaño, y es a
+ *    propósito: un panel tiene un titular cuando responde UNA pregunta, y este
+ *    responde dos de naturaleza distinta —«¿va todo bien?» y «¿cuánto
+ *    llevo?»—. Si las ganancias dominasen, el día que se caiga un validador el
+ *    ojo iría primero a un número que no ha cambiado. En un panel de
+ *    vigilancia eso es peor que no tener punto de entrada. Un HUD no lleva
+ *    titular.
+ *
+ * 2. `tabular-nums` EN LAS CIFRAS GRANDES. La guía lo marca como antipatrón
+ *    —iguala el ancho de los dígitos y un «121» queda suelto a tamaño
+ *    grande—. No aplica: la tipografía es monoespaciada, así que los dígitos
+ *    ya miden lo mismo y la propiedad no cambia nada. Y en un panel que se
+ *    refresca solo, que los números no bailen al actualizarse se agradece.
+ *
+ * 3. DOS COLORES, SIN VERDE DE «TODO BIEN». La paleta de estado de la guía
+ *    son cuatro (bien/aviso/serio/crítico). Aquí solo hay cian y naranja: si
+ *    nada está naranja, todo está bien. Un semáforo obliga a leer el color
+ *    antes que el número, y un tercer tono competiría con la esfera, que es
+ *    quien manda en la pantalla.
+ *
+ * 4. EL VALIDADOR DE PALETA DA UN FALLO DE «BANDA DE LUMINOSIDAD» Y SE IGNORA.
+ *    Esa comprobación asume la superficie oscura de la propia guía (#1a1a19);
+ *    sobre negro puro los colores tienen que ser más brillantes. La propia
+ *    guía dice que ese check es solo para paletas categóricas de series, no
+ *    para colores de estado. Lo que sí se midió y sí importa: la separación
+ *    entre cian y naranja bajo daltonismo es ΔE 21,9 (deuteranopía) y 30,0 en
+ *    visión normal, contra umbrales de 8 y 15. El par es seguro.
+ * ═══════════════════════════════════════════════════════════════════════════
  */
 
 :root {
   --negro:      #000;
-  --cian:       #2ad4f0;
-  --cian-suave: #7fd4ea;
-  --apagado:    #4a6b78;
-  --naranja:    #ff8a3d;
+  --cian:       #2ad4f0;   /* 11,77:1 sobre negro */
+  --cian-suave: #7fd4ea;   /* 12,51:1 */
+  /* Antes #4a6b78, que daba 3,67:1 y bajaba a 2,46:1 donde llevaba opacidad:
+     por debajo del 4,5:1 que WCAG exige a texto pequeño. Es el color de TODAS
+     las etiquetas, así que era el fallo más extendido del panel y el que hace
+     que un número no se lea en un móvil al sol. Ahora 5,69:1, con holgura
+     sobre el mínimo porque el sol aprieta más que el banco de pruebas. Sigue
+     siendo claramente recesivo frente al cian de los datos. */
+  --apagado:    #628b9b;   /* 5,69:1 */
+  --naranja:    #ff8a3d;   /* 8,95:1 */
   --borde:      rgba(42, 212, 240, .14);
   --borde-vivo: rgba(42, 212, 240, .28);
 
@@ -131,10 +175,14 @@
   gap: 10px 14px;
 }
 .p-fondo > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+/* Sin `opacity` y a 10px: con 9,5px y .75 de opacidad esto quedaba en 2,46:1,
+   el peor contraste de todo el panel. Apagar una etiqueta es bajarle el color,
+   no volverla translúcida — la opacidad compone contra el fondo y hunde el
+   contraste real sin que se vea venir en la hoja de estilos. */
 .p-fondo dt {
-  font: 400 9.5px/1 var(--mono);
+  font: 400 10px/1 var(--mono);
   letter-spacing: .14em; text-transform: uppercase;
-  color: var(--apagado); opacity: .75;
+  color: var(--apagado);
 }
 .p-fondo dd {
   margin: 0;
