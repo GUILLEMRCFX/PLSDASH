@@ -746,9 +746,6 @@ input[type=text].fld{
   // (epoch 319720) y el snapshot del brief (epoch 320041) pasaron 321 epochs
   // × 32 slots en 103.013 s → 10,03 s por slot.
   const SLOT_SECONDS = 10;
-  // Contrato de WPLS: el precio de PLS se toma de su par con más liquidez,
-  // igual que hace index.html. Buscar por texto devuelve tokens homónimos.
-  const WPLS = '0xa1077a294dde1b09bb078844df40758a5d0f9a27';
 
   let estado = null;
   let daily = [];        // historico rango=todo (resolución diaria)
@@ -1715,9 +1712,9 @@ input[type=text].fld{
     return Math.max(0, Math.min(1000, Math.round(t * 1000)));
   }
 
-  // Precio de PLS en vivo, del par de WPLS con más liquidez donde WPLS es la
-  // base. `simPricePerUnit` lo mueve el slider del simulador, así que no vale
-  // para valorar de verdad: para eso está este, que no lo toca nadie.
+  // Precio de PLS en vivo, servido por /api/precio. `simPricePerUnit` lo mueve
+  // el slider del simulador, así que no vale para valorar de verdad: para eso
+  // está este, que no lo toca nadie.
   let precioVivo = null;
 
   function precioPLS() {
@@ -1871,33 +1868,28 @@ input[type=text].fld{
 
   async function loadPrice() {
     try {
-      const res = await fetch(`https://api.dexscreener.com/token-pairs/v1/pulsechain/${WPLS}`);
-      if (!res.ok) return;
-      const pairs = await res.json();
-      if (!Array.isArray(pairs) || !pairs.length) return;
-
-      // `priceUsd` es el precio del token BASE del par, así que solo valen los
-      // pares donde WPLS es la base: en uno tipo HEX/WPLS traería el precio del
-      // HEX. Misma comprobación que hace index.html.
+      // Mismo endpoint que la portada y que el recolector del NUC. Antes cada
+      // uno llamaba a DexScreener por su cuenta y podían enseñar tres cifras
+      // distintas del mismo instante; ahora hay una sola lectura, cacheada en
+      // el borde, y con el criterio del par —solo los que llevan WPLS de base—
+      // escrito en un sitio en vez de en tres.
       //
-      // Hoy no cambia nada —WPLS/DAI, el de más liquidez, ya lleva WPLS como
-      // base— pero protege de que mañana lo haga otro par.
-      const propios = pairs.filter(p => (p.baseToken?.address || '').toLowerCase() === WPLS);
-      if (!propios.length) return;
+      // Ruta relativa a propósito: sirve igual en `plsdash.com/val/` que en
+      // `val.plsdash.com/`, que es donde acabará el panel.
+      const res = await fetch('/api/precio');
+      if (!res.ok) return;   // 503 = ni fuente ni respaldo; se queda el último bueno
+      const d = await res.json();
+      if (!d || d.disponible === false || !(d.precio > 0)) return;
 
-      const best = propios.reduce((a, p) => (p.liquidity?.usd || 0) > (a.liquidity?.usd || 0) ? p : a, propios[0]);
-      const price = parseFloat(best.priceUsd);
-      if (price > 0) {
-        precioVivo = price;
-        // El slider arranca en el precio real, pero luego va por libre.
-        if (!sliderTocado) {
-          simPricePerUnit = price;
-          $('simSlider').value = sliderFromPrice(price);
-        }
-        pintarPrecio(price, best.priceChange?.h24);
-        $('btnAhora').disabled = false;
-        pintarPrincipal();
+      precioVivo = d.precio;
+      // El slider arranca en el precio real, pero luego va por libre.
+      if (!sliderTocado) {
+        simPricePerUnit = d.precio;
+        $('simSlider').value = sliderFromPrice(d.precio);
       }
+      pintarPrecio(d.precio, d.cambio24, d.obsoleto ? d.edad_s : null);
+      $('btnAhora').disabled = false;
+      pintarPrincipal();
     } catch { /* se queda con el último precio bueno si falla */ }
   }
 
@@ -1913,8 +1905,17 @@ input[type=text].fld{
     return `0,0${'₀₁₂₃₄₅₆₇₈₉'[ceros]}${digitos}`;
   }
 
-  function pintarPrecio(precio, cambio24) {
-    $('precioVal').textContent = `$${fmtPrecio(precio)}`;
+  function pintarPrecio(precio, cambio24, edadObsoleto = null) {
+    const val = $('precioVal');
+    val.textContent = `$${fmtPrecio(precio)}`;
+
+    // Cuando DexScreener no responde, /api/precio sirve el último precio bueno
+    // con su antigüedad. Se enseña igual —un hueco sería peor— pero se dice de
+    // dónde sale en vez de hacerlo pasar por dato fresco.
+    val.title = edadObsoleto != null
+      ? `Último precio conocido, de hace ${Math.max(1, Math.round(edadObsoleto / 60))} min `
+        + '(DexScreener no responde)'
+      : '';
 
     const chg = $('precioChg');
     if (cambio24 == null || !Number.isFinite(Number(cambio24))) {
