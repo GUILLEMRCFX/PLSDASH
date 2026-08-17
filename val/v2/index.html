@@ -48,8 +48,8 @@
 
   /* Las columnas desaparecen como caja en móvil (`display:contents`), así que
      los paneles caen directamente en la retícula, en orden. Se reparten
-     llenando primero la izquierda: con 2 paneles sale 1 y 2, y en móvil el
-     orden de lectura sigue siendo el correcto. */
+     llenando primero la izquierda, así el orden de lectura en móvil sigue
+     siendo el correcto. */
   .col{display:contents}
 
   @media (min-width:1000px){
@@ -65,30 +65,10 @@
       height:calc(100dvh - 36px);
       position:sticky;top:18px;
     }
-    .col{display:flex;flex-direction:column;gap:18px;position:sticky;top:18px}
+    .col{display:flex;flex-direction:column;gap:18px}
     #colIzq{grid-area:izq}
     #colDer{grid-area:der}
   }
-
-  /* Conmutador PROVISIONAL de geometría. Vive dentro de la caja de la escena y
-     no pegado a la ventana: si fuera `fixed` taparía los paneles en móvil.
-     Se quita cuando la geometría esté decidida. */
-  #geo{
-    position:absolute;z-index:5;left:50%;transform:translateX(-50%);bottom:10px;
-    display:flex;gap:2px;padding:3px;border-radius:11px;
-    background:rgba(10,18,26,.72);border:1px solid var(--borde-vivo);
-    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  }
-  #geo button{
-    font:inherit;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
-    color:#5d7f8d;background:none;border:0;border-radius:8px;
-    padding:8px 13px;cursor:pointer;transition:.14s;
-    min-height:34px;
-  }
-  /* Apagado a propósito: es andamiaje de desarrollo, no un control del panel.
-     En cian encendido era lo más llamativo de la pantalla. */
-  #geo button.on{color:#04121a;background:rgba(42,212,240,.62)}
-  #geo button:not(.on):hover{color:#a8e6f5}
 
   #cargando{
     font:400 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
@@ -99,12 +79,7 @@
 <body>
 
 <main class="marco">
-  <div id="escena">
-    <nav id="geo" aria-label="Geometría de la malla (provisional)">
-      <button type="button" data-geo="voronoi" class="on">Voronoi</button>
-      <button type="button" data-geo="geodesica">Geodésica</button>
-    </nav>
-  </div>
+  <div id="escena"></div>
 
   <!-- Los paneles se inyectan aquí. Una columna sin paneles no pinta nada. -->
   <div class="col" id="colIzq"></div>
@@ -121,6 +96,8 @@
   import { cargarTodo } from './datos.js';
   import { panelEstadoGlobal } from './paneles/estado-global.js';
   import { panelGanancias } from './paneles/ganancias.js';
+  import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
+  import { panelValidadores } from './paneles/validadores.js';
 
   const q = new URLSearchParams(location.search);
   // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
@@ -130,7 +107,6 @@
 
   const esfera = crearEsfera(document.getElementById('escena'), {
     escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
-    geometria: q.get('geo') === 'geodesica' ? 'geodesica' : 'voronoi',
   });
 
   // La esfera sigue con datos inventados: sus nodos son decoración, no la
@@ -144,7 +120,7 @@
   /* ───────────────────────────────────────────── paneles */
 
   const columnas = [document.getElementById('colIzq'), document.getElementById('colDer')];
-  const PANELES = [panelEstadoGlobal, panelGanancias];
+  const PANELES = [panelEstadoGlobal, panelGanancias, panelCiclo, panelValidadores];
 
   function pintar(datos) {
     // Se reparten llenando la izquierda primero: así el orden en móvil —donde
@@ -154,6 +130,9 @@
     columnas.forEach((col, i) => {
       col.innerHTML = trozos[i].map(p => p(datos)).join('');
     });
+    // El diente de sierra lleva capa de exploración, y el HTML se regenera en
+    // cada refresco: hay que volver a engancharla.
+    engancharCiclo(document, datos);
     window.__datos = datos;
   }
 
@@ -175,34 +154,6 @@
   columnas[0].innerHTML = '<div id="cargando">Cargando…</div>';
   refrescar();
   setInterval(refrescar, REFRESCO_MS);
-
-  /* ───────────────────────────────────────────── conmutador provisional */
-
-  const nav = document.getElementById('geo');
-
-  // Si el navegador sirviese un `esfera.js` viejo de su caché, esta API no
-  // existiría y los botones dejarían de responder SIN decir nada.
-  const apiOk = typeof esfera.setGeometria === 'function'
-             && typeof esfera.getGeometria === 'function';
-
-  if (!apiOk) {
-    nav.innerHTML = '<span style="padding:9px 14px;font-size:11px;color:#ff8a3d">'
-      + 'módulo desactualizado · recarga forzada (Ctrl/Cmd + Shift + R)</span>';
-    console.error('[val/v2] esfera.js no expone setGeometria/getGeometria: '
-      + 'el navegador está sirviendo una versión antigua del módulo.');
-  } else {
-    const pintarBotones = () => {
-      const activo = esfera.getGeometria();
-      for (const b of nav.querySelectorAll('button')) b.classList.toggle('on', b.dataset.geo === activo);
-    };
-    nav.addEventListener('click', ev => {
-      const b = ev.target.closest('button');
-      if (!b) return;
-      esfera.setGeometria(b.dataset.geo);
-      pintarBotones();
-    });
-    pintarBotones();
-  }
 </script>
 </body>
 </html>

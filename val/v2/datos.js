@@ -117,9 +117,12 @@ export function saludGlobal(datos) {
   }
 
   const v = estado.validadores || {};
-  if (Number(v.activos) < Number(v.total)) {
+  const fuera = Number(v.total) - Number(v.activos);
+  if (fuera > 0) {
     return { palabra: 'AVISO', tono: 'aviso',
-             nota: `${Number(v.total) - Number(v.activos)} validador(es) fuera de servicio.` };
+             nota: fuera === 1
+               ? 'Un validador fuera de servicio.'
+               : `${fuera} validadores fuera de servicio.` };
   }
   if (estado.salud === 'aviso' || n.optimistic) {
     return { palabra: 'AVISO', tono: 'aviso',

@@ -207,3 +207,115 @@
   font: 400 11.5px/1.45 var(--mono);
   color: var(--apagado);
 }
+
+/* ─────────────────────────────────────────────── diente de sierra */
+
+.sierra { margin: 0; }
+.sierra svg {
+  display: block; width: 100%; height: 68px;
+  overflow: visible;
+}
+/* `vector-effect` mantiene el grosor real pese al `preserveAspectRatio:none`,
+   que si no estiraría la línea horizontalmente y la dejaría en un pelo. */
+.s-linea {
+  fill: none; stroke: var(--cian); stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+/* La caída se dibuja aparte y en naranja: es el barrido, el único momento en
+   que el número baja, y es lo que hace que la forma se entienda. */
+.s-caida {
+  stroke: var(--naranja); stroke-width: 1.5; opacity: .85;
+  vector-effect: non-scaling-stroke;
+}
+.s-cursor {
+  stroke: var(--cian-suave); stroke-width: 1; opacity: .5;
+  vector-effect: non-scaling-stroke;
+}
+.s-pie {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin-top: 7px;
+  font: 400 10px/1 var(--mono);
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--apagado);
+}
+.s-pie > span:nth-child(2) {
+  text-transform: none; letter-spacing: 0; color: var(--cian-suave);
+}
+
+/* Avance del ciclo actual. */
+.avance { display: flex; flex-direction: column; gap: 7px; }
+.a-barra { height: 3px; background: rgba(42, 212, 240, .16); border-radius: 2px; }
+.a-barra > i { display: block; height: 100%; background: var(--cian); border-radius: 2px; }
+.a-pie {
+  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  font: 400 11px/1.3 var(--mono); color: var(--cian-suave); opacity: .8;
+}
+.a-pie b { font-weight: 400; color: var(--cian); }
+.a-pie b.tarde { color: var(--naranja); }
+.a-pie > span { color: var(--apagado); opacity: 1; font-size: 10px; letter-spacing: .1em; }
+
+/* ─────────────────────────────────────────────── lista de validadores */
+
+/* 2px de separación entre filas, no un borde: una línea divisoria por fila
+   suma diez trazos que compiten con las barras, que son lo que hay que leer. */
+.vlista { display: flex; flex-direction: column; gap: 2px; }
+
+/* La barra ES el fondo de la fila. No ocupa ancho, así que los cuatro datos
+   caben en 320px sin encoger la letra, y el que se queda corto se ve sin leer
+   un solo número. El corte es duro (dos paradas en el mismo punto) porque un
+   degradado convertiría el final de la barra en una zona difusa y la
+   comparación entre filas dejaría de ser exacta. */
+.vfila {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto;
+  align-items: baseline;
+  gap: 0 8px;
+  padding: 7px 8px;
+  border-radius: 5px;
+  text-decoration: none;
+  font: 400 12px/1.25 var(--mono);
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(to right,
+    rgba(42, 212, 240, .13) 0, rgba(42, 212, 240, .13) var(--barra),
+    transparent var(--barra), transparent 100%);
+  position: relative;
+}
+.vfila:hover { background-color: rgba(42, 212, 240, .05); }
+
+/* Marca de la referencia del grupo.
+   Sin ella la barra apenas discrimina: los diez validadores ganan casi lo
+   mismo, así que todas las barras salen entre el 96% y el 100% y a ojo son
+   iguales. La barra sigue arrancando en cero —moverle el origen mentiría
+   sobre la magnitud— y lo que se añade es el punto contra el que hay que
+   comparar. Quien no llega a la marca se ve sin leer un número. */
+.vfila::after {
+  content: '';
+  position: absolute; top: 4px; bottom: 4px; left: var(--ref, -99px);
+  width: 1px; background: var(--cian-suave); opacity: .38;
+}
+.vfila.mal::after { background: var(--naranja); opacity: .55; }
+
+/* El texto por encima de la marca: si no, la línea cruza los dígitos y a este
+   tamaño eso se lee como un número mal impreso. */
+.vfila > span { position: relative; z-index: 1; }
+
+.v-id   { color: var(--cian-suave); }
+.v-marca{ color: var(--naranja); font-size: 11px; }
+.v-gan  { color: var(--cian); text-align: right; }
+.v-bal  { color: var(--apagado); font-size: 11px; }
+/* La nota ocupa la fila entera debajo: es texto, no una columna más. */
+.v-nota {
+  grid-column: 1 / -1;
+  color: var(--naranja); font-size: 10px;
+  letter-spacing: .12em; text-transform: uppercase;
+  margin-top: 3px;
+}
+
+.vfila.mal {
+  background: linear-gradient(to right,
+    rgba(255, 138, 61, .16) 0, rgba(255, 138, 61, .16) var(--barra),
+    transparent var(--barra), transparent 100%);
+}
+.vfila.mal .v-id,
+.vfila.mal .v-gan { color: var(--naranja); }
