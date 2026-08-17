@@ -221,3 +221,69 @@ export function ultimaHora(serie = []) {
 export function generadoHoy(serie = [], hoy = new Date().toISOString().slice(0, 10)) {
   return diarioReal(serie).find(d => d.fecha === hoy) || null;
 }
+
+/**
+ * Referencia del grupo para comparar validadores entre sí.
+ *
+ * Es la media **quitando al que más ha ganado**, no el máximo. Si uno acaba de
+ * proponer bloque se lleva unos 5.700 PLS de premio, y medir contra él
+ * convertiría esa suerte en «lo que han fallado» los otros nueve — justo lo
+ * contrario de lo que pasa.
+ *
+ * @returns {number|null} null si no hay suficientes para comparar.
+ */
+export function referenciaGrupo(valores) {
+  if (valores.length < 3) return null;
+  const orden = [...valores].sort((a, b) => a - b);
+  const resto = orden.slice(0, -1);            // fuera el más alto
+  const ref = resto.reduce((a, x) => a + x, 0) / resto.length;
+  return ref > 0 ? ref : null;
+}
+
+/**
+ * Ritmo de los barridos, medido sobre los ciclos ya observados.
+ *
+ * Se usa la MEDIANA de los huecos, no la media: si el recolector estuvo parado
+ * un día, ese hueco enorme entra en la lista y una media lo repartiría sobre
+ * la estimación entera. La mediana lo ignora.
+ *
+ * @param {Array} ciclos  `ganancia.ciclos`, cada uno con su `ts`.
+ * @returns {object|null} { periodo, ultimo, n } en segundos, o null.
+ */
+export function ritmoBarridos(ciclos = []) {
+  if (ciclos.length < 3) return null;
+
+  const ts = ciclos.map(c => Number(c.ts)).filter(Number.isFinite).sort((a, b) => a - b);
+  if (ts.length < 3) return null;
+
+  const huecos = [];
+  for (let i = 1; i < ts.length; i++) huecos.push(ts[i] - ts[i - 1]);
+  huecos.sort((a, b) => a - b);
+
+  return {
+    periodo: huecos[Math.floor(huecos.length / 2)],
+    ultimo: ts[ts.length - 1],
+    n: ts.length,
+  };
+}
+
+/**
+ * Cuándo toca el próximo barrido.
+ *
+ * `falta` en negativo significa que ya debería haber caído: no es un error,
+ * el protocolo tiene su propia cola y el ciclo se corre unos minutos. El panel
+ * lo dice en vez de enseñar una cuenta atrás en negativo.
+ */
+export function proximoBarrido(ciclos = [], ahoraS = Math.floor(Date.now() / 1000)) {
+  const r = ritmoBarridos(ciclos);
+  if (!r) return null;
+
+  const previsto = r.ultimo + r.periodo;
+  return {
+    ...r,
+    previsto,
+    desde: ahoraS - r.ultimo,
+    falta: previsto - ahoraS,
+    avance: Math.max(0, Math.min(1, (ahoraS - r.ultimo) / r.periodo)),
+  };
+}

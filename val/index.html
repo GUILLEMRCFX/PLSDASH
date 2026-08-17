@@ -736,6 +736,7 @@ import {
   gananciaAcumulada as calcGananciaAcumulada,
   diarioReal        as calcDiarioReal,
   ritmoDiario       as calcRitmoDiario,
+  referenciaGrupo,
 } from '/val/compartido/ganancias.js';
 
 (function(){
@@ -934,13 +935,6 @@ import {
     return ` <span class="pill-blq" title="${n} bloque${n === 1 ? '' : 's'} propuesto${n === 1 ? '' : 's'}">⬦${n > 1 ? ' ' + n : ''}</span>`;
   }
 
-  function referenciaGrupo(valores) {
-    if (valores.length < 3) return null;
-    const orden = [...valores].sort((a, b) => a - b);
-    const resto = orden.slice(0, -1);            // fuera el más alto
-    const ref = resto.reduce((a, x) => a + x, 0) / resto.length;
-    return ref > 0 ? ref : null;
-  }
 
   // Efectividad = lo que gana el más rezagado frente a esa referencia. Es la
   // forma directa de responder «¿se está quedando alguno atrás?».

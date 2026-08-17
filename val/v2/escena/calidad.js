@@ -25,27 +25,15 @@
  * `grosor`, `halo` y `punto` sí suben en los escalones pequeños, pero no por
  * técnica: en 390px la esfera ocupa muchos menos píxeles y una línea que en
  * escritorio se lee bien allí sería un pelo. Es corrección de tamaño.
- *
- * `geoDetalle` es para la esfera geodésica. `IcosahedronGeometry` parte cada
- * arista del icosaedro en `detalle+1`, así que salen (detalle+1)²×20
- * triángulos, y por Euler V = T/2+2 y A = 3T/2. Los valores están elegidos
- * para que la geodésica tenga un número de aristas parecido al del Voronoi del
- * mismo escalón: si no, la comparación mediría densidad en vez de forma.
- *
- *   detalle  7 → 1.280 triángulos,   642 vértices, 1.920 aristas
- *   detalle 13 → 3.920 triángulos, 1.962 vértices, 5.880 aristas
  */
 export const ESCALONES = {
   alto:  { celdas: 620, celdasFinas: 1700, puntosInterior: 1500, dprMax: 2,
-           geoDetalle: 7, geoDetalleFino: 13,
            grosor: 1.15, grosorFino: 0.62, ganFina: 0.20,
            halo: 1.00, intensidad: 2.35, atmosfera: 0.15, punto: 1.00 },
   medio: { celdas: 430, celdasFinas: 1100, puntosInterior: 950, dprMax: 2,
-           geoDetalle: 6, geoDetalleFino: 8,
            grosor: 1.35, grosorFino: 0.70, ganFina: 0.22,
            halo: 1.30, intensidad: 2.45, atmosfera: 0.17, punto: 1.15 },
   bajo:  { celdas: 300, celdasFinas: 700,  puntosInterior: 550, dprMax: 1.5,
-           geoDetalle: 5, geoDetalleFino: 6,
            grosor: 1.60, grosorFino: 0.80, ganFina: 0.24,
            halo: 1.50, intensidad: 2.55, atmosfera: 0.19, punto: 1.30 },
 };

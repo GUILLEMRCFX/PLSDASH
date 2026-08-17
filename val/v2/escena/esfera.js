@@ -24,11 +24,19 @@
  * La jerarquía entre los tres niveles de línea es la mitad del efecto: con
  * todas al mismo grosor y brillo la esfera se lee plana.
  *
- * ## Dos geometrías intercambiables
+ * ## Por qué Voronoi y no una geodésica
  *
- * `setGeometria('voronoi' | 'geodesica')` cambia SOLO la malla; el campo
- * interior, los nodos, la cadena y el resplandor son los mismos en las dos.
- * Es provisional, para poder decidir mirándolas en vez de imaginándolas.
+ * Hubo un conmutador provisional entre las dos, y se decidió mirándolas. La
+ * geodésica se descartó por dos motivos:
+ *
+ *   · Sus triángulos son regulares, y a esta densidad las filas de aristas
+ *     interfieren entre sí y con la rejilla de píxeles: hace muaré, con una
+ *     costura visible donde se alinean las filas del icosaedro. En movimiento
+ *     es peor que en una captura. El Voronoi no puede hacerlo porque no tiene
+ *     dos aristas paralelas repitiéndose — la irregularidad, que se buscó por
+ *     estética, además protege de eso.
+ *   · Una malla regular dice «esfera»; una irregular dice «red». Esto es una
+ *     red.
  *
  * ## Sobre el grosor de las líneas
  *
@@ -44,7 +52,7 @@ import { LineSegments2 } from '../vendor/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from '../vendor/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/jsm/lines/LineMaterial.js';
 
-import { construirCeldas, construirGeodesica, campoInterior } from './celdas.js';
+import { construirCeldas, campoInterior } from './celdas.js';
 import { ESCALONES, elegirEscalon, Vigilante } from './calidad.js';
 import { crearUniformsDeformacion, inyectar, UNIFORMS_DEFORMACION, FUNCION_DEFORMACION } from './deformacion.js';
 
@@ -69,28 +77,6 @@ function direccionesFibonacci(n) {
     ));
   }
   return out;
-}
-
-/**
- * Las mismas direcciones, pero clavadas en el vértice más cercano de la malla.
- * Así el nodo se apoya en la estructura en vez de flotar sobre ella. Se
- * descartan los repetidos: con subdivisión suficiente sobran vértices para
- * muchos más de diez validadores, así que el recuento nunca se ve limitado.
- */
-function ajustarAVertices(dirs, vertices) {
-  const usados = new Set();
-  const n = vertices.length / 3;
-  return dirs.map(d => {
-    let mejor = -2, mejorId = -1;
-    for (let i = 0; i < n; i++) {
-      if (usados.has(i)) continue;
-      const p = d.x * vertices[i * 3] + d.y * vertices[i * 3 + 1] + d.z * vertices[i * 3 + 2];
-      if (p > mejor) { mejor = p; mejorId = i; }
-    }
-    if (mejorId < 0) return d.clone();
-    usados.add(mejorId);
-    return new THREE.Vector3(vertices[mejorId * 3], vertices[mejorId * 3 + 1], vertices[mejorId * 3 + 2]);
-  });
 }
 
 /**
@@ -134,7 +120,7 @@ function instanciar(base, n) {
   return g;
 }
 
-export function crearEsfera(contenedor, { escalon = null, semilla, geometria = 'voronoi' } = {}) {
+export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
   const nombreEscalon = escalon || elegirEscalon();
   const cfg = { ...ESCALONES[nombreEscalon] };
   const reducido = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -331,22 +317,11 @@ export function crearEsfera(contenedor, { escalon = null, semilla, geometria = '
   const vorFina = construirCeldas(THREE, {
     nCeldas: cfg.celdasFinas, semilla: (semilla || 20260815) + 7717, variacion: 0.75,
   });
-  const geo = construirGeodesica(THREE, { detalle: cfg.geoDetalle, semilla });
-  const geoFina = construirGeodesica(THREE, { detalle: cfg.geoDetalleFino, semilla: (semilla || 20260815) + 31 });
 
-  const MALLAS = {
-    voronoi:   { ...vor, aristasFinas: vorFina.aristas, nSegmentosFinos: vorFina.nSegmentos, vertices: null },
-    geodesica: { ...geo, aristasFinas: geoFina.aristas, nSegmentosFinos: geoFina.nSegmentos },
-  };
+  const MALLA = { ...vor, aristasFinas: vorFina.aristas, nSegmentosFinos: vorFina.nSegmentos };
+  montarMalla(MALLA);
 
-  const grupos = {
-    voronoi:   montarMalla(MALLAS.voronoi),
-    geodesica: montarMalla(MALLAS.geodesica),
-  };
-
-  let tipo = (geometria === 'geodesica') ? 'geodesica' : 'voronoi';
-
-  // Campo interior: común a las dos, fuera de los grupos conmutables.
+  // Campo interior.
   const campo = campoInterior(cfg.puntosInterior);
   nube(campo.pos, campo.brillo, matCampo, grupo);
 
@@ -477,11 +452,9 @@ export function crearEsfera(contenedor, { escalon = null, semilla, geometria = '
     nNodos = n;
     if (n === 0) return;
 
-    // En la geodésica los nodos se clavan en vértices reales de la malla; en
-    // el Voronoi se quedan en las direcciones de Fibonacci.
-    const base = direccionesFibonacci(n);
-    const verts = MALLAS[tipo].vertices;
-    const dirs = verts ? ajustarAVertices(base, verts) : base;
+    // Direcciones de Fibonacci: reparto uniforme sobre la esfera, sin clavar
+    // los nodos en vértices de la malla. Son decoración, no topología.
+    const dirs = direccionesFibonacci(n);
 
     const aDir = new Float32Array(n * 3);
     const aInt = new Float32Array(n);
@@ -526,13 +499,6 @@ export function crearEsfera(contenedor, { escalon = null, semilla, geometria = '
       grupo.add(mallaCadena);
     }
   }
-
-  function aplicarTipo() {
-    grupos.voronoi.visible   = tipo === 'voronoi';
-    grupos.geodesica.visible = tipo === 'geodesica';
-    if (nNodos) construirNodos(nNodos);   // las posiciones cambian con la malla
-  }
-  aplicarTipo();
 
   // ─────────────────────────────────────────────── tamaño y zoom
   let ancho = 1, alto = 1, distanciaBase = 3.05, zoom = 1;
@@ -693,24 +659,14 @@ export function crearEsfera(contenedor, { escalon = null, semilla, geometria = '
 
   return {
     actualizar,
-    /** Provisional: para comparar las dos mallas mirándolas. */
-    setGeometria(t) {
-      const nuevo = (t === 'geodesica') ? 'geodesica' : 'voronoi';
-      if (nuevo === tipo) return tipo;
-      tipo = nuevo;
-      aplicarTipo();
-      return tipo;
-    },
-    getGeometria: () => tipo,
     info: () => {
-      const m = MALLAS[tipo];
+      const m = MALLA;
       return {
-        escalon: nombreEscalon, geometria: tipo, fps, fotogramas,
+        escalon: nombreEscalon, fps, fotogramas,
         celdas: m.nCeldas, segmentos: m.nSegmentos, segmentosFinos: m.nSegmentosFinos,
         vertices: m.nPuntos, triangulos: m.nTriangulos,
-        detalle: m.detalle ?? null,
         puntosInterior: campo.n,
-        msGeometria: vor.ms + vorFina.ms + geo.ms + geoFina.ms,
+        msGeometria: vor.ms + vorFina.ms,
         nodos: nNodos, dpr: renderer.getPixelRatio(), zoom: +zoom.toFixed(2),
         ancho, alto, visible, respiracion: uniformes.uRespiracion.value,
         llamadas: renderer.info.render.calls, reducido,
