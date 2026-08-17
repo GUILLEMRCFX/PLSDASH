@@ -13,6 +13,7 @@
  *   /api/val/historico?rango=24h   → snapshots de las últimas 24 h
  *   /api/val/historico?rango=todo  → tabla `daily` (trae `minutos_caido`)
  *   /api/val/ganancia              → barridos reconciliados contra la cadena
+ *   /api/val/eventos?limit=60      → registro de vida (activacion, barrido, bloque)
  *   /api/precio                    → precio de PLS (ver functions/api/precio.js)
  *
  * Ninguno bloquea a los demás: se piden en paralelo y lo que falle se anota en
@@ -47,6 +48,7 @@ export async function cargarTodo() {
     snapshots24h: `${API}/historico?rango=24h`,
     daily:        `${API}/historico?rango=todo`,
     ganancia:     `${API}/ganancia`,
+    eventos:      `${API}/eventos?limit=60`,
     precio:       '/api/precio',
   };
 
@@ -54,7 +56,8 @@ export async function cargarTodo() {
   const res = await Promise.allSettled(nombres.map(n => pedir(peticiones[n])));
 
   const salida = {
-    estado: null, serie: [], snapshots24h: [], daily: [], ganancia: null, precio: null,
+    estado: null, serie: [], snapshots24h: [], daily: [], ganancia: null,
+    eventos: [], precio: null,
     fallos: [],
     // Un 401 en los endpoints del panel no es «está roto»: es «no has metido
     // el PIN». Son dos mensajes muy distintos y confundirlos manda a mirar el
@@ -72,10 +75,26 @@ export async function cargarTodo() {
     }
     const v = r.value;
     if (nombre === 'estado' || nombre === 'ganancia' || nombre === 'precio') salida[nombre] = v;
+    else if (nombre === 'eventos') salida.eventos = v.eventos || [];
     else salida[nombre] = v.datos || [];
   });
 
   return salida;
+}
+
+/**
+ * Temperatura del NVMe.
+ *
+ * No está en el estado de KV —`estado.nodo` no la trae— y sí en `snapshots`,
+ * así que sale de la última fila de las 24 h. Se busca hacia atrás porque las
+ * dos únicas filas con huecos de la tabla podrían ser las últimas.
+ */
+export function tempNvme(snapshots24h = []) {
+  for (let i = snapshots24h.length - 1; i >= 0; i--) {
+    const t = Number(snapshots24h[i].temp_nvme);
+    if (Number.isFinite(t)) return t;
+  }
+  return null;
 }
 
 /**

@@ -98,6 +98,10 @@
   import { panelGanancias } from './paneles/ganancias.js';
   import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
   import { panelValidadores } from './paneles/validadores.js';
+  import { panelRitmo } from './paneles/ritmo.js';
+  import { panelSaludNodo } from './paneles/salud-nodo.js';
+  import { panelTrayectoria } from './paneles/trayectoria.js';
+  import { panelRegistro } from './paneles/registro.js';
 
   const q = new URLSearchParams(location.search);
   // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
@@ -120,7 +124,13 @@
   /* ───────────────────────────────────────────── paneles */
 
   const columnas = [document.getElementById('colIzq'), document.getElementById('colDer')];
-  const PANELES = [panelEstadoGlobal, panelGanancias, panelCiclo, panelValidadores];
+  // El orden es el de lectura en móvil y el de relleno de columnas en
+  // escritorio: la mitad de arriba a la izquierda, la de abajo a la derecha.
+  // El ritmo va el primero porque es el dato que más se consulta.
+  const PANELES = [
+    panelRitmo, panelEstadoGlobal, panelGanancias, panelCiclo,   // columna izquierda
+    panelValidadores, panelSaludNodo, panelTrayectoria, panelRegistro,  // derecha
+  ];
 
   function pintar(datos) {
     // Se reparten llenando la izquierda primero: así el orden en móvil —donde

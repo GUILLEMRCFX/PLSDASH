@@ -1,8 +1,11 @@
 /**
  * Panel 2 — Ganancias.
  *
- * Total generado (PLS y dólares), lo de hoy, lo de la última hora cerrada y la
- * media por día.
+ * Total generado (PLS y dólares), lo de hoy y lo de la última hora cerrada.
+ *
+ * Solo hechos medidos: las proyecciones viven en el panel de Ritmo. «Media por
+ * día» estaba aquí y se mudó allí — era el mismo `ritmoDiario()`, y tenerlo en
+ * los dos sitios lo enseñaba dos veces con dos rótulos distintos.
  *
  * ⚠ La fuente NO es el balance de los validadores. `snapshots.ganado` es solo
  *   el excedente sin barrer y cada ~8,1 h el protocolo lo retira dejándolo a
@@ -16,7 +19,7 @@
  */
 
 import {
-  gananciaAcumulada, ritmoDiario, ultimaHora, generadoHoy,
+  gananciaAcumulada, ultimaHora, generadoHoy,
 } from '/val/compartido/ganancias.js';
 import { ACTIVACION_TS } from '../datos.js';
 import { fmt, fmtEdad, escapar } from './formato.js';
@@ -32,7 +35,7 @@ const cifraPLS = (pls, etiqueta, sub = '') => `
   </div>`;
 
 export function panelGanancias(datos) {
-  const { estado, serie, snapshots24h, ganancia, precio } = datos;
+  const { estado, serie, ganancia, precio } = datos;
 
   if (!estado && !serie.length) {
     return `
@@ -43,9 +46,6 @@ export function panelGanancias(datos) {
   }
 
   const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
-  const ritmo = ritmoDiario({
-    serie, snapshots24h, plsDiaKV: estado?.validadores?.pls_dia, fmt,
-  });
   const hora = ultimaHora(serie);
   const hoy = generadoHoy(serie);
 
@@ -88,7 +88,6 @@ export function panelGanancias(datos) {
       <div class="rejilla">
         ${cifraPLS(hoy ? hoy.ganado_dia : null, 'Hoy · UTC')}
         ${cifraPLS(hora ? hora.pls : null, 'Última hora')}
-        ${cifraPLS(ritmo?.pls_dia, 'Media por día', ritmo?.provisional ? `${ritmo.base} · provisional` : ritmo?.base)}
       </div>
 
       ${procedencia ? `<p class="c-sub">${escapar(procedencia)}</p>` : ''}
