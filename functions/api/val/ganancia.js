@@ -259,6 +259,14 @@ async function guardar(db, nuevas) {
   return escritas;
 }
 
+// Un evento se identifica por (ts, tipo, validador). `ON CONFLICT DO NOTHING`
+// se apoya en el índice único `ix_eventos_unico`, y sin objetivo explícito:
+// así solo se traga los choques de unicidad y cualquier otro fallo —un NOT
+// NULL, por ejemplo— sigue saliendo a la superficie en vez de desaparecer.
+const SQL_EVENTO =
+  'INSERT INTO eventos (ts, tipo, titulo, detalle, pls, validador)'
+  + ' VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING';
+
 /**
  * Anota en `eventos` los barridos y bloques que aún no estuvieran.
  *
@@ -266,43 +274,46 @@ async function guardar(db, nuevas) {
  * dos días pasaban ocho bloques y ocho barridos. Los datos estaban en
  * `barridos`; solo faltaba contarlos como sucesos.
  *
- * Se comprueba antes de insertar porque `eventos` no tiene clave natural: su
- * id es autoincremental, así que un INSERT OR IGNORE no evitaría nada.
+ * ## Por qué ya no se consulta antes de insertar
+ *
+ * Aquí había un SELECT por evento y, si no aparecía, un INSERT. Eso es una
+ * carrera: este endpoint es un GET sin cerrojo y lo llama el panel en cada
+ * carga, así que dos peticiones a la vez consultaban las dos, no encontraban
+ * nada las dos, e insertaban las dos. No es teórico — el ciclo del 16-ago-2026
+ * a las 21:20:45 acabó con el barrido escrito dos veces y el bloque del
+ * validador 109555 también.
+ *
+ * Ahora la unicidad la impone la base de datos con `ix_eventos_unico`, un
+ * índice sobre `(ts, tipo, COALESCE(validador, -1))`. El COALESCE no es
+ * adorno: en SQLite dos NULL no se consideran iguales a efectos de índice
+ * único, y `validador` es NULL en TODOS los barridos — un índice sobre la
+ * columna a pelo habría dejado pasar exactamente el duplicado que causó el
+ * problema. Comprobado contra la base real: con el índice puesto, insertar un
+ * barrido repetido falla con SQLITE_CONSTRAINT_UNIQUE.
+ *
+ * Sale además una consulta por evento en vez de dos.
  */
-async function registrarEventos(db, ciclosNuevos) {
+export async function registrarEventos(db, ciclosNuevos) {
   let escritos = 0;
 
   for (const c of ciclosNuevos) {
-    const yaBarrido = await db.prepare(
-      "SELECT 1 FROM eventos WHERE tipo = 'barrido' AND ts = ? LIMIT 1"
-    ).bind(c.ts).first();
-
-    if (!yaBarrido) {
-      await db.prepare(
-        'INSERT INTO eventos (ts, tipo, titulo, detalle, pls) VALUES (?, ?, ?, ?, ?)'
-      ).bind(
-        c.ts, 'barrido', 'Barrido de saldo',
-        `${c.validadores} validadores retirados`, c.pls
-      ).run();
-      escritos++;
-    }
+    const barrido = await db.prepare(SQL_EVENTO).bind(
+      c.ts, 'barrido', 'Barrido de saldo',
+      `${c.validadores} validadores retirados`, c.pls, null
+    ).run();
+    // `changes` distingue lo escrito de lo ignorado por repetido, que antes
+    // decidía el SELECT previo.
+    escritos += barrido?.meta?.changes ?? 0;
 
     for (const v of c.proponentes) {
-      const yaBloque = await db.prepare(
-        "SELECT 1 FROM eventos WHERE tipo = 'bloque' AND ts = ? AND validador = ? LIMIT 1"
-      ).bind(c.ts, v).first();
-      if (yaBloque) continue;
-
       // La recompensa se reparte entre los proponentes del ciclo: si hubo dos,
       // el extra medido es de los dos juntos.
       const premio = c.bloques > 0 ? c.pls_bloques / c.bloques : null;
-      await db.prepare(
-        'INSERT INTO eventos (ts, tipo, titulo, detalle, pls, validador) VALUES (?, ?, ?, ?, ?, ?)'
-      ).bind(
+      const bloque = await db.prepare(SQL_EVENTO).bind(
         c.ts, 'bloque', 'Bloque propuesto',
         `Validador ${v}`, premio, v
       ).run();
-      escritos++;
+      escritos += bloque?.meta?.changes ?? 0;
     }
   }
 

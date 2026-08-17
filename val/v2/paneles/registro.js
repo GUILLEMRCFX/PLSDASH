@@ -16,11 +16,19 @@
  * Un barrido y los bloques que cayeron con él comparten `ts` exacto y son un
  * mismo suceso: se juntan en una línea.
  *
- * Y hay que DEDUPLICAR. En D1 el ciclo del 16-ago-2026 a las 21:20:45 tiene el
- * barrido escrito dos veces y el bloque del validador 109555 también, porque
- * `/api/val/ganancia` lo registró en dos pasadas. Sin deduplicar, ese ciclo
- * enseñaría el doble de PLS y dos bloques donde hubo uno. La clave real de un
- * evento es `(ts, tipo, validador)`.
+ * La deduplicación es DEFENSA EN PROFUNDIDAD, no la protección principal.
+ *
+ * El origen ya está arreglado: `/api/val/ganancia` escribía con un SELECT
+ * seguido de un INSERT, y dos peticiones simultáneas se colaban las dos —así
+ * salió el ciclo del 16-ago-2026 a las 21:20:45 con el barrido y el bloque del
+ * validador 109555 por duplicado—. Ahora la unicidad la impone la base con el
+ * índice `ix_eventos_unico` sobre `(ts, tipo, COALESCE(validador, -1))`, y el
+ * INSERT lleva `ON CONFLICT DO NOTHING`.
+ *
+ * Esto se queda porque el panel también lee filas escritas antes de que
+ * existiera el índice, y porque una vista que se rompe con un dato repetido es
+ * una vista frágil aunque hoy nadie los escriba. La clave de un evento es
+ * `(ts, tipo, validador)`, aquí y en la base.
  */
 
 import { fmt, escapar } from './formato.js';
