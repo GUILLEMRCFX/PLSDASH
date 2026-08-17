@@ -161,6 +161,19 @@ vive dentro de ese envoltorio.
   totales, el contador de bloques y la gráfica por ciclos.
 - **`meta`** lleva los cursores: hasta dónde llega la siembra de `barridos` y
   hasta qué instante se han pasado los barridos al registro de vida.
+- **`eventos` tiene un índice único** `ix_eventos_unico` sobre
+  `(ts, tipo, COALESCE(validador, -1))`:
+
+  ```sql
+  CREATE UNIQUE INDEX ix_eventos_unico
+    ON eventos (ts, tipo, COALESCE(validador, -1));
+  ```
+
+  El `COALESCE` **no es adorno**. En SQLite dos `NULL` no se consideran iguales
+  a efectos de índice único, y `validador` es `NULL` en todos los barridos: un
+  índice sobre la columna a pelo habría dejado pasar justo el duplicado que
+  hubo que limpiar. `/api/val/ganancia` inserta con `ON CONFLICT DO NOTHING`,
+  así que un reintento no escribe nada y tampoco rompe la petición.
 
 El código del NUC que alimenta ambas cosas está en `nuc/`, con las
 instrucciones de integración en `nuc/INTEGRACION.md`.
