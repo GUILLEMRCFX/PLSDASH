@@ -21,7 +21,44 @@ import sys
 import urllib.request
 
 BEACON = "http://localhost:5052"
-VALIDADORES = set(range(109549, 109559))
+# Los índices NO se escriben: no son correlativos. El undécimo validador
+# recibió el 109876 y no el 109559, porque entre un depósito y el siguiente
+# entraron 317 validadores más en la red. Se descubren igual que en
+# collector.py, leyendo los keystores del disco.
+KEYSTORE_DIR = "/blockchain/validator_keys"
+
+
+def _pubkeys_locales():
+    import glob
+    pk = set()
+    for ruta in glob.glob(KEYSTORE_DIR + "/keystore-*.json"):
+        try:
+            p = json.load(open(ruta)).get("pubkey")
+            if p:
+                pk.add(p if p.startswith("0x") else "0x" + p)
+        except Exception:
+            pass
+    return sorted(pk)
+
+
+def validadores_propios(beacon=BEACON):
+    """Índices propios, resueltos por pubkey contra la beacon API."""
+    ids = ",".join(_pubkeys_locales())
+    if not ids:
+        return set()
+    try:
+        r = requests.get(
+            f"{beacon}/eth/v1/beacon/states/head/validators",
+            params={"id": ids}, timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        return {int(v["index"]) for v in r.json()["data"]}
+    except Exception as e:
+        print(f"[validadores] no se pudieron resolver: {e}")
+        return set()
+
+
+VALIDADORES = validadores_propios()
 STAKE_TOTAL = 320_000_000
 TIMEOUT = 20
 

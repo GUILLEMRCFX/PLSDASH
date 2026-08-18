@@ -53,9 +53,46 @@ WALLET = "0x952E0311DdDCe7090d61a275f411a6ddF879BDc8"
 # que nada de lo que devuelve el explorador sirve sin filtrar.
 #
 # El filtro bueno son los índices de validador, no las fechas: cada retirada
-# trae `validator_index`, y los diez actuales son 109549..109558. Es exacto y no
+# trae `validator_index`, que se compara con el conjunto propio. Es exacto y no
 # depende de acertar con la marca de activación.
-VALIDADORES = set(range(109549, 109559))
+# Los índices NO se escriben: no son correlativos. El undécimo validador
+# recibió el 109876 y no el 109559, porque entre un depósito y el siguiente
+# entraron 317 validadores más en la red. Se descubren igual que en
+# collector.py, leyendo los keystores del disco.
+KEYSTORE_DIR = "/blockchain/validator_keys"
+
+
+def _pubkeys_locales():
+    import glob
+    pk = set()
+    for ruta in glob.glob(KEYSTORE_DIR + "/keystore-*.json"):
+        try:
+            p = json.load(open(ruta)).get("pubkey")
+            if p:
+                pk.add(p if p.startswith("0x") else "0x" + p)
+        except Exception:
+            pass
+    return sorted(pk)
+
+
+def validadores_propios(beacon=BEACON):
+    """Índices propios, resueltos por pubkey contra la beacon API."""
+    ids = ",".join(_pubkeys_locales())
+    if not ids:
+        return set()
+    try:
+        r = requests.get(
+            f"{beacon}/eth/v1/beacon/states/head/validators",
+            params={"id": ids}, timeout=TIMEOUT,
+        )
+        r.raise_for_status()
+        return {int(v["index"]) for v in r.json()["data"]}
+    except Exception as e:
+        print(f"[validadores] no se pudieron resolver: {e}")
+        return set()
+
+
+VALIDADORES = validadores_propios()
 
 # Activación de los diez actuales (evento `activacion` en D1). Se conserva solo
 # como red de seguridad para listados que no traigan índice de validador.
@@ -146,7 +183,7 @@ def retiradas(wallet=WALLET, validadores=VALIDADORES):
                     "block_number": 27240802,
                     "index": 160124319,
                     "timestamp": "2026-08-09T03:04:35.000000Z",
-                    "validator_index": 109558}, ...],
+                    "validator_index": 109876}, ...],
          "next_page_params": {"index": ..., "items_count": ...}}
 
     El filtro por `validator_index` es lo que separa esta etapa de la anterior:

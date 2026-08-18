@@ -1,7 +1,20 @@
 /**
- * Panel — Trayectoria al validador #11.
+ * Panel — Trayectoria al siguiente validador.
  *
  * Cuánto falta para reunir otro depósito completo, al ritmo actual.
+ *
+ * ⚠ NINGÚN número de este panel está escrito. El objetivo sale de
+ *   `validadores.total + 1`, el porcentaje de `reunido / depósito` y el
+ *   depósito de `stake_total / total`.
+ *
+ *   El objetivo estuvo fijo una vez, y el día que ese validador entró de
+ *   verdad el panel se quedó apuntando a una meta ya cumplida — que es peor
+ *   que no tener panel. Ahora avanza solo: en cuanto el recuento sube, el
+ *   objetivo sube con él, sin que nadie toque nada.
+ *
+ *   Se usa `total` y no `activos` a propósito: un validador propio que esté
+ *   temporalmente inactivo sigue siendo tuyo y su depósito ya está puesto, así
+ *   que no hay que volver a reunirlo.
  *
  * ## Qué cuenta como «reunido»
  *
@@ -23,7 +36,16 @@ import { gananciaAcumulada, ritmoDiario } from '/val/compartido/ganancias.js';
 import { ACTIVACION_TS } from '../datos.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
 
-export const TITULO = 'Validador #11';
+/**
+ * El objetivo es el siguiente al que ya se tiene. Si no hay recuento todavía,
+ * se dice «siguiente validador» en vez de inventarse un número.
+ */
+export function tituloObjetivo(estado) {
+  const total = Number(estado?.validadores?.total);
+  return Number.isFinite(total) && total > 0
+    ? `Validador #${total + 1}`
+    : 'Siguiente validador';
+}
 
 /** Días → «11 meses», «1,4 años», «23 días». */
 function fmtPlazo(dias) {
@@ -37,6 +59,7 @@ export function panelTrayectoria(datos) {
   const { estado, serie, snapshots24h, ganancia, precio, ahoraS } = datos;
   const v = estado?.validadores || {};
 
+  const titulo = tituloObjetivo(estado);
   const deposito = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : null;
   const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
 
@@ -47,7 +70,7 @@ export function panelTrayectoria(datos) {
   if (!deposito || reunido == null) {
     return `
       <section class="panel" aria-labelledby="pt-t">
-        <header class="p-cab"><h2 id="pt-t">${TITULO}</h2></header>
+        <header class="p-cab"><h2 id="pt-t">${escapar(titulo)}</h2></header>
         <p class="vacio">Faltan datos para calcular la trayectoria.</p>
       </section>`;
   }
@@ -70,7 +93,7 @@ export function panelTrayectoria(datos) {
   return `
     <section class="panel" aria-labelledby="pt-t">
       <header class="p-cab">
-        <h2 id="pt-t">${TITULO}</h2>
+        <h2 id="pt-t">${escapar(titulo)}</h2>
         <span class="p-marca">${fmt(pct, 1)} %</span>
       </header>
 

@@ -737,6 +737,7 @@ import {
   diarioReal        as calcDiarioReal,
   ritmoDiario       as calcRitmoDiario,
   referenciaGrupo,
+  aprValidadorHora,
 } from '/val/compartido/ganancias.js';
 
 (function(){
@@ -1196,13 +1197,19 @@ import {
       $('blocksPesoD').textContent = 'sin bloques aún';
     }
 
-    // APR sobre la ganancia real, no sobre el excedente: es la rentabilidad
-    // efectiva del stake, que es la pregunta de fondo («¿voy bien?»).
-    const horas = Number(v.horas_activo) || 0;
-    if (acum && horas >= 1 && v.stake_total > 0) {
-      const apr = (acum.total / horas) * 8760 / v.stake_total * 100;
-      $('statAprV').innerHTML = `${fmt(apr, 2)}<small>%</small>`;
-      $('statAprD').textContent = `sobre ${fmtCompact(v.stake_total)} en staking`;
+    // APR sobre la ganancia real, no sobre el excedente, y ponderado por
+    // validador-hora: dividir entre las horas del más veterano diluía la cifra
+    // en cuanto un validador entraba después que los demás. Ver el módulo
+    // compartido.
+    const deposito = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : 0;
+    const apr = acum && aprValidadorHora({
+      total: acum.total, detalle: v.detalle || [], deposito,
+    });
+    if (apr) {
+      $('statAprV').innerHTML = `${fmt(apr.pct, 2)}<small>%</small>`;
+      $('statAprD').textContent = apr.deTodos
+        ? `sobre ${fmtCompact(v.stake_total)} en staking`
+        : `sobre ${apr.conActivacion} de ${v.total} validadores`;
     } else {
       $('statAprV').textContent = '–';
       $('statAprD').textContent = 'aún sin recorrido';

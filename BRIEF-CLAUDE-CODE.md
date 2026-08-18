@@ -255,7 +255,8 @@ El PIN lo configurará el propietario como variable de entorno en Cloudflare. **
 ## Detalles a tener en cuenta
 
 **Datos reales actuales** (para calibrar el diseño con cifras verosímiles):
-- 10 validadores, índices `109549` a `109558`
+- Validadores propios: se descubren leyendo los keystores del disco. Los
+  índices NO son correlativos (el undécimo recibió el 109876, no el 109559)
 - Activados el 7 ago 2026 a las 09:45 UTC
 - 320.000.000 PLS en staking (32M por validador)
 - ~10.500 PLS ganados en las primeras 29 horas

@@ -42,6 +42,26 @@
  *
  *   Para eso está `ultimaHora()`, que mide el tramo de verdad.
  *
+ * ⚠ TRAMPA — el `apr` y el `pls_hora` del recolector tenían LA MISMA raíz.
+ *
+ *   Hasta el 18-ago-2026 el recolector publicaba:
+ *
+ *       pls_hora = ganado_total / horas_activo
+ *       apr      = pls_hora × 24 × 365 / stake_total × 100
+ *
+ *   Mal por los dos lados de la división:
+ *
+ *   · El NUMERADOR es el excedente sin barrer, que vuelve a cero cada ~8,1 h.
+ *     Eso da un diente de sierra, no una rentabilidad. Medido en D1 en seis
+ *     horas seguidas: 0,217 → 0 → 0,029 → 0,061 → 0,09 → 0,119. El cero es el
+ *     instante justo después del barrido.
+ *   · El DENOMINADOR eran las horas desde la activación MÁS ANTIGUA del grupo.
+ *     Daba igual mientras todos entraran juntos; en cuanto uno lleva once días
+ *     y otro unas horas, la media queda diluida.
+ *
+ *   Por eso el recolector ya no los publica (van a `null`) y el APR se calcula
+ *   aquí con `aprValidadorHora()`, ponderando por validador-hora.
+ *
  * ⚠ TRAMPA — `daily.ganado_dia` tampoco sirve.
  *
  *   Guarda el excedente que había a medianoche, no lo ganado en la jornada.
@@ -238,6 +258,58 @@ export function referenciaGrupo(valores) {
   const resto = orden.slice(0, -1);            // fuera el más alto
   const ref = resto.reduce((a, x) => a + x, 0) / resto.length;
   return ref > 0 ? ref : null;
+}
+
+/**
+ * APR real, ponderado por validador-hora.
+ *
+ *     APR = ganancia_real / Σ(depósito_i × horas_activas_i) × 8760 × 100
+ *
+ * El denominador NO es `stake_total × horas_del_grupo`. Con validadores de
+ * distinta antigüedad esa cuenta miente en los dos sentidos: si se usan las
+ * horas del más veterano, el que acaba de entrar infla el stake sin haber
+ * tenido tiempo de producir y el APR sale bajo; si se usan las del más nuevo,
+ * sale disparado. Lo que de verdad ha estado trabajando es cada depósito
+ * durante SUS horas, y eso es lo que se suma.
+ *
+ * Con diez a 273 h y uno a 20 h, el denominador correcto es
+ * 320M×273 + 32M×20 = 88.000M validador-hora, frente a los 96.096M que da
+ * `stake_total × horas_del_veterano`. Un 8,4% de diferencia, y el APR sale
+ * proporcionalmente más alto.
+ *
+ * El numerador es la ganancia REAL —barridos más excedente—, nunca el
+ * excedente suelto.
+ *
+ * @param {number} total      `gananciaAcumulada().total`.
+ * @param {Array}  detalle    `estado.validadores.detalle`, con `activacion_ts`.
+ * @param {number} deposito   PLS por validador (`stake_total / total`).
+ * @returns {object|null} { pct, validadorHoras, conActivacion, deTodos }
+ */
+export function aprValidadorHora({ total, detalle = [], deposito, ahoraS = Math.floor(Date.now() / 1000) }) {
+  if (!(total > 0) || !(deposito > 0) || !detalle.length) return null;
+
+  let validadorHoras = 0;
+  let conActivacion = 0;
+
+  for (const d of detalle) {
+    const ts = Number(d.activacion_ts);
+    if (!Number.isFinite(ts) || ts <= 0 || ts > ahoraS) continue;
+    conActivacion++;
+    validadorHoras += deposito * ((ahoraS - ts) / 3600);
+  }
+
+  // Sin activaciones no se inventa nada: es preferible no enseñar APR a
+  // enseñar uno calculado sobre un denominador adivinado.
+  if (conActivacion === 0 || validadorHoras <= 0) return null;
+
+  return {
+    pct: (total / validadorHoras) * 8760 * 100,
+    validadorHoras,
+    conActivacion,
+    // Si el recolector todavía no publica `activacion_ts` para todos, el APR
+    // sale sobre los que sí lo traen y hay que decirlo.
+    deTodos: conActivacion === detalle.length,
+  };
 }
 
 /**
