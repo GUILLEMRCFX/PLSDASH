@@ -5,6 +5,49 @@
 
 ---
 
+# Subir el collector arreglado — pasos cortos
+
+`nuc/collector.py` es ahora la copia versionada del que corre en el NUC, con
+dos cambios encima de la versión que descubre las claves por keystore.
+
+### 1. Copiarlo
+
+```bash
+scp nuc/collector.py guillem@NUC:/home/guillem/
+```
+
+### 2. Comprobar que sale la antigüedad de cada uno
+
+```bash
+ssh guillem@NUC
+cd /home/guillem && python3 collector.py --resumen
+```
+
+En «Antigüedades» tienen que salir **dos números distintos** mientras el
+validador nuevo sea reciente. Si sale uno solo, los `activacion_ts` no se están
+leyendo y hay que mirarlo antes de seguir.
+
+Y donde antes iban «Ritmo» y «APR» ahora pone que los calcula el panel. Es lo
+esperado: **ver la cabecera de `leer_validadores()` para el porqué**.
+
+### 3. Comprobar el JSON
+
+```bash
+python3 collector.py --pretty | head -40
+```
+
+Cada entrada de `detalle` tiene que traer `activacion_ts`, `activacion_utc` y
+`horas_activo` propios.
+
+### 4. No hay que tocar `push.py`
+
+`pls_hora`, `pls_dia` y `apr_pct` siguen existiendo como claves, ahora a
+`null`. `push.py` las escribe igual y D1 las guarda como `NULL`, que es
+exactamente lo que son. Las filas nuevas de `snapshots` tendrán esas dos
+columnas vacías **a propósito**.
+
+---
+
 # Subir el precio al NUC — pasos cortos
 
 `push.py` vive en `/home/guillem/` del NUC, no en este repo, así que no puedo
@@ -285,7 +328,8 @@ ha anotado, por si se quisiera registrar en el log.
    marcaría como perdido un bloque que aún no se ha propuesto.
 2. Para cada epoch pendiente pide
    `/eth/v1/validator/duties/proposer/{epoch}` y se queda con los slots
-   asignados a los índices 109549–109558.
+   asignados a los índices propios, que se resuelven por pubkey y NO son
+   correlativos.
 3. **Confirma que el bloque existe** pidiendo la cabecera del slot. Estar
    asignado no es haber propuesto: si el slot se perdió no hay bloque, y
    anotarlo apuntaría una recompensa que nunca se cobró.

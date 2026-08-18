@@ -2,7 +2,7 @@
  * Panel 4 — Los validadores.
  *
  * Este es el panel que se mira cuando algo falla, así que todo está ordenado
- * alrededor de una sola pregunta: **¿cuál de los diez está raro?**
+ * alrededor de una sola pregunta: **¿cuál de ellos está raro?**
  *
  * ## Por qué una fila con barra de fondo y no una tabla
  *
@@ -14,7 +14,7 @@
  * columna al texto: **el `ganado` se codifica dos veces**, como número y como
  * longitud de una barra que es el fondo de la propia fila. La barra no ocupa
  * ancho —vive detrás del texto— y es lo que permite detectar al raro sin leer
- * ni un número: diez barras casi iguales y una corta se ve de un vistazo.
+ * ni un número: N barras casi iguales y una corta se ve de un vistazo.
  *
  * Esa es también la razón de que la misma forma sirva en móvil y en
  * escritorio, y de que no haya dos disposiciones que mantener.
@@ -38,9 +38,27 @@ const EXPLORADOR = 'https://www.g4mm4.io/validator/';
  * marca. Las recompensas por atestación son casi idénticas entre validadores
  * del mismo grupo, así que quedarse un 15% por detrás no es ruido: es haberse
  * perdido atestaciones. La referencia ya excluye al más alto, de modo que el
- * que acaba de proponer bloque no arrastra a los otros nueve al naranja.
+ * que acaba de proponer bloque no arrastra a los demás al naranja.
  */
 const UMBRAL_REZAGADO = 0.85;
+
+/**
+ * Un validador activado DESPUÉS del último barrido no ha tenido el ciclo
+ * entero para acumular, así que llega con menos que los demás sin que le pase
+ * nada. Compararlo contra el grupo lo marcaría como rezagado siendo mentira.
+ *
+ * Se corrige solo en cuanto pasa un barrido completo (~8,1 h), pero mientras
+ * tanto el panel diría que algo va mal justo el día que acabas de ampliar —
+ * que es cuando más se mira. Así que se le saca de la comparación y se le
+ * rotula por lo que es.
+ *
+ * Sin `activacion_ts` —recolector viejo— nadie es reciente y todo queda como
+ * antes: se degrada, no se rompe.
+ */
+function esReciente(d, desdeTs) {
+  const ts = Number(d.activacion_ts);
+  return Number.isFinite(ts) && desdeTs != null && ts > desdeTs;
+}
 
 export function panelValidadores(datos) {
   const detalle = datos.estado?.validadores?.detalle || [];
@@ -54,7 +72,20 @@ export function panelValidadores(datos) {
       </section>`;
   }
 
-  const valores = detalle.map(d => Number(d.ganado) || 0);
+  // Instante del último barrido: todo lo activado después no ha corrido el
+  // ciclo entero. Sale de los ciclos ya reconciliados contra la cadena.
+  const ciclos = datos.ganancia?.ciclos || [];
+  const ultimoBarrido = ciclos.length ? Number(ciclos[ciclos.length - 1].ts) : null;
+
+  const recientes = new Set(
+    detalle.filter(d => esReciente(d, ultimoBarrido)).map(d => d.indice));
+
+  // La referencia se calcula SIN los recién activados: si no, uno que lleva
+  // dos horas arrastraría la media del grupo hacia abajo y taparía a un
+  // rezagado de verdad.
+  const valores = detalle
+    .filter(d => !recientes.has(d.indice))
+    .map(d => Number(d.ganado) || 0);
   const ref = referenciaGrupo(valores);
 
   // La escala de la barra llega un 15% por encima del mayor, no justo hasta
@@ -63,7 +94,7 @@ export function panelValidadores(datos) {
   // borde en vez de leerse como referencia. El origen sigue en cero: lo que se
   // añade es techo, no un corte por abajo, así que las longitudes siguen
   // siendo proporcionales al valor.
-  const tope = Math.max(1, ...valores) * 1.15;
+  const tope = Math.max(1, ...detalle.map(d => Number(d.ganado) || 0)) * 1.15;
 
   // El stake que le toca a cada uno. No se escribe 32M a fuego: sale del
   // estado real, y si algún día cambia el tamaño del depósito esto sigue
@@ -73,14 +104,18 @@ export function panelValidadores(datos) {
 
   const activos = detalle.filter(d => d.estado === 'active_ongoing').length;
   const totalBloques = Object.values(bloques).reduce((a, n) => a + Number(n || 0), 0);
-  const rezagados = ref ? detalle.filter(d => (Number(d.ganado) || 0) < ref * UMBRAL_REZAGADO).length : 0;
+  const rezagados = ref
+    ? detalle.filter(d => !recientes.has(d.indice)
+        && (Number(d.ganado) || 0) < ref * UMBRAL_REZAGADO).length
+    : 0;
   const problemas = detalle.filter(d => d.slashed || d.estado !== 'active_ongoing').length + rezagados;
 
   const filas = [...detalle].sort((a, b) => a.indice - b.indice).map(d => {
     const ganado = Number(d.ganado) || 0;
     const balance = Number(d.balance);
     const nBloques = Number(bloques[d.indice] || 0);
-    const rezagado = ref != null && ganado < ref * UMBRAL_REZAGADO;
+    const reciente = recientes.has(d.indice);
+    const rezagado = !reciente && ref != null && ganado < ref * UMBRAL_REZAGADO;
     // Por debajo del depósito significa penalización: el balance solo baja de
     // ahí si la cadena ha quitado. Es lo ÚNICO que hace informativa esta
     // columna — el resto del tiempo los diez marcan el mismo 32M, porque
@@ -95,6 +130,7 @@ export function panelValidadores(datos) {
       : d.estado !== 'active_ongoing' ? String(d.estado || 'inactivo')
       : penalizado ? 'por debajo del depósito'
       : rezagado ? 'rezagado'
+      : reciente ? 'recién activado · aún sin ciclo completo'
       : '';
 
     return `
@@ -125,7 +161,7 @@ export function panelValidadores(datos) {
 
       <dl class="p-fondo">
         <div><dt>Bloques</dt><dd>${fmt(totalBloques)}</dd></div>
-        <div><dt>Ganado ahora</dt><dd>${fmt(valores.reduce((a, v) => a + v, 0))}</dd></div>
+        <div><dt>Ganado ahora</dt><dd>${fmt(detalle.reduce((a, d) => a + (Number(d.ganado) || 0), 0))}</dd></div>
         <div><dt>Referencia</dt><dd>${ref == null ? '–' : fmt(ref)}</dd></div>
       </dl>
     </section>`;

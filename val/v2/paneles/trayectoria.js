@@ -3,11 +3,14 @@
  *
  * Cuánto falta para reunir otro depósito completo, al ritmo actual.
  *
- * ⚠ El número del objetivo NO se escribe. Sale de `validadores.total + 1`, que
- *   es el recuento real del estado. Estuvo fijo en «#11» hasta que el #11
- *   entró de verdad y el panel se quedó apuntando a un objetivo ya cumplido:
- *   un panel que celebra una meta pasada es peor que no tenerlo. Ahora avanza
- *   solo, y el mismo día que entre el #12 pasará a apuntar al #13.
+ * ⚠ NINGÚN número de este panel está escrito. El objetivo sale de
+ *   `validadores.total + 1`, el porcentaje de `reunido / depósito` y el
+ *   depósito de `stake_total / total`.
+ *
+ *   El objetivo estuvo fijo una vez, y el día que ese validador entró de
+ *   verdad el panel se quedó apuntando a una meta ya cumplida — que es peor
+ *   que no tener panel. Ahora avanza solo: en cuanto el recuento sube, el
+ *   objetivo sube con él, sin que nadie toque nada.
  *
  *   Se usa `total` y no `activos` a propósito: un validador propio que esté
  *   temporalmente inactivo sigue siendo tuyo y su depósito ya está puesto, así
