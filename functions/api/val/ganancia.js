@@ -29,10 +29,20 @@
 const WALLET = '0x952E0311DdDCe7090d61a275f411a6ddF879BDc8';
 const API = 'https://api.scan.pulsechain.com/api/v2';
 
-// Los diez validadores actuales. Filtrar por índice es lo que separa esta
-// etapa de la del validador que usó esta misma wallet durante un año.
-const PRIMER_VALIDADOR = 109549;
-const ULTIMO_VALIDADOR = 109558;
+// Los índices propios NO se escriben aquí.
+//
+// Estuvieron a fuego como un rango `109549..109558`, y funcionó exactamente
+// hasta que entró el undécimo validador: su índice es 109876, no 109559,
+// porque entre un depósito y el siguiente entraron 317 validadores más en la
+// red. Ampliar el rango tampoco habría servido — los índices no son
+// correlativos y nunca lo van a ser.
+//
+// Ahora el conjunto sale del estado real que publica el recolector, con la
+// caché de esta misma respuesta como respaldo. Filtrar sigue haciendo falta:
+// esta wallet la usó otro validador durante un año, y aunque el corte por
+// `ACTIVACION_TS` deja fuera casi todo lo suyo, una retirada de salida podría
+// caer del lado nuevo y colarse como si fuera nuestra.
+const CLAVE_ESTADO = 'validator:estado';
 
 // Una retirada normal ronda los 2.390 PLS por validador y ciclo; cuando toca
 // proponer bloque sube a ~8.100. El umbral solo sirve para contarlos.
@@ -192,7 +202,7 @@ async function saldoWallet() {
  * Devuelve lo encontrado y el motivo de la parada, que es lo que dice si la
  * siembra ha terminado o si hay que seguir en la próxima llamada.
  */
-async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas }) {
+async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas, propios }) {
   const encontradas = [];
   let params = { items_count: 50 };
   if (arrancarEn != null) params.index = arrancarEn;
@@ -213,7 +223,7 @@ async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas }) {
       if (pararEn != null && indice <= pararEn) { parada = 'conocido'; break; }
 
       const validador = Number(w.validator_index);
-      if (validador < PRIMER_VALIDADOR || validador > ULTIMO_VALIDADOR) continue;
+      if (!propios.has(validador)) continue;
 
       encontradas.push({
         indice,
@@ -320,15 +330,53 @@ export async function registrarEventos(db, ciclosNuevos) {
   return escritos;
 }
 
+/**
+ * Los índices de nuestros validadores, tal y como estén hoy.
+ *
+ * Orden de preferencia:
+ *   1. `validator:estado` en KV — lo que acaba de publicar el recolector, que
+ *      los descubre leyendo los keystores del disco.
+ *   2. Los índices guardados en la caché de esta misma respuesta, por si KV
+ *      falla o el recolector lleva un rato callado.
+ *
+ * Si no hay ninguno de los dos devuelve `null`, y quien llama NO recorre el
+ * explorador. Es deliberado: sin saber cuáles son nuestros, la alternativa
+ * sería aceptar cualquier retirada a esta wallet, y esta wallet la usó otro
+ * validador durante un año. Escribir sus retiradas en `barridos` inflaría el
+ * total para siempre y habría que limpiarlo a mano. Una cifra vieja se
+ * arregla sola en la siguiente pasada; una tabla contaminada, no.
+ */
+async function indicesPropios(env, cache) {
+  if (env.PLSDASH_KV) {
+    try {
+      const estado = await env.PLSDASH_KV.get(CLAVE_ESTADO, { type: 'json' });
+      const detalle = estado?.validadores?.detalle;
+      if (Array.isArray(detalle) && detalle.length) {
+        const s = new Set(detalle.map(d => Number(d.indice)).filter(Number.isFinite));
+        if (s.size) return s;
+      }
+    } catch { /* se prueba el respaldo */ }
+  }
+
+  if (Array.isArray(cache?.indices) && cache.indices.length) {
+    const s = new Set(cache.indices.map(Number).filter(Number.isFinite));
+    if (s.size) return s;
+  }
+
+  return null;
+}
+
 export async function onRequestGet({ env }) {
   const db = env.VALIDATOR_DB;
   if (!db) return json({ error: 'D1 no configurado (binding VALIDATOR_DB)' }, 500);
 
   // Caché de respuesta. Si algo falla al leerla se sigue adelante: es una
   // optimización, no un requisito.
+  let cacheGuardada = null;
   try {
     if (env.PLSDASH_KV) {
       const cache = await env.PLSDASH_KV.get(CLAVE_CACHE, { type: 'json' });
+      cacheGuardada = cache;
       // Durante la siembra la caché se acorta: si no, cada tramo esperaría
       // cinco minutos y completar el histórico llevaría horas.
       const ventana = cache && cache.sembrando ? 5000 : FRESCURA_MS;
@@ -342,11 +390,18 @@ export async function onRequestGet({ env }) {
   let error = null;
   let sembrando = false;
 
+  const propios = await indicesPropios(env, cacheGuardada);
+
   try {
+    if (!propios) {
+      // Sin la lista no se toca el explorador: ver `indicesPropios`.
+      throw new Error('no se sabe qué índices son nuestros (KV sin estado y sin caché)');
+    }
+
     const { tope, suelo } = await extremos(db);
 
     // Fase 1 — novedades. Desde la más reciente hasta alcanzar lo guardado.
-    const nov = await recorrer({ pararEn: tope, maxPaginas: PAGINAS_NOVEDADES });
+    const nov = await recorrer({ pararEn: tope, maxPaginas: PAGINAS_NOVEDADES, propios });
     nuevas += await guardar(db, nov.encontradas);
 
     // Fase 2 — siembra hacia atrás, a trozos. La tabla empieza vacía y el
@@ -359,7 +414,7 @@ export async function onRequestGet({ env }) {
         : null);
 
       if (desde != null) {
-        const atras = await recorrer({ arrancarEn: desde, maxPaginas: PAGINAS_SIEMBRA });
+        const atras = await recorrer({ arrancarEn: desde, maxPaginas: PAGINAS_SIEMBRA, propios });
         nuevas += await guardar(db, atras.encontradas);
 
         if (atras.motivo === 'activacion' || atras.motivo === 'fin') {
@@ -410,6 +465,9 @@ export async function onRequestGet({ env }) {
     pls_bloques: plsBloques,
     peso_bloques: total > 0 ? (plsBloques / total) * 100 : 0,
     por_validador: await porValidador(db),
+    // Se publican para que la próxima pasada tenga respaldo si KV falla, y
+    // para poder ver desde fuera con qué conjunto se filtró.
+    indices: propios ? [...propios].sort((a, b) => a - b) : (cacheGuardada?.indices ?? []),
     saldo_wallet: saldo,
     ciclos: lista.slice(-40),
     nuevas,
