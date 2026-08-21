@@ -58,6 +58,29 @@
   }
   #escena canvas{display:block;width:100%;height:100%}
 
+  /* Rótulo del nodo señalado. Se coloca con `transform` y no con `top/left`
+     porque se mueve en cada fotograma mientras la esfera gira: `transform` no
+     provoca reflujo. `translate(-50%,-140%)` lo deja centrado y por encima del
+     nodo, para que el dedo no lo tape en táctil. */
+  #rotulo{
+    position:absolute;left:0;top:0;margin:0;
+    pointer-events:none;
+    font:400 11px/1.25 var(--mono);
+    white-space:nowrap;
+    padding:5px 8px;
+    border-radius:7px;
+    background:rgba(6,14,20,.88);
+    border:1px solid var(--borde-vivo);
+    backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+    display:flex;gap:8px;align-items:baseline;
+    transform-origin:0 0;
+  }
+  #rotulo[hidden]{display:none}
+  #rotulo .r-id{color:var(--cian);letter-spacing:.04em}
+  #rotulo .r-blq{color:var(--apagado);font-size:10px}
+  #rotulo.inactivo .r-id{color:var(--naranja)}
+
   @media (max-height:800px){ #escena{height:30dvh} }
   @media (max-height:700px){ #escena{height:24dvh} }
 
@@ -118,7 +141,14 @@
 <body>
 
 <main class="marco">
-  <div id="escena"></div>
+  <div id="escena">
+    <!-- `aria-hidden`: la esfera es decoración con dato, y el mismo dato está
+         en la tabla del panel de Validadores, que sí se puede leer y recorrer.
+         Anunciar un rótulo que aparece al pasar el ratón no aporta nada ahí. -->
+    <p id="rotulo" hidden aria-hidden="true">
+      <span class="r-id"></span><span class="r-blq"></span>
+    </p>
+  </div>
 
   <div id="contenido">
     <nav class="pestanas" role="tablist" aria-label="Secciones del panel">
@@ -159,8 +189,26 @@
   // máquina lo que en otro caso decidiría la heurística.
   const forzado = q.get('escalon');
 
+  // El rótulo del validador señalado. Vive en el DOM y no en una textura: es
+  // texto de verdad, nítido a cualquier densidad, y no hay que subir nada a la
+  // GPU cada vez que cambia el recuento de validadores.
+  const rotulo = document.getElementById('rotulo');
+
   const esfera = crearEsfera(document.getElementById('escena'), {
     escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
+    alSenalar(n) {
+      if (!n) { rotulo.hidden = true; return; }
+      rotulo.querySelector('.r-id').textContent = n.indice;
+      rotulo.querySelector('.r-blq').textContent =
+        n.bloques === 1 ? '1 bloque' : `${n.bloques} bloques`;
+      rotulo.classList.toggle('inactivo', n.activo === false);
+      // El segundo `translate` es el centrado sobre el nodo, en porcentaje del
+      // propio rótulo: tiene que ir aquí y no en el CSS, porque escribir
+      // `transform` desde JS sustituye la propiedad entera.
+      rotulo.style.transform =
+        `translate(${Math.round(n.x)}px, ${Math.round(n.y)}px) translate(-50%, -150%)`;
+      rotulo.hidden = false;
+    },
   });
 
   // ⚠ La esfera arranca VACÍA, sin un solo nodo, y se llena cuando llegan los

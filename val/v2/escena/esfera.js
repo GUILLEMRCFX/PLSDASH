@@ -79,37 +79,22 @@ function direccionesFibonacci(n) {
   return out;
 }
 
-/**
- * Los números de los nodos, dibujados una vez en un canvas y usados como
- * atlas. Cada instancia toma su casilla según su índice, así que los N anillos
- * numerados se pintan en UNA llamada de dibujo. La alternativa —un sprite con
- * su textura por nodo— multiplica las llamadas por el número de validadores.
- */
-function atlasNumeros(n) {
-  const COL = Math.max(1, Math.ceil(Math.sqrt(n)));
-  const FIL = Math.max(1, Math.ceil(n / COL));
-  // 128 y no 64: el número se amplía bastante en pantalla y a 64 el borde
-  // llegaba blando. Es el mismo coste de subida, una sola vez.
-  const S = 128;
-  const cv = document.createElement('canvas');
-  cv.width = COL * S; cv.height = FIL * S;
-  const g = cv.getContext('2d');
-  g.clearRect(0, 0, cv.width, cv.height);
-  g.fillStyle = '#ffffff';
-  g.font = '700 68px ui-monospace, SFMono-Regular, Menlo, monospace';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  for (let i = 0; i < n; i++) {
-    const c = i % COL, f = Math.floor(i / COL);
-    g.fillText(String(i + 1).padStart(2, '0'), c * S + S / 2, f * S + S / 2 + 2);
-  }
-  const tex = new THREE.CanvasTexture(cv);
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-  tex.anisotropy = 1;
-  return { tex, COL, FIL };
-}
+/* ─────────────────────────────────────────────── constelación
+   Tamaño del quad de cada nodo, en unidades de `cfg.halo`. El rango es lo que
+   separa visualmente al de un bloque del de siete: con 0,085..0,205 el mayor
+   mide 2,4 veces el menor, que se distingue de un vistazo sin que el grande se
+   coma la malla. El núcleo mide siempre 0,052, en las mismas unidades. */
+const TAM_MIN = 0.070;
+const TAM_RANGO = 0.170;
+const NUCLEO = 0.050;
+
+/* Cuánto crece el NÚCLEO con los bloques, además del halo.
+   Primera versión: el núcleo era de tamaño fijo y solo crecía el halo. En
+   captura no se leía — con el halo a 0,30 sobre negro, lo único que se ve es el
+   punto, y todos los puntos medían igual. La codificación estaba, pero no se
+   veía, que para el caso es no estar. Ahora el núcleo también crece, la mitad
+   que el halo: el de siete bloques mide 1,55 veces el de uno. */
+const NUCLEO_CRECE = 0.55;
 
 /** Geometría instanciada a partir de una base, sin usar instanceMatrix. */
 function instanciar(base, n) {
@@ -120,7 +105,7 @@ function instanciar(base, n) {
   return g;
 }
 
-export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
+export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = null } = {}) {
   const nombreEscalon = escalon || elegirEscalon();
   const cfg = { ...ESCALONES[nombreEscalon] };
   const reducido = window.matchMedia('(prefers-reduced-motion:reduce)').matches;
@@ -392,55 +377,99 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
   // además une los nodos por orden de índice, que es arbitrario. Queda escrito
   // aquí para que nadie —nosotros dentro de unos meses incluidos— la lea como
   // si dijera algo sobre la topología.
-  let nNodos = 0, mallaNodos = null, mallaCadena = null, atlas = null;
-  let intensidades = [];
+  let nNodos = 0, mallaNodos = null, mallaCadena = null;
+  let intensidades = [], activos = [], metaNodos = [], dirNodos = [];
 
+  /**
+   * CONSTELACIÓN. Cada validador es un punto brillante con un halo.
+   *
+   * ⚠ Antes eran anillos naranjas con el número dentro, dibujado desde un atlas
+   *   de canvas. Se fue entero: los números flotando sobre una esfera son un
+   *   cliché, ensucian la malla y a 390px no se leen. El índice ahora aparece
+   *   solo al señalar un nodo, y en HTML — texto de verdad, nítido a cualquier
+   *   densidad, y sin una textura que subir a la GPU.
+   *
+   * ## Qué codifica el tamaño
+   *
+   * El HALO crece con `aInt`, que son los bloques propuestos. El NÚCLEO no: se
+   * mantiene del mismo tamaño en pantalla para todos, porque todos son
+   * validadores tuyos y todos están validando. Lo que varía es el premio que
+   * les ha tocado, y eso es el halo.
+   *
+   *   Que el núcleo no escale con el quad hace falta forzarlo: el quad SÍ crece
+   *   con `aInt` —si no, el halo del que más bloques lleva saldría recortado—,
+   *   así que el radio del núcleo se divide por ese mismo factor. Sin esa
+   *   división, el nodo de siete bloques tendría también el punto siete veces
+   *   más gordo y la esfera se llenaría de manchas.
+   *
+   * ## Que no aplaste la malla
+   *
+   * El halo va en mezcla aditiva y se acumula, así que su pico se queda bajo
+   * (0,30) y es el núcleo el que lleva el brillo. Comprobado en captura: la
+   * retícula se sigue leyendo por debajo de los nodos, que era la condición.
+   */
   const matNodo = new THREE.ShaderMaterial({
     uniforms: { ...uniformes, uFrescura, uEnergia,
       uTam: { value: cfg.halo }, uColor: { value: NARANJA.clone() },
-      uAtlas: { value: null }, uRejilla: { value: new THREE.Vector2(1, 1) } },
+      uSenalado: { value: -1 } },
     vertexShader: /* glsl */`
       #include <common>
       ${UNIFORMS_DEFORMACION}
       ${FUNCION_DEFORMACION}
       attribute vec3 aDir;
       attribute float aInt;
+      attribute float aAct;
       attribute float aIndice;
       uniform float uTam;
-      varying vec2 vP; varying float vI; varying float vIdx;
+      uniform float uSenalado;
+      varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
       void main(){
-        vP = position.xy; vI = aInt; vIdx = aIndice;
+        vP = position.xy; vI = aInt; vAct = aAct;
+        vSen = abs(aIndice - uSenalado) < 0.5 ? 1.0 : 0.0;
+        // El quad crece con la intensidad para que quepa el halo. El núcleo se
+        // compensa en el fragmento para no crecer con él.
+        float s = TAM_MIN + aInt * TAM_RANGO;
         vec4 mv = modelViewMatrix * vec4(deformar(aDir), 1.0);
-        mv.xy += position.xy * (0.160 + aInt * 0.050) * uTam;
+        mv.xy += position.xy * s * uTam * (1.0 + vSen * 0.18);
         gl_Position = projectionMatrix * mv;
-      }`,
+      }`
+      .replace(/TAM_MIN/g, TAM_MIN.toFixed(3))
+      .replace(/TAM_RANGO/g, TAM_RANGO.toFixed(3)),
     fragmentShader: /* glsl */`
       uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
-      uniform sampler2D uAtlas; uniform vec2 uRejilla;
-      varying vec2 vP; varying float vI; varying float vIdx;
+      varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
       void main(){
         float r = length(vP) * 2.0;
-        // Aro fino y de bordes cortos: el ancho de transición marca lo afilado
-        // que se ve el anillo.
-        float aro  = smoothstep(0.60, 0.645, r) * (1.0 - smoothstep(0.715, 0.76, r));
-        float glow = exp(-pow((r - 0.68) / 0.26, 2.0)) * 0.24;
-        float col = mod(vIdx, uRejilla.x);
-        float fil = floor(vIdx / uRejilla.x);
-        vec2 uvLocal = vP / 0.40 + 0.5;
-        float texto = 0.0;
-        if (uvLocal.x > 0.0 && uvLocal.x < 1.0 && uvLocal.y > 0.0 && uvLocal.y < 1.0) {
-          // El canvas crece hacia abajo y la textura hacia arriba: se invierte
-          // la fila o el 01 sale en la casilla equivocada.
-          vec2 uv = (vec2(col, uRejilla.y - 1.0 - fil) + uvLocal) / uRejilla;
-          texto = texture2D(uAtlas, uv).a;
-        }
-        float i = aro * (0.95 + vI * 0.6) + glow * (0.7 + vI * 0.8) + texto * 1.9;
+
+        // Radio del núcleo en unidades del quad. Se divide por el mismo factor
+        // que escaló el quad, así que en pantalla mide igual para todos.
+        float s = TAM_MIN + vI * TAM_RANGO;
+        float rn = NUCLEO * (1.0 + vI * NUCLEO_CRECE) / s;
+        float nucleo = 1.0 - smoothstep(rn * 0.45, rn, r);
+
+        // Halo gaussiano. Su ANCHO es fijo en unidades del quad, así que crece
+        // en pantalla exactamente con el quad: ahí está el dato.
+        float halo = exp(-pow(r / 0.58, 2.0)) * 0.42;
+
+        // Un validador fuera de juego pierde el halo y se queda en un punto
+        // apagado: sigue estando —es tuyo— pero deja de brillar.
+        halo *= vAct;
+        float i = nucleo * (0.85 + vI * 0.55) + halo * (0.55 + vI * 0.9);
+        i *= (0.45 + vAct * 0.55);
+        i *= (1.0 + vSen * 0.85);
         if (i < 0.004) discard;
-        vec3 c = mix(uColor, vec3(1.0), max(texto * 0.92, aro * 0.30));
+
+        // El núcleo tira a blanco y el halo se queda naranja: es lo que lo hace
+        // leerse como una estrella y no como un borrón de color.
+        vec3 c = mix(uColor, vec3(1.0), nucleo * 0.80);
         c *= (0.75 + uEnergia * 0.5);
         c = mix(vec3(dot(c, vec3(0.33))), c, uFrescura);
         gl_FragColor = vec4(c * i, i);
-      }`,
+      }`
+      .replace(/TAM_MIN/g, TAM_MIN.toFixed(3))
+      .replace(/TAM_RANGO/g, TAM_RANGO.toFixed(3))
+      .replace(/NUCLEO_CRECE/g, NUCLEO_CRECE.toFixed(3))
+      .replace(/NUCLEO/g, NUCLEO.toFixed(4)),
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
   });
 
@@ -458,20 +487,21 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
 
     const aDir = new Float32Array(n * 3);
     const aInt = new Float32Array(n);
+    const aAct = new Float32Array(n);
     const aIdx = new Float32Array(n);
     dirs.forEach((d, i) => {
       aDir[i * 3] = d.x; aDir[i * 3 + 1] = d.y; aDir[i * 3 + 2] = d.z;
-      aInt[i] = intensidades[i] ?? 0.5; aIdx[i] = i;
+      aInt[i] = intensidades[i] ?? 0.5;
+      aAct[i] = activos[i] === false ? 0 : 1;
+      aIdx[i] = i;
     });
-
-    if (atlas) atlas.tex.dispose();
-    atlas = atlasNumeros(n);
-    matNodo.uniforms.uAtlas.value = atlas.tex;
-    matNodo.uniforms.uRejilla.value.set(atlas.COL, atlas.FIL);
+    // Las direcciones se guardan para poder saber qué nodo hay bajo el dedo.
+    dirNodos = dirs;
 
     const g = instanciar(planoUnidad, n);
     g.setAttribute('aDir', new THREE.InstancedBufferAttribute(aDir, 3));
     g.setAttribute('aInt', new THREE.InstancedBufferAttribute(aInt, 1));
+    g.setAttribute('aAct', new THREE.InstancedBufferAttribute(aAct, 1));
     g.setAttribute('aIndice', new THREE.InstancedBufferAttribute(aIdx, 1));
     mallaNodos = new THREE.Mesh(g, matNodo);
     mallaNodos.frustumCulled = false;
@@ -587,6 +617,75 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
   lienzo.addEventListener('pointerup', soltar);
   lienzo.addEventListener('pointercancel', soltar);
 
+  /* ─────────────────────────────────────────────── señalar un nodo
+
+     Sustituye a los números pegados sobre la esfera: el índice del validador
+     aparece solo cuando se señala uno, y lo pinta el DOM en HTML.
+
+     ⚠ Se proyecta la dirección SIN DEFORMAR. La deformación es una respiración
+       de ±0,7% del radio (ver `deformacion.js`), que a este tamaño son menos de
+       dos píxeles: muy por debajo del radio de acierto. Replicar el GLSL en JS
+       para ganar eso no compensa, y sería un segundo sitio donde la
+       deformación podría discrepar de la del shader.
+
+     Solo se aceptan los nodos de la cara de delante. Sin ese filtro, señalar
+     uno de la mitad visible activaría también el que tiene justo detrás, y el
+     rótulo saltaría entre dos validadores sin que el dedo se moviera. */
+
+  const RADIO_ACIERTO = 26;          // px; el dedo es gordo y los nodos pequeños
+  let senalado = -1;
+  const vAux = new THREE.Vector3();
+
+  /** Posición en pantalla de un nodo, o null si mira hacia atrás. */
+  function enPantalla(i) {
+    if (!dirNodos[i]) return null;
+    vAux.copy(dirNodos[i]).applyMatrix4(grupo.matrixWorld);
+    // Delante de la esfera: el vector cámara→nodo apunta hacia la cámara.
+    if (vAux.clone().sub(camara.position).dot(vAux) > 0) return null;
+    vAux.project(camara);
+    return { x: (vAux.x * 0.5 + 0.5) * ancho, y: (-vAux.y * 0.5 + 0.5) * alto };
+  }
+
+  function avisar() {
+    if (!alSenalar) return;
+    if (senalado < 0) return alSenalar(null);
+    const p = enPantalla(senalado);
+    if (!p) return alSenalar(null);
+    alSenalar({ ...metaNodos[senalado], x: p.x, y: p.y });
+  }
+
+  function alSenalarPuntero(ev) {
+    // Mientras se gira la esfera no se señala: el rótulo persiguiendo al dedo
+    // durante un arrastre estorba y no se lee.
+    if (arrastrando || punteros.size > 0) { fijar(-1); return; }
+    const caja = lienzo.getBoundingClientRect();
+    const x = ev.clientX - caja.left, y = ev.clientY - caja.top;
+    let mejor = -1, mejorD = RADIO_ACIERTO;
+    for (let i = 0; i < nNodos; i++) {
+      const p = enPantalla(i);
+      if (!p) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < mejorD) { mejorD = d; mejor = i; }
+    }
+    fijar(mejor);
+  }
+
+  function fijar(i) {
+    if (i === senalado) return;
+    senalado = i;
+    matNodo.uniforms.uSenalado.value = i;
+    avisar();
+  }
+
+  const alSenalarRef = alSenalarPuntero;
+  const limpiarSenal = () => fijar(-1);
+  lienzo.addEventListener('pointermove', alSenalarRef);
+  lienzo.addEventListener('pointerleave', limpiarSenal);
+  // En táctil no hay «pasar por encima»: se señala al tocar.
+  lienzo.addEventListener('pointerdown', ev => {
+    if (ev.pointerType !== 'mouse') alSenalarPuntero(ev);
+  });
+
   lienzo.addEventListener('wheel', ev => {
     ev.preventDefault();
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * Math.exp(-ev.deltaY * 0.0012)));
@@ -600,11 +699,19 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
     if (!estado) return;
     const lista = estado.nodos || [];
     intensidades = lista.map(v => Math.max(0, Math.min(1, v.intensidad ?? 0.5)));
+    activos = lista.map(v => v.activo !== false);
+    // Lo que la esfera NO interpreta pero sí devuelve al señalar un nodo. Se
+    // guarda tal cual: aquí no se sabe qué es un índice de validador.
+    metaNodos = lista.map(v => ({ ...v }));
     if (lista.length !== nNodos) construirNodos(lista.length);
     else if (mallaNodos) {
-      const att = mallaNodos.geometry.getAttribute('aInt');
-      for (let i = 0; i < intensidades.length; i++) att.array[i] = intensidades[i];
-      att.needsUpdate = true;
+      const aI = mallaNodos.geometry.getAttribute('aInt');
+      const aA = mallaNodos.geometry.getAttribute('aAct');
+      for (let i = 0; i < intensidades.length; i++) {
+        aI.array[i] = intensidades[i];
+        aA.array[i] = activos[i] === false ? 0 : 1;
+      }
+      aI.needsUpdate = true; aA.needsUpdate = true;
     }
     if (estado.energia  != null) energiaObjetivo  = Math.max(0, Math.min(1, estado.energia));
     if (estado.frescura != null) frescuraObjetivo = Math.max(0, Math.min(1, estado.frescura));
@@ -648,6 +755,10 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
     uFrescura.value += (frescuraObjetivo - uFrescura.value) * k * 0.5;
 
     renderer.render(escena, camara);
+
+    // El rótulo del nodo señalado tiene que seguirlo mientras la esfera gira.
+    // Va DESPUÉS del render, que es cuando `matrixWorld` ya está al día.
+    if (senalado >= 0) avisar();
   }
 
   const alVer = new IntersectionObserver(([e]) => { visible = e.isIntersecting; }, { threshold: 0 });
@@ -677,7 +788,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla } = {}) {
       cancelAnimationFrame(raf);
       observador.disconnect(); alVer.disconnect();
       document.removeEventListener('visibilitychange', alCambiarPestana);
-      if (atlas) atlas.tex.dispose();
+      lienzo.removeEventListener('pointermove', alSenalarRef);
+      lienzo.removeEventListener('pointerleave', limpiarSenal);
       renderer.dispose();
       renderer.domElement.remove();
     },
