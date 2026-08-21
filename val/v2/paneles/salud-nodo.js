@@ -1,17 +1,21 @@
 /**
  * Panel — Salud del nodo.
  *
- * Temperaturas, RAM, disco y peers de la máquina, más el runway del disco.
+ * Temperaturas, RAM y disco de la máquina, más el runway del disco.
  *
  * `temp_nvme` NO está en el estado de KV: solo vive en `snapshots`, así que
  * sale de la última fila de las 24 h (ver `tempNvme` en datos.js). El resto
  * viene de `estado.nodo`, que es lo más fresco que hay.
  *
- * Peers aparece también en «Estado global», donde vive como dato de segundo
- * plano junto a epoch y sincronía. Aquí es un dato de la máquina de pleno
- * derecho. Está repetido a sabiendas: son dos preguntas distintas —«¿valida
- * bien?» y «¿cómo está el cacharro?»— y los dos paneles caen en columnas
- * distintas, así que no se ven uno al lado del otro.
+ * ⚠ Los peers ESTABAN también aquí, repetidos a sabiendas, con el argumento de
+ *   que este panel y «Estado global» caían en columnas distintas y nunca se
+ *   veían juntos. Con las cuatro pestañas eso dejó de ser verdad: los dos
+ *   viven en «Nodo», uno al lado del otro, y en la captura se leía «PEERS 64»
+ *   dos veces en la misma fila de pantalla. Se quedan en «Estado global», que
+ *   es donde llevan la marca de «· pocos».
+ *
+ *   El recuento SIGUE contando para el estado del panel (`alerta`): pocos peers
+ *   marcan este panel para revisar aunque el número se lea en el de al lado.
  */
 
 import { tempNvme } from '../datos.js';
@@ -123,8 +127,6 @@ export function panelSaludNodo(datos) {
         rw.provisional ? ' · medido en pocas horas' : ''}</p>
 
       <dl class="p-fondo">
-        <div><dt>Peers</dt><dd${Number(n.peers) < PEERS_POCOS ? ' class="alerta"' : ''}>${
-          fmt(n.peers)}${Number(n.peers) < PEERS_POCOS ? ' · pocos' : ''}</dd></div>
         <div><dt>Carga</dt><dd>${n.carga_pct == null ? '–' : `${fmt(n.carga_pct, 1)} %`}</dd></div>
         <div><dt>Slot</dt><dd>${fmt(n.head_slot)}</dd></div>
       </dl>

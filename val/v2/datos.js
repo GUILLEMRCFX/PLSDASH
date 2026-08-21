@@ -12,6 +12,7 @@
  *   /api/val/historico?rango=serie → [{ts, ganado}] toda la serie
  *   /api/val/historico?rango=24h   → snapshots de las últimas 24 h
  *   /api/val/historico?rango=todo  → tabla `daily` (trae `minutos_caido`)
+ *   /api/val/historico?rango=precio→ [{ts, precio_pls}] histórico del precio
  *   /api/val/ganancia              → barridos reconciliados contra la cadena
  *   /api/val/eventos?limit=60      → registro de vida (activacion, barrido, bloque)
  *   /api/precio                    → precio de PLS (ver functions/api/precio.js)
@@ -49,6 +50,7 @@ export async function cargarTodo() {
     daily:        `${API}/historico?rango=todo`,
     ganancia:     `${API}/ganancia`,
     eventos:      `${API}/eventos?limit=60`,
+    precioSerie:  `${API}/historico?rango=precio`,
     precio:       '/api/precio',
   };
 
@@ -57,7 +59,7 @@ export async function cargarTodo() {
 
   const salida = {
     estado: null, serie: [], snapshots24h: [], daily: [], ganancia: null,
-    eventos: [], precio: null,
+    eventos: [], precioSerie: [], precio: null,
     fallos: [],
     // Un 401 en los endpoints del panel no es «está roto»: es «no has metido
     // el PIN». Son dos mensajes muy distintos y confundirlos manda a mirar el
