@@ -141,7 +141,7 @@
 
 <script type="module">
   import { crearEsfera } from './escena/esfera.js';
-  import { estadoFalso } from './datos-falsos.js';
+  import { escenaDesde } from './escena/estado-escena.js';
   import { cargarTodo } from './datos.js';
   import { panelResumen, engancharResumen } from './paneles/resumen.js';
   import { panelGanancias } from './paneles/ganancias.js';
@@ -158,15 +158,18 @@
   // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
   // máquina lo que en otro caso decidiría la heurística.
   const forzado = q.get('escalon');
-  const nFalsos = Number(q.get('n')) || undefined;
 
   const esfera = crearEsfera(document.getElementById('escena'), {
     escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
   });
 
-  // La esfera sigue con datos inventados: sus nodos son decoración, no la
-  // topología real de la red. Cuando dejen de serlo no habrá que tocarla.
-  esfera.actualizar(estadoFalso(nFalsos));
+  // ⚠ La esfera arranca VACÍA, sin un solo nodo, y se llena cuando llegan los
+  //   datos. Antes arrancaba con diez nodos inventados de `datos-falsos.js`,
+  //   que es de donde salía el 10 con once validadores activos. Ese fichero ya
+  //   no existe: si los datos no llegan, no hay nodos, y eso se ve — que es
+  //   justo lo que no pasaba antes.
+  //
+  //   El `?n=` para forzar un número de nodos falsos se va con él.
 
   // Se expone ANTES de nada. Si algo de lo de abajo fallase, `__esfera` sigue
   // estando en la consola y se puede diagnosticar desde ahí.
@@ -255,6 +258,12 @@
 
   function pintar(datos) {
     ultimos = datos;
+
+    // La esfera es el fondo de las cuatro pestañas, así que se actualiza aquí y
+    // no dentro de ninguna: sus nodos son los validadores reales, su brillo el
+    // avance del ciclo de barrido y su color la frescura del dato.
+    esfera.actualizar(escenaDesde(datos, datos.ahoraS));
+
     PESTANAS.forEach((p, i) => {
       vistas[i].innerHTML = p.paneles.map(fn => fn(datos)).join('');
     });
