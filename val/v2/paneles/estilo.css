@@ -110,8 +110,11 @@
      disposición real—, se recorta la caja de CADA texto de una captura y se
      toma la mediana de sus píxeles, que dentro de la caja de una etiqueta es
      el fondo. Con `--vidrio` al .78, los catorce textos del panel pasan el
-     4,5:1 de WCAG; el peor es `--apagado` sobre el filete de `.p-fondo`, a
-     5,00:1. Un barrido de opacidades (.78 → .90) mueve ese peor caso solo de
+     4,5:1 de WCAG; el peor es `--apagado` sobre el filete de `.p-fondo`, que
+     cae entre 4,91 y 5,00:1 según el fotograma de la esfera que toque —la
+     escena está animada, así que el fondo no es el mismo dos veces—. Cuatro
+     pasadas dieron 4,91, 4,92, 4,99 y 5,00. Se da el rango y no una cifra:
+     escribir «5,00:1» a secas fingiría una precisión que el método no tiene. Un barrido de opacidades (.78 → .90) mueve ese peor caso solo de
      4,58 a 4,82 en la medida por percentil, así que subir la opacidad no es la
      palanca: el desenfoque ya aplana casi toda la luz de la esfera.
 
@@ -534,7 +537,8 @@
      cae ALREDEDOR del trazo, no encima, y a .22 el fondo que levanta está muy
      por debajo del propio glifo. Medido leyendo píxeles con la esfera detrás
      —el método está en la nota de `.panel`, arriba—: la cifra pasa de 11,09:1
-     a 11,04:1 al añadir el halo. Cinco centésimas. */
+     a 11,04:1 al añadir el halo. Cinco centésimas, dentro del propio ruido de
+     la medida. */
   text-shadow: 0 0 26px rgba(42, 212, 240, .22);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
