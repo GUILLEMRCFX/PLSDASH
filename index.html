@@ -988,10 +988,27 @@ async function refresh(){
       // Completar metadatos desde DexScreener si seguían genéricos.
       if((t.symbol==='?'||!t.symbol)&&pc.symbol)t.symbol=pc.symbol;
       if((t.name==='Token'||!t.name)&&pc.name)t.name=pc.name;
-      t.value=(t.price!=null)?t.balance*t.price:0;
+      /* ⚠ SIN PRECIO, FUERA. Y se descarta AQUÍ, al construir la lista, no al
+         pintarla: así no existe para nada — ni para el reparto, ni para el
+         mejor activo del día, ni para la vista por wallet. Un token sin precio
+         en PulseChain es un airdrop de estafa: «Claim 50k $pDAI on
+         dai.free.nf», «Claim on: 9mm-airdrop.com». No tienen precio porque no
+         tienen mercado, y los manda cualquiera a cualquier wallet sin permiso.
+
+         El precio de mercado hace de prueba de que el token existe. Se prefirió
+         a una lista de tokens «oficiales» escrita a mano, que habría que
+         mantener y dejaría fuera cualquier token nuevo legítimo.
+
+         COSTE ACEPTADO: si un token legítimo se queda sin precio —se seca su
+         pool, DexScreener falla— desaparece sin dejar rastro. No queda ni bajo
+         el botón del polvo. Es la decisión que se tomó: en una cartera real, de
+         diez filas visibles seis eran estafas. */
+      if(t.price==null)continue;
+
+      t.value=t.balance*t.price;
       arr.push(t);
       for(const [w,amt] of Object.entries(t.perWallet)){
-        perWalletTotals[w]=(perWalletTotals[w]||0)+(t.price!=null?amt*t.price:0);
+        perWalletTotals[w]=(perWalletTotals[w]||0)+amt*t.price;
       }
     }
     tokensCombined=arr;
@@ -1012,44 +1029,21 @@ async function refresh(){
    estadísticas se siguen calculando sobre `tokensCombined` entero. Esto solo
    decide qué filas se pintan.
 
-   ⚠ UN TOKEN SIN PRECIO TAMBIÉN SE ESCONDE. Aquí decía lo contrario —«esconder
-     lo que no se puede medir sería mentir»— y era un error con los datos de
-     PulseChain delante: los tokens sin precio no son posiciones que no se
-     puedan valorar, son AIRDROPS DE ESTAFA. Se llaman «Claim 50k $pDAI on
-     dai.free.nf» o «Claim on: 9mm-airdrop.com», los manda cualquiera a
-     cualquier wallet sin permiso, y no tienen precio porque no tienen mercado.
-     La regla vieja los dejaba pasar TODOS y llenaba la cartera de ellos.
-
-     Que no tengan precio no es una laguna del dato: es la señal. Un token de
-     verdad tiene un par con liquidez y DexScreener le pone precio. Uno que no
-     lo tiene, o no vale nada o no existe.
-
-     El precio de mercado se usa como prueba de que el token es real, en vez de
-     una lista de tokens «oficiales» escrita a mano: una lista habría que
-     mantenerla, y dejaría fuera cualquier token nuevo legítimo.
-
-   ⚠ EL COSTE, para tenerlo escrito: si algún día un token legítimo tuyo se
-     queda sin precio —se seca su pool, DexScreener falla—, desaparece de la
-     lista principal. No se pierde: sale bajo SHOW, con su cantidad. */
-function sinPrecio(t){
-  return t.price==null;
-}
+   Aquí NO hace falta mirar el precio: los tokens sin precio ya se descartaron
+   al construir `tokensCombined` (ver la nota larga allí). Lo único que queda
+   por decidir es el umbral. */
 function esDust(t){
-  return t.price!=null && t.value < UMBRAL_DUST_USD;
-}
-/* Todo lo que no se enseña por omisión: sin precio o por debajo del umbral. */
-function esRuido(t){
-  return sinPrecio(t) || esDust(t);
+  return t.value < UMBRAL_DUST_USD;
 }
 function tokensDelPolvo(){
-  return tokensCombined.filter(esRuido);
+  return tokensCombined.filter(esDust);
 }
 /* La lista principal NUNCA trae polvo. El polvo se pinta aparte, al final y
    solo si se ha desplegado, para que no se cuele por orden entre los tokens
    de verdad: si fuese una sola lista ordenada por valor daría igual, pero
    ordenando por nombre o por cambio se mezclarían. */
 function tokensParaLista(){
-  return tokensCombined.filter(t=>!esRuido(t));
+  return tokensCombined.filter(t=>!esDust(t));
 }
 function sortTokens(list){
   const s=[...list];
@@ -1096,16 +1090,9 @@ function polvoHtml(){
   const polvo=tokensDelPolvo();
   if(!polvo.length)return '';
 
-  /* Los dos motivos se cuentan por separado. Sumar en dólares los que no
-     tienen precio es imposible —de ahí que estén escondidos—, así que decir
-     «14 tokens · 1,43 $» daría a entender que esos 14 valen eso. */
-  const mudos=polvo.filter(sinPrecio).length;
-  const bajos=polvo.length-mudos;
-  const suma=polvo.filter(t=>!sinPrecio(t)).reduce((s,t)=>s+t.value,0);
-  const partes=[];
-  if(bajos)partes.push(`${bajos} bajo ${fmtUsd(UMBRAL_DUST_USD)} · ${fmtUsd(suma)}`);
-  if(mudos)partes.push(`${mudos} sin precio`);
-  const resumen=partes.join(' · ');
+  const suma=polvo.reduce((s,t)=>s+t.value,0);
+  const plural=polvo.length===1?'token':'tokens';
+  const resumen=`${polvo.length} ${plural} bajo ${fmtUsd(UMBRAL_DUST_USD)} · ${fmtUsd(suma)}`;
 
   const boton=`<button class="dust-btn${state.verPolvo?' abierto':''}" onclick="togglePolvo()"
       aria-expanded="${state.verPolvo?'true':'false'}" aria-controls="polvoLista">
@@ -1118,14 +1105,9 @@ function polvoHtml(){
   // Desplegado: las filas completas, con su cantidad. En el polvo el valor en
   // dólares no dice nada —son céntimos—, así que lo que interesa es cuánto
   // tienes de cada cosa.
-  /* Los que tienen precio primero y por valor; los mudos al final, por nombre.
-     Mezclarlos por valor pondría los de estafa —todos a cero— por delante de
-     los tuyos de céntimos. */
-  const conPrecio=sortTokens(polvo.filter(t=>!sinPrecio(t)));
-  const mudosOrd=polvo.filter(sinPrecio).sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
-  const filas=[...conPrecio,...mudosOrd].map(rowHtml).join('');
+  const filas=sortTokens(polvo).map(rowHtml).join('');
   return `<div class="dust-foot">
-    <div class="dust-sep">Escondidos · sin precio de mercado o bajo ${fmtUsd(UMBRAL_DUST_USD)}</div>
+    <div class="dust-sep">Polvo · por debajo de ${fmtUsd(UMBRAL_DUST_USD)}</div>
     <div id="polvoLista" class="dust-lista">${filas}</div>${boton}</div>`;
 }
 
