@@ -111,7 +111,7 @@
      toma la mediana de sus píxeles, que dentro de la caja de una etiqueta es
      el fondo. Con `--vidrio` al .78, los catorce textos del panel pasan el
      4,5:1 de WCAG; el peor es `--apagado` sobre el filete de `.p-fondo`, a
-     4,99:1. Un barrido de opacidades (.78 → .90) mueve ese peor caso solo de
+     5,00:1. Un barrido de opacidades (.78 → .90) mueve ese peor caso solo de
      4,58 a 4,82 en la medida por percentil, así que subir la opacidad no es la
      palanca: el desenfoque ya aplana casi toda la luz de la esfera.
 
@@ -532,8 +532,9 @@
   /* Halo tenue: la cifra parece emitir luz en vez de estar impresa, que es lo
      que la emparenta con la esfera de detrás. No toca el contraste — el halo
      cae ALREDEDOR del trazo, no encima, y a .22 el fondo que levanta está muy
-     por debajo del propio glifo. Comprobado leyendo píxeles con la esfera
-     detrás — el método está en la nota de `.panel`, arriba. */
+     por debajo del propio glifo. Medido leyendo píxeles con la esfera detrás
+     —el método está en la nota de `.panel`, arriba—: la cifra pasa de 11,09:1
+     a 11,04:1 al añadir el halo. Cinco centésimas. */
   text-shadow: 0 0 26px rgba(42, 212, 240, .22);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;

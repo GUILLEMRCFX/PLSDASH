@@ -15,9 +15,15 @@
  *
  * `generado_ts + 180` es cuando el cron *arranca*, no cuando el dato *llega*:
  * entre medias el recolector consulta el beacon, el explorador y DexScreener, y
- * el panel además solo se refresca cada 15-20 s. Sin margen, el pulso se
- * pondría naranja en cada ciclo durante los segundos que tarda el relevo — un
- * 15-25% del tiempo — y en dos días nadie miraría ya el color.
+ * el panel además solo se refresca cada 18 s. Echando la cuenta, entre las dos
+ * cosas se van del orden de 30-45 s de cada 180 — un cuarto del ciclo. Sin
+ * margen, el pulso se pondría naranja durante ese cuarto EN CADA PASADA, y en
+ * dos días nadie miraría ya el color.
+ *
+ * (Los 30-45 s son una estimación de sobremesa, no una medida: lo que tarda el
+ * recolector no se publica en ningún sitio. El margen se ha puesto en 60 s para
+ * cubrirla con holgura. Si alguna vez se instrumenta el recolector, este número
+ * se puede afinar con datos.)
  *
  * Con margen, «naranja» significa de verdad que algo pasa: son ya cuatro
  * minutos sin señal, más de una pasada perdida.
