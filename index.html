@@ -171,7 +171,25 @@
   .val .d{font-size:11px;font-weight:500;margin-top:2px;display:block}
   /* Nota del filtro de polvo, bajo la lista. Discreta a propósito: informa
      de lo que no se está viendo sin competir con las filas. */
-  .dust-note{padding:13px 22px;font-family:var(--mono);font-size:11.5px;color:var(--faint);border-top:1px solid var(--line);text-align:center;letter-spacing:.02em}
+  /* ---------- POLVO ----------
+     Escondido por omisión. El botón vive al final de la lista, no en la barra
+     de herramientas: desplegar el polvo es algo que se hace después de mirar
+     la cartera, no antes. */
+  .dust-foot{border-top:1px solid var(--line)}
+  .dust-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;
+    padding:14px 22px;background:none;border:0;cursor:pointer;
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;
+    color:var(--faint);transition:color .16s,background .16s}
+  .dust-btn:hover{color:var(--text);background:var(--bg-2)}
+  .dust-btn .db-lbl{color:var(--violet);font-weight:600}
+  .dust-btn:hover .db-lbl{color:var(--text)}
+  .dust-btn .db-sub{letter-spacing:.02em;text-transform:none}
+  .dust-sep{padding:11px 22px 4px;font-family:var(--mono);font-size:10.5px;
+    letter-spacing:.13em;text-transform:uppercase;color:var(--faint)}
+  /* Las filas del polvo van un punto más apagadas que las de verdad: están
+     ahí porque las has pedido, no porque importen. */
+  .dust-lista .row{opacity:.72}
+  .dust-lista .row:hover{opacity:1}
 
   /* wallet group header (by-wallet view) */
   .wgroup{padding:16px 22px 6px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;background:var(--bg-2)}
@@ -458,10 +476,6 @@
           <button onclick="setTimeframe('7d',this)">7D</button>
           <button onclick="setTimeframe('30d',this)">30D</button>
         </div>
-        <button class="tool" id="dustTool" onclick="toggleHideDust()" aria-pressed="false">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-          <span>HIDE DUST</span>
-        </button>
         <button class="tool" id="sortTool" onclick="cycleSort()">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span id="sortLbl">Valor</span>
@@ -636,7 +650,15 @@ const state = {
   view: 'combined',
   sort: 'value',         // value | change | name
   timeframe: '24h',      // 24h | 7d | 30d (periodo del cambio de precio)
-  hideDust: false,       // filtro de vista: esconde posiciones < UMBRAL_DUST_USD
+  /* El polvo NO se enseña salvo que se pida. Antes era al revés: el filtro
+     era opcional y por omisión se veía todo, así que la cartera arrancaba
+     llena de tokens de céntimos.
+
+     ⚠ NO se guarda entre visitas, a diferencia del orden. «Ver el polvo» es
+       una ojeada, no una preferencia: cada vez que abres, la cartera arranca
+       limpia. Si se persistiera, un despliegue de una tarde dejaría la lista
+       sucia para siempre y volveríamos a lo de antes por la puerta de atrás. */
+  verPolvo: false,
 };
 
 /* Por debajo de este valor de posición (cantidad × precio) un token se
@@ -986,20 +1008,24 @@ async function refresh(){
 /* ============================================================
    RENDER
    ============================================================ */
-/* HIDE DUST es un filtro de vista, nunca de contabilidad: el total, el
-   cambio del periodo y las estadísticas siguen calculándose sobre
-   `tokensCombined` entero. Esto solo decide qué filas se pintan.
+/* El polvo es un filtro de VISTA, nunca de contabilidad: el total, el cambio
+   del periodo y las estadísticas se siguen calculando sobre `tokensCombined`
+   entero. Esto solo decide qué filas se pintan.
 
-   Un token sin precio no se considera polvo: su posición vale lo que valga,
-   y no lo sabemos. Esconder lo que no se puede medir sería mentir. */
+   Un token sin precio no se considera polvo: su posición vale lo que valga, y
+   no lo sabemos. Esconder lo que no se puede medir sería mentir. */
 function esDust(t){
   return t.price!=null && t.value < UMBRAL_DUST_USD;
 }
 function tokensDelPolvo(){
   return tokensCombined.filter(esDust);
 }
+/* La lista principal NUNCA trae polvo. El polvo se pinta aparte, al final y
+   solo si se ha desplegado, para que no se cuele por orden entre los tokens
+   de verdad: si fuese una sola lista ordenada por valor daría igual, pero
+   ordenando por nombre o por cambio se mezclarían. */
 function tokensParaLista(){
-  return state.hideDust ? tokensCombined.filter(t=>!esDust(t)) : tokensCombined;
+  return tokensCombined.filter(t=>!esDust(t));
 }
 function sortTokens(list){
   const s=[...list];
@@ -1039,21 +1065,33 @@ function rowHtml(t){
   </div>`;
 }
 
-/* Aviso de lo que el filtro está escondiendo. Sin filtro activo, o sin nada
-   que esconder, no se pinta nada. */
-function dustNoteHtml(){
-  if(!state.hideDust)return '';
+/* El pie del polvo: cuántos hay, cuánto suman, y el botón para desplegarlos.
+   Sin polvo no se pinta nada — ni el botón, porque un botón que no despliega
+   nada solo hace preguntarse qué esconde. */
+function polvoHtml(){
   const polvo=tokensDelPolvo();
   if(!polvo.length)return '';
   const suma=polvo.reduce((s,t)=>s+t.value,0);
-  const plural=polvo.length===1?'token oculto':'tokens ocultos';
-  return `<div class="dust-note">${polvo.length} ${plural} · ${fmtUsd(suma)}</div>`;
+  const plural=polvo.length===1?'token':'tokens';
+  const resumen=`${polvo.length} ${plural} bajo ${fmtUsd(UMBRAL_DUST_USD)} · ${fmtUsd(suma)}`;
+
+  const boton=`<button class="dust-btn${state.verPolvo?' abierto':''}" onclick="togglePolvo()"
+      aria-expanded="${state.verPolvo?'true':'false'}" aria-controls="polvoLista">
+    <span class="db-lbl">${state.verPolvo?'HIDE':'SHOW'}</span>
+    <span class="db-sub">${resumen}</span>
+  </button>`;
+
+  if(!state.verPolvo)return `<div class="dust-foot">${boton}</div>`;
+
+  // Desplegado: las filas completas, con su cantidad. En el polvo el valor en
+  // dólares no dice nada —son céntimos—, así que lo que interesa es cuánto
+  // tienes de cada cosa.
+  const filas=sortTokens(polvo).map(rowHtml).join('');
+  return `<div class="dust-foot"><div class="dust-sep">Polvo</div>
+    <div id="polvoLista" class="dust-lista">${filas}</div>${boton}</div>`;
 }
 
 function render(){
-  // Antes de cualquier salida temprana: el botón refleja el estado guardado
-  // aunque todavía no haya nada que pintar.
-  updateDustLabel();
   // --- estado vacío ---
   if(!state.wallets.length){
     if(state.view==='history'){loadHistory();updateHeader();renderWalletBar();return;}
@@ -1084,7 +1122,7 @@ function render(){
 
   if(state.view==='combined'){
     const sorted=sortTokens(list);
-    rows.innerHTML=(sorted.length?sorted.map(rowHtml).join(''):emptyHoldingsHtml())+dustNoteHtml();
+    rows.innerHTML=(sorted.length?sorted.map(rowHtml).join(''):emptyHoldingsHtml())+polvoHtml();
   }else{
     // Por wallet: agrupar.
     let html='';
@@ -1107,7 +1145,10 @@ function render(){
       </div>`;
       html+=sorted.length?sorted.map(rowHtml).join(''):'<div class="state-block" style="padding:26px"><p>Sin tokens con balance en esta wallet.</p></div>';
     }
-    rows.innerHTML=html+dustNoteHtml();
+    /* En la vista por wallet el polvo va también al final, del conjunto y no
+       de cada wallet: repetir el bloque por grupo llenaría la pantalla de
+       botones y la suma de cada uno no diría gran cosa. */
+    rows.innerHTML=html+polvoHtml();
   }
 
   updateHeader();
@@ -1197,12 +1238,6 @@ function renderWalletBar(){
   bar.innerHTML=html;
 }
 
-function updateDustLabel(){
-  const b=$('dustTool');
-  b.classList.toggle('active',state.hideDust);
-  b.setAttribute('aria-pressed',state.hideDust?'true':'false');
-}
-
 /* ---------- estados (vacío / carga / error) ---------- */
 function renderEmpty(){
   $('rows').innerHTML=`<div class="state-block">
@@ -1287,9 +1322,9 @@ function cycleSort(){
   $('sortLbl').textContent=labels[state.sort];
   render();
 }
-function toggleHideDust(){
-  state.hideDust=!state.hideDust;
-  savePortfolio();   // se recuerda entre visitas, como el orden
+/* Desplegar el polvo no se guarda: ver la nota de `verPolvo` en el estado. */
+function togglePolvo(){
+  state.verPolvo=!state.verPolvo;
   render();
 }
 
@@ -1649,16 +1684,20 @@ function histSelectDay(key){
    ============================================================ */
 function serialize(){
   return {wallets:state.wallets,customTokens:state.customTokens,
-    view:state.view,sort:state.sort,hideDust:state.hideDust,v:1};
+    view:state.view,sort:state.sort,v:1};
 }
 function applyData(d){
   if(!d)return;
   state.wallets=Array.isArray(d.wallets)?d.wallets.filter(w=>isAddr(w.address)).map(w=>({address:lc(w.address),label:(w.label||'').toString().slice(0,24)})):[];
   state.customTokens=Array.isArray(d.customTokens)?d.customTokens.filter(isAddr).map(lc):[];
   if(d.sort)state.sort=d.sort;
-  state.hideDust=d.hideDust===true;
-  // `d.hidden` (la lista de tokens ocultos a mano) ya no se lee: esa función
-  // se retiró y esos tokens vuelven a verse y a contar en el total.
+  /* `d.hideDust` ya NO se lee, y no se migra a propósito. Valía `false` en
+     casi todo el mundo —era el valor por omisión—, así que respetarlo habría
+     dejado la cartera llena de polvo para justo los usuarios a los que este
+     cambio va dirigido. El polvo arranca escondido para todos.
+
+     `d.hidden` (la lista de tokens ocultos a mano) tampoco: esa función se
+     retiró y esos tokens vuelven a verse y a contar en el total. */
 }
 function saveLocal(){
   try{localStorage.setItem(LS_KEY,JSON.stringify({code:state.code,data:serialize()}));}catch(e){}
