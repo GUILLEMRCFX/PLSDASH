@@ -891,13 +891,23 @@ async function fetchPrices(addresses){
       const r=await fetch(`${DEXSCREENER_API}/tokens/v1/${CHAIN_ID}/${batch.join(',')}`);
       if(!r.ok)continue;
       const pairs=await r.json();
-      // Agrupar por token, quedarnos con el par de mayor liquidez.
-      const best={};
+      /* Agrupar por token y quedarnos con el par de mayor liquidez — ese manda
+         para el precio.
+
+         ⚠ EL LOGO NO SALE DEL PAR GANADOR, sale del PRIMERO QUE TENGA UNO.
+           `info.imageUrl` solo viene en los pares cuyo perfil está reclamado en
+           DexScreener, y un token puede tener seis pares con uno solo
+           reclamado. Si ese no es además el de más liquidez, tomar el logo del
+           ganador lo tira a la basura y el token sale con el círculo de
+           relleno teniendo imagen oficial disponible. El precio sí tiene que
+           venir del par de más liquidez; el logo es el mismo en todos. */
+      const best={}, logoDe={};
       for(const p of (pairs||[])){
         const base=lc(p.baseToken?.address);
         if(!batch.includes(base))continue;
         const liq=p.liquidity?.usd||0;
         if(!best[base]||liq>best[base].liquidity?.usd){best[base]=p;}
+        if(!logoDe[base]&&p.info?.imageUrl)logoDe[base]=p.info.imageUrl;
       }
       for(const a of batch){
         const p=best[a];
@@ -905,7 +915,7 @@ async function fetchPrices(addresses){
           priceCache.set(a,{
             price:parseFloat(p.priceUsd)||0,
             change24:p.priceChange?.h24!=null?parseFloat(p.priceChange.h24):null,
-            logo:p.info?.imageUrl||null,
+            logo:logoDe[a]||p.info?.imageUrl||null,
             name:p.baseToken?.name||null,
             symbol:p.baseToken?.symbol||null,
             pair:p.pairAddress||null,            // para el gráfico y el cambio 7d/30d
@@ -918,6 +928,47 @@ async function fetchPrices(addresses){
       }
     }catch(e){/* red caída → reintenta en el próximo ciclo */}
   }
+}
+
+/* ============================================================
+   LOGOS — segunda fuente
+   ============================================================
+   DexScreener solo trae `info.imageUrl` de los tokens con el perfil reclamado,
+   y muchos legítimos no lo tienen: salían con el círculo de relleno y su
+   inicial. El explorador de PulseChain guarda el icono de cada contrato, así
+   que sirve de respaldo para justo esos.
+
+   ⚠ RESPALDO, NO SEGUNDO CAMINO. Solo se consulta por los tokens que se han
+     quedado SIN logo tras DexScreener, y una sola vez por token: el icono de
+     un contrato no cambia. Un fallo aquí no rompe nada — se queda el círculo,
+     que es lo que había antes.
+
+   Va DESPUÉS de pintar y no bloquea: los números salen cuando salen, y los
+   iconos entran después con un repintado. Nadie espera a una imagen para ver
+   cuánto tiene. */
+const logoRespaldo = new Map();   // address → url | null (null = ya se miró y no hay)
+
+async function completarLogos(){
+  const faltan=tokensCombined.filter(t=>!t.logo).map(t=>lc(t.priceAddr||t.address))
+    .filter(a=>isAddr(a)&&!logoRespaldo.has(a));
+  if(!faltan.length)return;
+
+  // Secuencial y a lo sumo ocho por pasada: son peticiones de cortesía a un
+  // explorador público, no vale la pena disparar treinta a la vez.
+  for(const a of faltan.slice(0,8)){
+    try{
+      const r=await fetch(`${BLOCKSCOUT_API}/tokens/${a}`);
+      logoRespaldo.set(a, r.ok ? ((await r.json()).icon_url||null) : null);
+    }catch(e){ logoRespaldo.set(a,null); }
+  }
+
+  let alguno=false;
+  for(const t of tokensCombined){
+    if(t.logo)continue;
+    const u=logoRespaldo.get(lc(t.priceAddr||t.address));
+    if(u){ t.logo=u; alguno=true; }
+  }
+  if(alguno)render();
 }
 
 // Lookup de un único token (usado en el preview del modal "Añadir token").
@@ -988,15 +1039,33 @@ async function refresh(){
       // Completar metadatos desde DexScreener si seguían genéricos.
       if((t.symbol==='?'||!t.symbol)&&pc.symbol)t.symbol=pc.symbol;
       if((t.name==='Token'||!t.name)&&pc.name)t.name=pc.name;
-      t.value=(t.price!=null)?t.balance*t.price:0;
+      /* ⚠ SIN PRECIO, FUERA. Y se descarta AQUÍ, al construir la lista, no al
+         pintarla: así no existe para nada — ni para el reparto, ni para el
+         mejor activo del día, ni para la vista por wallet. Un token sin precio
+         en PulseChain es un airdrop de estafa: «Claim 50k $pDAI on
+         dai.free.nf», «Claim on: 9mm-airdrop.com». No tienen precio porque no
+         tienen mercado, y los manda cualquiera a cualquier wallet sin permiso.
+
+         El precio de mercado hace de prueba de que el token existe. Se prefirió
+         a una lista de tokens «oficiales» escrita a mano, que habría que
+         mantener y dejaría fuera cualquier token nuevo legítimo.
+
+         COSTE ACEPTADO: si un token legítimo se queda sin precio —se seca su
+         pool, DexScreener falla— desaparece sin dejar rastro. No queda ni bajo
+         el botón del polvo. Es la decisión que se tomó: en una cartera real, de
+         diez filas visibles seis eran estafas. */
+      if(t.price==null)continue;
+
+      t.value=t.balance*t.price;
       arr.push(t);
       for(const [w,amt] of Object.entries(t.perWallet)){
-        perWalletTotals[w]=(perWalletTotals[w]||0)+(t.price!=null?amt*t.price:0);
+        perWalletTotals[w]=(perWalletTotals[w]||0)+amt*t.price;
       }
     }
     tokensCombined=arr;
     lastUpdate=Date.now();
     render();
+    completarLogos();   // sin `await`: los iconos entran después, si entran
   }catch(e){
     console.error(e);
     if(!tokensCombined.length)renderError('No pudimos cargar los balances. Reintentando en 30s.');
@@ -1008,14 +1077,15 @@ async function refresh(){
 /* ============================================================
    RENDER
    ============================================================ */
-/* El polvo es un filtro de VISTA, nunca de contabilidad: el total, el cambio
-   del periodo y las estadísticas se siguen calculando sobre `tokensCombined`
-   entero. Esto solo decide qué filas se pintan.
+/* Filtro de VISTA, nunca de contabilidad: el total, el cambio del periodo y las
+   estadísticas se siguen calculando sobre `tokensCombined` entero. Esto solo
+   decide qué filas se pintan.
 
-   Un token sin precio no se considera polvo: su posición vale lo que valga, y
-   no lo sabemos. Esconder lo que no se puede medir sería mentir. */
+   Aquí NO hace falta mirar el precio: los tokens sin precio ya se descartaron
+   al construir `tokensCombined` (ver la nota larga allí). Lo único que queda
+   por decidir es el umbral. */
 function esDust(t){
-  return t.price!=null && t.value < UMBRAL_DUST_USD;
+  return t.value < UMBRAL_DUST_USD;
 }
 function tokensDelPolvo(){
   return tokensCombined.filter(esDust);
@@ -1071,6 +1141,7 @@ function rowHtml(t){
 function polvoHtml(){
   const polvo=tokensDelPolvo();
   if(!polvo.length)return '';
+
   const suma=polvo.reduce((s,t)=>s+t.value,0);
   const plural=polvo.length===1?'token':'tokens';
   const resumen=`${polvo.length} ${plural} bajo ${fmtUsd(UMBRAL_DUST_USD)} · ${fmtUsd(suma)}`;
@@ -1087,7 +1158,8 @@ function polvoHtml(){
   // dólares no dice nada —son céntimos—, así que lo que interesa es cuánto
   // tienes de cada cosa.
   const filas=sortTokens(polvo).map(rowHtml).join('');
-  return `<div class="dust-foot"><div class="dust-sep">Polvo</div>
+  return `<div class="dust-foot">
+    <div class="dust-sep">Polvo · por debajo de ${fmtUsd(UMBRAL_DUST_USD)}</div>
     <div id="polvoLista" class="dust-lista">${filas}</div>${boton}</div>`;
 }
 
@@ -1180,7 +1252,7 @@ function updateHeader(){
   const up=diff>=0;
   const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
-  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${tokensCombined.length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
+  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${tokensParaLista().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
 }
 
 function renderStats(){
