@@ -122,6 +122,26 @@
      de tocar esta opacidad. La prueba está en el cuaderno como
      `contraste-elementos.js` + `contraste-elementos.py`. */
   background: var(--vidrio);
+  /* COSTE, medido por saturación (21-ago-2026, 390×844 a DPR 2).
+     El panel desenfoca 640K píxeles de dispositivo: la tarjeta (376×375) más
+     la barra de pestañas (366×52). Apilando copias sobre un fondo animado en
+     una máquina SIN GPU, los 60 fps aguantan hasta 8 copias —4,5M píxeles— y
+     empiezan a caer a las 16 (49,6 fps) y a las 32 (24,9 fps). O sea: el panel
+     real va a un octavo del techo de la peor máquina que tenemos a mano.
+
+     La pendiente en el tramo saturado da 1,31 ms por megapíxel, que sobre los
+     0,64 Mpx del panel serían ~0,84 ms por fotograma; el punto de 16 copias da
+     0,39 ms/Mpx y ~0,26 ms. Los dos se llevan un factor 3 —el punto de 16 está
+     a caballo entre dos ciclos de vsync y no es limpio—, así que la cifra
+     buena es el orden de magnitud: POR DEBAJO DE 1 ms por fotograma,
+     rasterizando por software. Con GPU, menos.
+
+     ⚠ Otros tres métodos NO sirvieron, y están anotados para que nadie los
+       repita: (1) restar dos tandas largas sobre la esfera dio 12,7 ms, luego
+       34,4 y luego −18,6 —un coste negativo, imposible—; (2) emparejado sobre
+       la esfera, 4,7 ± 4,1 ms, por debajo del ruido de una escena que ya cuesta
+       234 ms; (3) aislado y sin vsync, `requestAnimationFrame` se desacopla de
+       la pintura y corre a 3.589 «fps», que es un bucle vacío. */
   backdrop-filter: blur(16px) saturate(1.25);
   -webkit-backdrop-filter: blur(16px) saturate(1.25);
   padding: 18px 18px 20px;
@@ -439,6 +459,26 @@
   padding: 4px;
   border-radius: 13px;
   background: var(--vidrio);
+  /* COSTE, medido por saturación (21-ago-2026, 390×844 a DPR 2).
+     El panel desenfoca 640K píxeles de dispositivo: la tarjeta (376×375) más
+     la barra de pestañas (366×52). Apilando copias sobre un fondo animado en
+     una máquina SIN GPU, los 60 fps aguantan hasta 8 copias —4,5M píxeles— y
+     empiezan a caer a las 16 (49,6 fps) y a las 32 (24,9 fps). O sea: el panel
+     real va a un octavo del techo de la peor máquina que tenemos a mano.
+
+     La pendiente en el tramo saturado da 1,31 ms por megapíxel, que sobre los
+     0,64 Mpx del panel serían ~0,84 ms por fotograma; el punto de 16 copias da
+     0,39 ms/Mpx y ~0,26 ms. Los dos se llevan un factor 3 —el punto de 16 está
+     a caballo entre dos ciclos de vsync y no es limpio—, así que la cifra
+     buena es el orden de magnitud: POR DEBAJO DE 1 ms por fotograma,
+     rasterizando por software. Con GPU, menos.
+
+     ⚠ Otros tres métodos NO sirvieron, y están anotados para que nadie los
+       repita: (1) restar dos tandas largas sobre la esfera dio 12,7 ms, luego
+       34,4 y luego −18,6 —un coste negativo, imposible—; (2) emparejado sobre
+       la esfera, 4,7 ± 4,1 ms, por debajo del ruido de una escena que ya cuesta
+       234 ms; (3) aislado y sin vsync, `requestAnimationFrame` se desacopla de
+       la pintura y corre a 3.589 «fps», que es un bucle vacío. */
   backdrop-filter: blur(16px) saturate(1.25);
   -webkit-backdrop-filter: blur(16px) saturate(1.25);
   border: 1px solid var(--borde);
