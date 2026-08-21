@@ -1008,24 +1008,48 @@ async function refresh(){
 /* ============================================================
    RENDER
    ============================================================ */
-/* El polvo es un filtro de VISTA, nunca de contabilidad: el total, el cambio
-   del periodo y las estadísticas se siguen calculando sobre `tokensCombined`
-   entero. Esto solo decide qué filas se pintan.
+/* Filtro de VISTA, nunca de contabilidad: el total, el cambio del periodo y las
+   estadísticas se siguen calculando sobre `tokensCombined` entero. Esto solo
+   decide qué filas se pintan.
 
-   Un token sin precio no se considera polvo: su posición vale lo que valga, y
-   no lo sabemos. Esconder lo que no se puede medir sería mentir. */
+   ⚠ UN TOKEN SIN PRECIO TAMBIÉN SE ESCONDE. Aquí decía lo contrario —«esconder
+     lo que no se puede medir sería mentir»— y era un error con los datos de
+     PulseChain delante: los tokens sin precio no son posiciones que no se
+     puedan valorar, son AIRDROPS DE ESTAFA. Se llaman «Claim 50k $pDAI on
+     dai.free.nf» o «Claim on: 9mm-airdrop.com», los manda cualquiera a
+     cualquier wallet sin permiso, y no tienen precio porque no tienen mercado.
+     La regla vieja los dejaba pasar TODOS y llenaba la cartera de ellos.
+
+     Que no tengan precio no es una laguna del dato: es la señal. Un token de
+     verdad tiene un par con liquidez y DexScreener le pone precio. Uno que no
+     lo tiene, o no vale nada o no existe.
+
+     El precio de mercado se usa como prueba de que el token es real, en vez de
+     una lista de tokens «oficiales» escrita a mano: una lista habría que
+     mantenerla, y dejaría fuera cualquier token nuevo legítimo.
+
+   ⚠ EL COSTE, para tenerlo escrito: si algún día un token legítimo tuyo se
+     queda sin precio —se seca su pool, DexScreener falla—, desaparece de la
+     lista principal. No se pierde: sale bajo SHOW, con su cantidad. */
+function sinPrecio(t){
+  return t.price==null;
+}
 function esDust(t){
   return t.price!=null && t.value < UMBRAL_DUST_USD;
 }
+/* Todo lo que no se enseña por omisión: sin precio o por debajo del umbral. */
+function esRuido(t){
+  return sinPrecio(t) || esDust(t);
+}
 function tokensDelPolvo(){
-  return tokensCombined.filter(esDust);
+  return tokensCombined.filter(esRuido);
 }
 /* La lista principal NUNCA trae polvo. El polvo se pinta aparte, al final y
    solo si se ha desplegado, para que no se cuele por orden entre los tokens
    de verdad: si fuese una sola lista ordenada por valor daría igual, pero
    ordenando por nombre o por cambio se mezclarían. */
 function tokensParaLista(){
-  return tokensCombined.filter(t=>!esDust(t));
+  return tokensCombined.filter(t=>!esRuido(t));
 }
 function sortTokens(list){
   const s=[...list];
@@ -1071,9 +1095,17 @@ function rowHtml(t){
 function polvoHtml(){
   const polvo=tokensDelPolvo();
   if(!polvo.length)return '';
-  const suma=polvo.reduce((s,t)=>s+t.value,0);
-  const plural=polvo.length===1?'token':'tokens';
-  const resumen=`${polvo.length} ${plural} bajo ${fmtUsd(UMBRAL_DUST_USD)} · ${fmtUsd(suma)}`;
+
+  /* Los dos motivos se cuentan por separado. Sumar en dólares los que no
+     tienen precio es imposible —de ahí que estén escondidos—, así que decir
+     «14 tokens · 1,43 $» daría a entender que esos 14 valen eso. */
+  const mudos=polvo.filter(sinPrecio).length;
+  const bajos=polvo.length-mudos;
+  const suma=polvo.filter(t=>!sinPrecio(t)).reduce((s,t)=>s+t.value,0);
+  const partes=[];
+  if(bajos)partes.push(`${bajos} bajo ${fmtUsd(UMBRAL_DUST_USD)} · ${fmtUsd(suma)}`);
+  if(mudos)partes.push(`${mudos} sin precio`);
+  const resumen=partes.join(' · ');
 
   const boton=`<button class="dust-btn${state.verPolvo?' abierto':''}" onclick="togglePolvo()"
       aria-expanded="${state.verPolvo?'true':'false'}" aria-controls="polvoLista">
@@ -1086,8 +1118,14 @@ function polvoHtml(){
   // Desplegado: las filas completas, con su cantidad. En el polvo el valor en
   // dólares no dice nada —son céntimos—, así que lo que interesa es cuánto
   // tienes de cada cosa.
-  const filas=sortTokens(polvo).map(rowHtml).join('');
-  return `<div class="dust-foot"><div class="dust-sep">Polvo</div>
+  /* Los que tienen precio primero y por valor; los mudos al final, por nombre.
+     Mezclarlos por valor pondría los de estafa —todos a cero— por delante de
+     los tuyos de céntimos. */
+  const conPrecio=sortTokens(polvo.filter(t=>!sinPrecio(t)));
+  const mudosOrd=polvo.filter(sinPrecio).sort((a,b)=>(a.symbol||'').localeCompare(b.symbol||''));
+  const filas=[...conPrecio,...mudosOrd].map(rowHtml).join('');
+  return `<div class="dust-foot">
+    <div class="dust-sep">Escondidos · sin precio de mercado o bajo ${fmtUsd(UMBRAL_DUST_USD)}</div>
     <div id="polvoLista" class="dust-lista">${filas}</div>${boton}</div>`;
 }
 
@@ -1180,7 +1218,7 @@ function updateHeader(){
   const up=diff>=0;
   const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
-  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${tokensCombined.length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
+  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${tokensParaLista().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
 }
 
 function renderStats(){
