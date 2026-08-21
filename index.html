@@ -891,13 +891,23 @@ async function fetchPrices(addresses){
       const r=await fetch(`${DEXSCREENER_API}/tokens/v1/${CHAIN_ID}/${batch.join(',')}`);
       if(!r.ok)continue;
       const pairs=await r.json();
-      // Agrupar por token, quedarnos con el par de mayor liquidez.
-      const best={};
+      /* Agrupar por token y quedarnos con el par de mayor liquidez — ese manda
+         para el precio.
+
+         ⚠ EL LOGO NO SALE DEL PAR GANADOR, sale del PRIMERO QUE TENGA UNO.
+           `info.imageUrl` solo viene en los pares cuyo perfil está reclamado en
+           DexScreener, y un token puede tener seis pares con uno solo
+           reclamado. Si ese no es además el de más liquidez, tomar el logo del
+           ganador lo tira a la basura y el token sale con el círculo de
+           relleno teniendo imagen oficial disponible. El precio sí tiene que
+           venir del par de más liquidez; el logo es el mismo en todos. */
+      const best={}, logoDe={};
       for(const p of (pairs||[])){
         const base=lc(p.baseToken?.address);
         if(!batch.includes(base))continue;
         const liq=p.liquidity?.usd||0;
         if(!best[base]||liq>best[base].liquidity?.usd){best[base]=p;}
+        if(!logoDe[base]&&p.info?.imageUrl)logoDe[base]=p.info.imageUrl;
       }
       for(const a of batch){
         const p=best[a];
@@ -905,7 +915,7 @@ async function fetchPrices(addresses){
           priceCache.set(a,{
             price:parseFloat(p.priceUsd)||0,
             change24:p.priceChange?.h24!=null?parseFloat(p.priceChange.h24):null,
-            logo:p.info?.imageUrl||null,
+            logo:logoDe[a]||p.info?.imageUrl||null,
             name:p.baseToken?.name||null,
             symbol:p.baseToken?.symbol||null,
             pair:p.pairAddress||null,            // para el gráfico y el cambio 7d/30d
@@ -918,6 +928,47 @@ async function fetchPrices(addresses){
       }
     }catch(e){/* red caída → reintenta en el próximo ciclo */}
   }
+}
+
+/* ============================================================
+   LOGOS — segunda fuente
+   ============================================================
+   DexScreener solo trae `info.imageUrl` de los tokens con el perfil reclamado,
+   y muchos legítimos no lo tienen: salían con el círculo de relleno y su
+   inicial. El explorador de PulseChain guarda el icono de cada contrato, así
+   que sirve de respaldo para justo esos.
+
+   ⚠ RESPALDO, NO SEGUNDO CAMINO. Solo se consulta por los tokens que se han
+     quedado SIN logo tras DexScreener, y una sola vez por token: el icono de
+     un contrato no cambia. Un fallo aquí no rompe nada — se queda el círculo,
+     que es lo que había antes.
+
+   Va DESPUÉS de pintar y no bloquea: los números salen cuando salen, y los
+   iconos entran después con un repintado. Nadie espera a una imagen para ver
+   cuánto tiene. */
+const logoRespaldo = new Map();   // address → url | null (null = ya se miró y no hay)
+
+async function completarLogos(){
+  const faltan=tokensCombined.filter(t=>!t.logo).map(t=>lc(t.priceAddr||t.address))
+    .filter(a=>isAddr(a)&&!logoRespaldo.has(a));
+  if(!faltan.length)return;
+
+  // Secuencial y a lo sumo ocho por pasada: son peticiones de cortesía a un
+  // explorador público, no vale la pena disparar treinta a la vez.
+  for(const a of faltan.slice(0,8)){
+    try{
+      const r=await fetch(`${BLOCKSCOUT_API}/tokens/${a}`);
+      logoRespaldo.set(a, r.ok ? ((await r.json()).icon_url||null) : null);
+    }catch(e){ logoRespaldo.set(a,null); }
+  }
+
+  let alguno=false;
+  for(const t of tokensCombined){
+    if(t.logo)continue;
+    const u=logoRespaldo.get(lc(t.priceAddr||t.address));
+    if(u){ t.logo=u; alguno=true; }
+  }
+  if(alguno)render();
 }
 
 // Lookup de un único token (usado en el preview del modal "Añadir token").
@@ -1014,6 +1065,7 @@ async function refresh(){
     tokensCombined=arr;
     lastUpdate=Date.now();
     render();
+    completarLogos();   // sin `await`: los iconos entran después, si entran
   }catch(e){
     console.error(e);
     if(!tokensCombined.length)renderError('No pudimos cargar los balances. Reintentando en 30s.');
