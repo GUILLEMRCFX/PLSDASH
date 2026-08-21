@@ -1,24 +1,21 @@
 /**
- * Panel — Ritmo de ganancias.
+ * Ritmo de ganancias — por hora, día, semana, mes y año, en PLS y en dólares.
  *
- * Cuánto se genera por hora, día, semana, mes y año, en PLS y en dólares.
+ * ## Dónde vive, y por qué ya no es un panel
  *
- * ## Dónde va, y por qué
+ * Fue un panel propio mientras el tablero era una sola pantalla de ocho
+ * paneles. Con las cuatro pestañas, el ritmo es lo primero que hay que
+ * responder —«¿cuánto llevo y a qué velocidad?»— así que se ha mudado DENTRO
+ * del panel de Resumen, que es el que se mira veinte veces al día.
  *
- * Va como panel PROPIO y el PRIMERO de la columna izquierda: en escritorio es
- * la esquina superior izquierda, y en móvil el primer panel bajo la esfera. Es
- * el dato que más se consulta, así que ocupa el sitio que primero mira el ojo.
+ * Lo que queda aquí es la tabla: el cálculo, la conversión a dólares y la nota
+ * de procedencia. Este módulo no dibuja panel porque el ritmo enseñado dos
+ * veces —una en Resumen y otra en un panel propio— serían los mismos cinco
+ * números con dos rótulos distintos, que es exactamente lo que se evitó cuando
+ * «Media por día» salió del panel de Ganancias.
  *
- * No va dentro de «Ganancias» porque responden preguntas distintas: aquel
- * enseña lo que YA se ha ganado —total, hoy, última hora—, hechos medidos.
- * Este enseña un RITMO proyectado, que es otra clase de número y no debe
- * mezclarse con los primeros: si van juntos, en un par de meses nadie
- * recuerda cuáles se midieron y cuáles se extrapolaron.
- *
- * ⚠ Por esa misma razón, «Media por día» sale del panel de Ganancias y vive
- *   aquí como la fila «Día». Era exactamente este número —`ritmoDiario()`— y
- *   tenerlo en los dos sitios lo enseñaría dos veces con dos rótulos
- *   distintos. Si prefieres recuperarlo allí, es una línea.
+ * ⚠ Por esa misma razón, «Media por día» NO vuelve al panel de Ganancias: era
+ *   este mismo `ritmoDiario()` y su sitio es la fila «Día» de esta tabla.
  *
  * ## El cálculo
  *
@@ -29,16 +26,14 @@
  *
  * No se distingue lo medido de lo extrapolado: es una proyección entera y así
  * se dice, en una nota discreta. Bailará, sobre todo por el precio, y quien
- * mira este panel ya lo sabe: no hace falta un aviso grande.
+ * mira esto ya lo sabe: no hace falta un aviso grande.
  */
 
 import { ritmoDiario } from '/val/compartido/ganancias.js';
 import { fmt, fmtEdad, escapar } from './formato.js';
 
-export const TITULO = 'Ritmo de ganancias';
-
 // Días por periodo. La media real, no números redondos.
-const PERIODOS = [
+export const PERIODOS = [
   ['Hora',   1 / 24],
   ['Día',    1],
   ['Semana', 7],
@@ -46,56 +41,53 @@ const PERIODOS = [
   ['Año',    365.25],
 ];
 
-export function panelRitmo(datos) {
+/**
+ * Los dólares con dos decimales salvo que sean céntimos: a 0,00001 $ el PLS,
+ * la hora da menos de un céntimo y «0,00 $» no dice nada.
+ */
+const fmtUsd = usd => (usd < 0.01 ? '&lt;0,01 $' : `${fmt(usd, 2)} $`);
+
+/**
+ * La tabla del ritmo, para incrustar donde haga falta.
+ *
+ * La nota lleva SIEMPRE la procedencia del ritmo —«media de 7 días», «medido en
+ * 3 h»—, porque de eso depende cuánto vale la proyección: siete días cerrados y
+ * tres horas que pueden haber pillado una propuesta de bloque no merecen la
+ * misma confianza, y la cifra sale idéntica en los dos casos.
+ *
+ * @returns {object|null} { html, nota } — o null si aún no hay ritmo medible,
+ *   para que quien la pida decida qué decir en su sitio.
+ */
+export function tablaRitmo(datos) {
   const { estado, serie, snapshots24h, precio } = datos;
 
   const ritmo = ritmoDiario({
     serie, snapshots24h, plsDiaKV: estado?.validadores?.pls_dia, fmt,
   });
-
-  if (!ritmo || !(ritmo.pls_dia > 0)) {
-    return `
-      <section class="panel" aria-labelledby="pr-t">
-        <header class="p-cab"><h2 id="pr-t">${TITULO}</h2></header>
-        <p class="vacio">Sin ritmo medible todavía.</p>
-      </section>`;
-  }
+  if (!ritmo || !(ritmo.pls_dia > 0)) return null;
 
   const hayPrecio = precio && precio.disponible !== false && precio.precio > 0;
   const precioViejo = hayPrecio && precio.obsoleto;
 
   const filas = PERIODOS.map(([nombre, dias]) => {
     const pls = ritmo.pls_dia * dias;
-    // Los dólares con dos decimales salvo que sean céntimos: a 0,00001 $ el
-    // PLS, la hora da menos de un céntimo y «0,00 $» no dice nada.
-    const usd = hayPrecio ? pls * precio.precio : null;
-    const usdTxt = usd == null ? ''
-      : usd < 0.01 ? '&lt;0,01 $'
-      : `${fmt(usd, 2)} $`;
     return `
       <div class="rfila">
         <span class="r-per">${escapar(nombre)}</span>
         <span class="r-pls">${fmt(pls)}<span class="u">PLS</span></span>
-        ${hayPrecio ? `<span class="r-usd">${usdTxt}</span>` : ''}
+        ${hayPrecio ? `<span class="r-usd">${fmtUsd(pls * precio.precio)}</span>` : ''}
       </div>`;
   }).join('');
 
-  return `
-    <section class="panel" aria-labelledby="pr-t">
-      <header class="p-cab">
-        <h2 id="pr-t">${TITULO}</h2>
-        <span class="p-marca${precioViejo ? ' alerta' : ''}">${
-          precioViejo ? 'Precio no fresco' : escapar(ritmo.base)
-        }</span>
-      </header>
-
-      <div class="rlista${hayPrecio ? '' : ' sin-usd'}">${filas}</div>
-
-      <p class="c-sub">${
-        hayPrecio
-          ? `Proyección al ritmo y precio actuales${
-              precioViejo ? ` · precio ${fmtEdad(precio.edad_s)}` : ''}.`
-          : 'Proyección al ritmo actual. Sin precio de PLS: no se convierte a dólares.'
-      }${ritmo.provisional ? ' El ritmo aún es provisional.' : ''}</p>
-    </section>`;
+  return {
+    html: `<div class="rlista${hayPrecio ? '' : ' sin-usd'}">${filas}</div>`,
+    // Corta a propósito: en «Resumen» esta línea tiene que caber en una sola a
+    // 390px, y cada línea de más empuja el panel fuera de la primera pantalla.
+    nota: `${
+      hayPrecio
+        ? `Proyección · ${ritmo.base} · precio ${
+            precioViejo ? fmtEdad(precio.edad_s) : 'actual'}.`
+        : `Proyección · ${ritmo.base}. Sin precio de PLS: no se convierte a dólares.`
+    }${ritmo.provisional ? ' El ritmo aún es provisional.' : ''}`,
+  };
 }

@@ -20,54 +20,93 @@
   }
 
   /* ───────────────────────────────────────────── retícula
-     Móvil: la esfera se queda con la mayor parte de la primera pantalla y los
-     paneles caen debajo en una sola columna.
-
-     Escritorio: la esfera manda en el centro y los paneles se reparten a los
-     lados. Crece sola — las columnas se llenan con lo que haya, y una columna
-     sin paneles no ocupa nada. No hay huecos esperando contenido. */
+     Móvil: esfera arriba, barra de pestañas debajo y la vista activa al pie.
+     Escritorio: la esfera se queda con la izquierda entera y fija, y las
+     pestañas con su contenido ocupan la derecha. */
   .marco{
     display:grid;
     grid-template-columns:1fr;
-    gap:14px;
-    padding:14px;
-    padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    gap:12px;
+    padding:12px;
+    padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
     max-width:1680px;margin:0 auto;
   }
 
+  /* La altura de la esfera en móvil NO es un gusto, es una cuenta.
+     «Resumen» mide 375px y tiene que caber entero sin desplazarse, así que a
+     la esfera le toca lo que sobre después de la barra de pestañas (52px) y
+     los márgenes (48px): alto − 100 − 375. De ahí los tres escalones. La
+     esfera es lo bonito; «Resumen» es para lo que se abre el panel, y cuando
+     compiten gana la respuesta.
+
+       alto útil   esfera    le queda a Resumen
+        844        338 (40%)      406
+        750        225 (30%)      425
+        667        170 (mín)      397
+
+     `dvh` y no `vh`: con `vh` la cuenta se haría sobre la pantalla completa e
+     ignoraría la barra del navegador, que es precisamente el trozo que falta. */
   #escena{
     position:relative;
-    /* dvh y no vh: en móvil la barra del navegador se retrae y con vh la
-       esfera quedaría cortada al arrancar. */
-    height:58dvh;min-height:300px;
+    height:clamp(170px,40dvh,360px);
+    /* Suelo absoluto: los escalones de abajo sustituyen la altura entera, así
+       que sin esto un móvil apaisado dejaría la esfera en una raya. */
+    min-height:150px;
     /* La esfera se lleva el gesto entero dentro de su caja; fuera de ella la
        página se desplaza con normalidad. */
     touch-action:none;
   }
   #escena canvas{display:block;width:100%;height:100%}
 
-  /* Las columnas desaparecen como caja en móvil (`display:contents`), así que
-     los paneles caen directamente en la retícula, en orden. Se reparten
-     llenando primero la izquierda, así el orden de lectura en móvil sigue
-     siendo el correcto. */
-  .col{display:contents}
+  @media (max-height:800px){ #escena{height:30dvh} }
+  @media (max-height:700px){ #escena{height:24dvh} }
+
+  #contenido{min-width:0}
+
+  /* Las cuatro vistas viven a la vez en el DOM y solo una se enseña. Cambiar
+     de pestaña no vuelve a pedir datos ni a construir HTML: enseña lo que ya
+     estaba pintado, que es lo que hace que el cambio sea instantáneo. */
+  .vista{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:12px;
+    align-content:start;
+    /* Sin esto, `min-width:auto` deja que el contenido más ancho —una barra de
+       pestañas larga, una tabla— estire la columna de la retícula y la página
+       entera se desplace en horizontal. Nunca se nota en escritorio. */
+    min-width:0;
+  }
 
   @media (min-width:1000px){
     .marco{
-      grid-template-columns:minmax(320px,1fr) minmax(0,1.7fr) minmax(320px,1fr);
-      grid-template-areas:"izq escena der";
+      grid-template-columns:minmax(0,1fr) minmax(520px,.9fr);
+      grid-template-areas:"escena contenido";
       gap:18px;padding:18px;
       align-items:start;
       min-height:100dvh;
     }
     #escena{
       grid-area:escena;
-      height:calc(100dvh - 36px);
+      height:calc(100dvh - 36px);max-height:none;
       position:sticky;top:18px;
     }
-    .col{display:flex;flex-direction:column;gap:18px}
-    #colIzq{grid-area:izq}
-    #colDer{grid-area:der}
+    #contenido{
+      grid-area:contenido;
+      display:flex;flex-direction:column;gap:18px;
+    }
+    /* En escritorio hay ancho para dos columnas de paneles. `auto-fit` con un
+       mínimo de 290px las crea solas cuando caben y las deshace cuando no:
+       «Resumen» y «Validadores», que traen un solo panel, ocupan el ancho
+       entero sin que haya que decírselo. */
+    /* `align-items:start` y no el estirado por omisión: con cuatro paneles en
+       dos columnas, estirar iguala la altura de cada fila y el panel corto se
+       queda con un palmo de vidrio vacío debajo de su último dato. Cada uno a
+       su altura queda desigual por abajo, y desigual es mejor que hueco. */
+    .vista{
+      grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+      gap:18px;
+      align-items:start;
+    }
   }
 
   #cargando{
@@ -81,9 +120,19 @@
 <main class="marco">
   <div id="escena"></div>
 
-  <!-- Los paneles se inyectan aquí. Una columna sin paneles no pinta nada. -->
-  <div class="col" id="colIzq"></div>
-  <div class="col" id="colDer"></div>
+  <div id="contenido">
+    <nav class="pestanas" role="tablist" aria-label="Secciones del panel">
+      <button type="button" role="tab" id="t-resumen"     aria-controls="v-resumen"     aria-selected="true">Resumen</button>
+      <button type="button" role="tab" id="t-ganancias"   aria-controls="v-ganancias"   aria-selected="false" tabindex="-1">Ganancias</button>
+      <button type="button" role="tab" id="t-validadores" aria-controls="v-validadores" aria-selected="false" tabindex="-1">Validadores</button>
+      <button type="button" role="tab" id="t-nodo"        aria-controls="v-nodo"        aria-selected="false" tabindex="-1">Nodo</button>
+    </nav>
+
+    <div class="vista" role="tabpanel" id="v-resumen"     aria-labelledby="t-resumen"     tabindex="0"></div>
+    <div class="vista" role="tabpanel" id="v-ganancias"   aria-labelledby="t-ganancias"   tabindex="0" hidden></div>
+    <div class="vista" role="tabpanel" id="v-validadores" aria-labelledby="t-validadores" tabindex="0" hidden></div>
+    <div class="vista" role="tabpanel" id="v-nodo"        aria-labelledby="t-nodo"        tabindex="0" hidden></div>
+  </div>
 </main>
 
 <script type="importmap">
@@ -94,14 +143,16 @@
   import { crearEsfera } from './escena/esfera.js';
   import { estadoFalso } from './datos-falsos.js';
   import { cargarTodo } from './datos.js';
-  import { panelEstadoGlobal } from './paneles/estado-global.js';
+  import { panelResumen, engancharResumen } from './paneles/resumen.js';
   import { panelGanancias } from './paneles/ganancias.js';
   import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
-  import { panelValidadores } from './paneles/validadores.js';
-  import { panelRitmo } from './paneles/ritmo.js';
-  import { panelSaludNodo } from './paneles/salud-nodo.js';
   import { panelTrayectoria } from './paneles/trayectoria.js';
+  import { panelPrecio } from './paneles/precio-historico.js';
+  import { panelValidadores } from './paneles/validadores.js';
+  import { panelSaludNodo } from './paneles/salud-nodo.js';
+  import { panelEstadoGlobal } from './paneles/estado-global.js';
   import { panelRegistro } from './paneles/registro.js';
+  import { latir } from './paneles/pulso.js';
 
   const q = new URLSearchParams(location.search);
   // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
@@ -121,32 +172,106 @@
   // estando en la consola y se puede diagnosticar desde ahí.
   window.__esfera = esfera;
 
-  /* ───────────────────────────────────────────── paneles */
+  /* ───────────────────────────────────────────── pestañas
 
-  const columnas = [document.getElementById('colIzq'), document.getElementById('colDer')];
-  // El orden es el de lectura en móvil y el de relleno de columnas en
-  // escritorio: la mitad de arriba a la izquierda, la de abajo a la derecha.
-  // El ritmo va el primero porque es el dato que más se consulta.
-  const PANELES = [
-    panelRitmo, panelEstadoGlobal, panelGanancias, panelCiclo,   // columna izquierda
-    panelValidadores, panelSaludNodo, panelTrayectoria, panelRegistro,  // derecha
+     Cada pestaña responde a una pregunta distinta, y ese es el criterio de
+     reparto — no «cuántos paneles caben en cada una»:
+
+       Resumen     ¿cuánto llevo y va todo bien?   (sin desplazarse)
+       Ganancias   ¿de dónde sale y hacia dónde va?
+       Validadores ¿cuál de ellos está raro?
+       Nodo        ¿cómo está la máquina, y qué ha pasado?
+
+     El ritmo por periodos vivía en un panel propio y ahora está dentro de
+     Resumen: era lo primero que hay que responder. Ver `paneles/ritmo.js`. */
+
+  const PESTANAS = [
+    { id: 'resumen',     paneles: [panelResumen] },
+    { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelTrayectoria, panelPrecio] },
+    { id: 'validadores', paneles: [panelValidadores] },
+    { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
   ];
 
-  function pintar(datos) {
-    // Se reparten llenando la izquierda primero: así el orden en móvil —donde
-    // las columnas se disuelven— sigue siendo el de lectura.
-    const mitad = Math.ceil(PANELES.length / 2);
-    const trozos = [PANELES.slice(0, mitad), PANELES.slice(mitad)];
-    columnas.forEach((col, i) => {
-      col.innerHTML = trozos[i].map(p => p(datos)).join('');
+  const tabs = PESTANAS.map(p => document.getElementById(`t-${p.id}`));
+  const vistas = PESTANAS.map(p => document.getElementById(`v-${p.id}`));
+
+  // El hash manda: recargar con `#nodo` abre Nodo. Así un enlace a una pestaña
+  // concreta funciona, y un refresco no devuelve siempre a Resumen.
+  const desdeHash = () => {
+    const i = PESTANAS.findIndex(p => p.id === location.hash.slice(1));
+    return i < 0 ? 0 : i;
+  };
+
+  let activa = desdeHash();
+
+  function activar(i, { mover = true, animar = true, sellarHash = true } = {}) {
+    activa = i;
+    PESTANAS.forEach((p, j) => {
+      const sel = j === i;
+      tabs[j].setAttribute('aria-selected', String(sel));
+      tabs[j].tabIndex = sel ? 0 : -1;
+      vistas[j].hidden = !sel;
     });
-    // El diente de sierra lleva capa de exploración, y el HTML se regenera en
-    // cada refresco: hay que volver a engancharla.
+
+    // La animación de entrada se pone SOLO al cambiar de pestaña. Si viviera
+    // en la clase `.vista` a secas se repetiría en cada refresco de datos —
+    // un parpadeo cada 18 segundos mientras miras un número.
+    if (animar) {
+      const v = vistas[i];
+      v.classList.remove('entrando');
+      void v.offsetWidth;          // reinicia la animación
+      v.classList.add('entrando');
+    }
+    if (mover) tabs[i].focus();
+    // El hash solo se escribe al cambiar de pestaña a mano. En el arranque no:
+    // abrir /val/v2/ y ver cómo la barra de direcciones se convierte sola en
+    // /val/v2/#resumen parece que la página ha hecho algo raro.
+    if (sellarHash && location.hash.slice(1) !== PESTANAS[i].id) {
+      history.replaceState(null, '', `#${PESTANAS[i].id}`);
+    }
+    // El pulso puede haber entrado en pantalla justo ahora: que no espere al
+    // siguiente segundo para ponerse al día.
+    latir();
+  }
+
+  tabs.forEach((t, i) => t.addEventListener('click', () => activar(i, { mover: false })));
+
+  // Flechas, Inicio y Fin, que es lo que espera quien navega por teclado en un
+  // `tablist`. Sin esto el `role="tab"` promete algo que no cumple.
+  document.querySelector('.pestanas').addEventListener('keydown', ev => {
+    const salto = { ArrowRight: 1, ArrowLeft: -1 }[ev.key];
+    if (salto) activar((activa + salto + tabs.length) % tabs.length);
+    else if (ev.key === 'Home') activar(0);
+    else if (ev.key === 'End') activar(tabs.length - 1);
+    else return;
+    ev.preventDefault();
+  });
+
+  window.addEventListener('hashchange', () => activar(desdeHash(), { mover: false }));
+
+  /* ───────────────────────────────────────────── paneles */
+
+  let ultimos = null;
+
+  function pintar(datos) {
+    ultimos = datos;
+    PESTANAS.forEach((p, i) => {
+      vistas[i].innerHTML = p.paneles.map(fn => fn(datos)).join('');
+    });
+    // Las dos capas interactivas se pierden con el HTML, que se regenera
+    // entero: hay que volver a engancharlas en cada repintado.
     engancharCiclo(document, datos);
+    engancharResumen(document, () => pintar(ultimos));
     window.__datos = datos;
   }
 
-  const REFRESCO_MS = 60000;
+  /* ───────────────────────────────────────────── refresco
+
+     15-20 s para que el pulso de datos se note en tiempo real. NO es la
+     frecuencia del recolector: el NUC sigue empujando a KV cada 3 minutos por
+     la cuota de escrituras, y tocar eso aquí no serviría de nada — lo único
+     que cambia es cada cuánto se vuelve a leer lo que ya está publicado. */
+  const REFRESCO_MS = 18000;
 
   async function refrescar() {
     try {
@@ -155,15 +280,31 @@
       // `cargarTodo` ya absorbe los fallos por endpoint; llegar aquí es un
       // fallo del propio módulo, y callarlo dejaría la pantalla de carga fija.
       console.error('[val/v2] no se pudieron cargar los datos:', e);
-      columnas[0].innerHTML =
+      vistas[activa].innerHTML =
         '<section class="panel" data-alerta><p class="p-aviso">'
         + 'No se pudieron cargar los datos del panel.</p></section>';
     }
   }
 
-  columnas[0].innerHTML = '<div id="cargando">Cargando…</div>';
+  activar(activa, { mover: false, animar: false, sellarHash: false });
+  vistas[activa].innerHTML = '<div id="cargando">Cargando…</div>';
   refrescar();
   setInterval(refrescar, REFRESCO_MS);
+
+  // El pulso corre a su propio ritmo. Los datos llegan cada 18 s, pero la
+  // cuenta atrás tiene que avanzar segundo a segundo: si solo se moviera con
+  // los datos, daría saltos de 18 y no parecería una cuenta atrás.
+  //
+  // Y cuando cruza el umbral —de «llega en plazo» a «sin señal» o al revés— se
+  // repinta el panel con los datos que ya hay: la palabra de estado y la franja
+  // de alerta las decide `panelResumen`, y sin este aviso tardarían hasta 18
+  // segundos en enterarse de lo que el pulso ya está diciendo en naranja.
+  let pulsoPrevio = null;
+  setInterval(() => {
+    const ahora = latir();
+    if (ahora && pulsoPrevio && ahora !== pulsoPrevio && ultimos) pintar(ultimos);
+    if (ahora) pulsoPrevio = ahora;
+  }, 1000);
 </script>
 </body>
 </html>
