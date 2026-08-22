@@ -120,7 +120,16 @@
   .add-wallet-chip svg{width:14px;height:14px}
 
   /* ---------- STAT STRIP ---------- */
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
+  /* Al quedarse en una sola tarjeta, estirarla a todo el ancho dejaba un
+     cajón enorme con un número pequeño en una esquina. Se ajusta al contenido
+     y el botón se pone a su lado. En móvil vuelve a una columna y sí ocupa el
+     ancho, que allí es lo natural. */
+  .stats{display:grid;grid-template-columns:auto auto;justify-content:start;
+    gap:16px;margin-bottom:24px;align-items:center}
+  /* El botón se queda pequeño también cuando la rejilla pasa a una columna:
+     sin esto se estiraría a lo ancho y dejaría de parecer un botón. */
+  .dist-btn{justify-self:start;padding:11px 15px;font-size:13px}
+  .dist-btn svg{width:16px;height:16px}
   .stat{position:relative;border:1px solid rgba(255,255,255,.10);border-radius:18px;padding:20px;
     background:radial-gradient(120% 90% at 18% 0%,rgba(255,255,255,.08),transparent 60%),linear-gradient(160deg,rgba(255,255,255,.05),rgba(255,255,255,.012));
     backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);
@@ -128,14 +137,8 @@
   .stat h4{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:500;margin-bottom:12px}
   .stat .v{font-family:var(--display);font-size:25px;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
   .stat .sub{font-size:12.5px;color:var(--dim);margin-top:5px;font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
-  .perf-row{display:flex;align-items:center;gap:10px}
   .tk{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:11px;color:#0C0710;flex-shrink:0;overflow:hidden;position:relative}
   .tk img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
-  /* mini donut */
-  .donut{display:flex;align-items:center;gap:16px}
-  .donut svg{width:62px;height:62px;flex-shrink:0;transform:rotate(-90deg)}
-  .legend{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--dim)}
-  .legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:7px}
 
   /* ---------- HOLDINGS ---------- */
   .panel{position:relative;border:1px solid rgba(255,255,255,.10);border-radius:22px;overflow:hidden;
@@ -296,6 +299,66 @@
   .chartbtn:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
   .chartbtn svg{width:16px;height:16px}
   .modal.modal-wide{max-width:960px}
+
+  /* ---------- DISTRIBUCIÓN (radial) ----------
+     Es plano a propósito. Un quesito en perspectiva deforma la relación entre
+     ángulo y área —las porciones de delante se ven mayores que las de detrás
+     con el mismo valor—, y aquí lo único que se pide al dibujo es comparar
+     proporciones. El volumen se sugiere con luz (bisel y sombra), que no toca
+     la geometría, en vez de con una proyección que sí la toca. */
+  .modal.dist-modal{max-width:880px;max-height:calc(100dvh - 40px);overflow-y:auto}
+  .dist-cuerpo{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:26px;align-items:center}
+  .dist-graf{position:relative;width:100%;max-width:380px;margin:0 auto;aspect-ratio:1}
+  .dist-graf svg{width:100%;height:100%;display:block;overflow:visible}
+  .dist-sector{cursor:pointer;transition:transform .22s cubic-bezier(.2,.8,.2,1),filter .22s;
+    transform-origin:50% 50%;filter:drop-shadow(0 6px 14px rgba(0,0,0,.55))}
+  /* El anillo de foco por omisión es un RECTÁNGULO alrededor del cuadro que
+     envuelve al sector, y sobre una porción de corona sale un marco blanco
+     enorme que no tiene nada que ver con la forma. Se quita y se sustituye por
+     un contorno que sí sigue la porción, solo para quien navega con teclado. */
+  .dist-sector:focus{outline:none}
+  .dist-sector:focus-visible{stroke:#F4EFFA;stroke-width:2.5}
+  .dist-sector.sel{filter:drop-shadow(0 0 16px currentColor) brightness(1.16)}
+  .dist-graf.hay-sel .dist-sector:not(.sel){opacity:.4}
+  /* Entrada escalonada por tamaño: las porciones aparecen de mayor a menor, que
+     es el mismo orden en el que se leen. El retardo lo pone el JS por índice. */
+  @keyframes dist-in{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
+  .dist-graf.animar .dist-sector{animation:dist-in .42s cubic-bezier(.2,.8,.2,1) backwards}
+  .dist-logo{pointer-events:none}
+  /* El texto del centro tiene que caber DENTRO del agujero, que en el viewBox
+     mide 84 de radio sobre 160: el cuadrado inscrito es un 37% del ancho. El
+     relleno lo reserva y el tamaño de letra lo ajusta el JS según lo largo que
+     sea el número — «$10,508.82» no cabe con el mismo cuerpo que «54.1%». */
+  .dist-centro{position:absolute;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none;padding:31.5%}
+  .dist-centro .dz-sym{font-family:var(--display);font-size:17px;font-weight:600;letter-spacing:-.01em}
+  .dist-centro .dz-pct{font-family:var(--display);font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.08;white-space:nowrap}
+  .dist-centro .dz-val{font-family:var(--mono);font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .dist-centro .dz-pista{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.09em;text-transform:uppercase;line-height:1.35}
+  /* Sin scroll propio: con dos zonas desplazables —la leyenda y el modal— se
+     acaba arrastrando la que no es. Desborda el modal, que ya se desplaza. */
+  .dist-leyenda{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none}
+  .dl-fila{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;
+    width:100%;text-align:left;background:none;border:0;border-radius:11px;padding:8px 11px;cursor:pointer;
+    color:var(--text);font-family:var(--body);transition:background .15s}
+  .dl-fila:hover{background:var(--surface-2)}
+  .dl-fila.sel{background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line-2)}
+  /* El color de la porción va como aro del propio logo, no como un cuadradito
+     aparte: con las dos cosas había dos manchas de color por fila diciendo lo
+     mismo. Así el aro ATA el logo a su trozo del anillo. */
+  .dl-fila .tk{width:30px;height:30px;font-size:12px}
+  .dl-sym{font-weight:600;font-size:14px}
+  .dl-nom{font-size:12.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dl-num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+  .dl-num b{display:block;font-size:14px;font-weight:600}
+  .dl-num span{font-size:12px;color:var(--dim)}
+  @media(max-width:700px){
+    .dist-cuerpo{grid-template-columns:1fr;gap:18px}
+    .dist-graf{max-width:min(320px,76vw)}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .dist-graf.animar .dist-sector{animation:none}
+    .dist-sector{transition:none}
+  }
   .chart-wrap{margin-top:8px;border-radius:14px;overflow:hidden;background:var(--bg-2);border:1px solid var(--line)}
   .chart-wrap iframe{display:block;width:100%;height:min(68vh,560px);border:0}
   .chart-empty{padding:50px 20px;text-align:center;color:var(--faint);font-size:13px}
@@ -455,24 +518,29 @@
   <!-- WALLET BAR -->
   <section class="wallet-bar" id="walletBar"></section>
 
-  <!-- STAT STRIP -->
+  <!-- STAT STRIP
+       Fuera «Mejor activo»: premiaba exactamente lo que no hay que enseñar.
+       Un airdrop de estafa con precio errático siempre le gana en variación
+       porcentual a un token de verdad, así que el apartado se dedicaba a sacar
+       basura a la superficie. No es cosa de afinar un filtro: la métrica es la
+       que está mal elegida.
+
+       Y la distribución se recoge en el botón de al lado; ocupaba una tarjeta
+       permanente para un dato que se mira de vez en cuando. -->
   <section class="stats">
     <div class="stat">
       <h4 id="st24Title">Cambio 24h</h4>
       <div class="v" id="st24Val">—</div>
       <div class="sub" id="st24Sub">Sin datos todavía</div>
     </div>
-    <div class="stat">
-      <h4 id="stBestTitle">Mejor activo hoy</h4>
-      <div class="v perf-row" id="stBest"><span style="color:var(--faint);font-size:16px">—</span></div>
-      <div class="sub" id="stBestSub">Esperando datos</div>
-    </div>
-    <div class="stat">
-      <h4>Distribución</h4>
-      <div class="donut" id="stDonut">
-        <span class="sub" style="margin:0">Sin tokens todavía</span>
-      </div>
-    </div>
+    <button class="tool dist-btn" id="distBtn" onclick="abrirDist()"
+            aria-haspopup="dialog" aria-label="Ver la distribución del portfolio">
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3a9 9 0 1 0 9 9h-9V3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M14.5 2.5A9 9 0 0 1 21.5 9.5h-7v-7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+      </svg>
+      <span>Distribución</span>
+    </button>
   </section>
 
   <!-- HOLDINGS -->
@@ -608,6 +676,22 @@
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
       <button class="btn btn-primary" onclick="submitLoad()">Cargar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="distModal">
+  <div class="modal modal-wide dist-modal" role="dialog" aria-modal="true" aria-labelledby="distTitle">
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="distTitle">Distribución</h2>
+    <!-- El total va en el centro del anillo y solo ahí. Estaba también aquí
+         arriba y se leían dos veces la misma cifra a diez centímetros. -->
+    <p class="lead" id="distN">—</p>
+    <div class="dist-cuerpo">
+      <div class="dist-graf" id="distGraf">
+        <div class="dist-centro" id="distCentro"></div>
+      </div>
+      <ul class="dist-leyenda" id="distLeyenda"></ul>
     </div>
   </div>
 </div>
@@ -1078,7 +1162,13 @@ async function refresh(){
     tokensCombined=arr;
     lastUpdate=Date.now();
     render();
-    completarLogos();   // sin `await`: los iconos entran después, si entran
+    /* Sin `await`: los iconos entran después, si entran. Y detrás de ellos los
+       colores del quesito, que se sacan de esos mismos iconos — así al abrir la
+       distribución ya están y no se ve un cambio de color a medio abrir. */
+    completarLogos()
+      .then(precargarColores)
+      .then(cambio=>{ if(cambio&&$('distModal').classList.contains('show'))renderDist(); })
+      .catch(()=>{});
   }catch(e){
     console.error(e);
     if(!tokensCombined.length)renderError('No pudimos cargar los balances. Reintentando en 30s.');
@@ -1272,7 +1362,6 @@ function renderStats(){
   const vis=tokensCombined.filter(t=>t.value>0);
   // Cambio del periodo seleccionado.
   $('st24Title').textContent='Cambio '+state.timeframe;
-  $('stBestTitle').textContent=state.timeframe==='24h'?'Mejor activo hoy':('Mejor activo '+state.timeframe);
   let prev=0,total=0,has=false;
   for(const t of vis){total+=t.value;const chg=tokenChange(t);if(chg!=null){has=true;prev+=t.value/(1+chg/100);}else prev+=t.value;}
   const diff=total-prev;
@@ -1280,33 +1369,344 @@ function renderStats(){
   $('st24Val').textContent=has?(diff>=0?'+':'−')+fmtUsd(Math.abs(diff)).slice(1):'—';
   $('st24Sub').textContent=has?`de ${fmtUsd(prev)} → ${fmtUsd(total)}`:'Sin datos de cambio';
 
-  // Mejor activo del periodo.
-  const best=[...vis].map(t=>({t,chg:tokenChange(t)})).filter(x=>x.chg!=null).sort((a,b)=>b.chg-a.chg)[0];
-  if(best){
-    const bt=best.t;
-    $('stBest').innerHTML=`<span class="tk" style="background:${gradientFor(bt.address)}">${bt.logo?`<img src="${escapeHtml(bt.logo)}" onerror="this.remove()">`:''}${escapeHtml((bt.symbol||'?')[0].toUpperCase())}</span><span>${escapeHtml(bt.symbol||'?')} <span class="${best.chg>=0?'up':'down'}" style="font-size:16px">${fmtPct(best.chg)}</span></span>`;
-    $('stBestSub').textContent=`${escapeHtml(bt.name||'')} · ${fmtPrice(bt.price)}`;
-  }else{
-    $('stBest').innerHTML='<span style="color:var(--faint);font-size:16px">—</span>';
-    $('stBestSub').textContent='Sin datos de cambio';
+  // El botón de distribución no tiene sentido sin nada que repartir.
+  $('distBtn').disabled=!tokensParaLista().length;
+  $('distBtn').style.opacity=$('distBtn').disabled?'.45':'1';
+  if($('distModal').classList.contains('show'))renderDist();
+}
+
+/* ============================================================
+   DISTRIBUCIÓN — el radial
+   ============================================================
+
+   ## Por qué es plano y no 3D
+
+   Se valoró hacerlo con Three.js, que ya está en el proyecto para la esfera
+   del validador. Dos razones para no hacerlo, y la segunda pesa más:
+
+   1. El coste, medido: `val/v2/vendor/three.module.js` son 1,25 MB en crudo y
+      **259 KB comprimido**. La portada pública entera son 32 KB comprimidos.
+      Meter la librería para un quesito multiplica por ocho lo que se descarga,
+      y lo hace en la página que abre todo el mundo, no en el panel privado.
+   2. Un quesito en perspectiva **deforma la relación entre ángulo y área**: las
+      porciones de delante parecen mayores que las de detrás con el mismo valor,
+      y las de los extremos se comen a las del fondo. Lo único que se le pide a
+      este dibujo es comparar proporciones, así que la proyección estropea
+      justo aquello para lo que sirve. Y girar el anillo no codifica ningún
+      dato: se gira para ver lo que el propio giro tapaba.
+
+   El volumen se consigue con luz —un bisel de claro a oscuro sobre el anillo y
+   una sombra debajo— que sugiere relieve **sin tocar la geometría**. Los
+   ángulos siguen siendo exactos.
+
+   ## De dónde salen los colores
+
+   Del logo oficial de cada token, muestreado en un lienzo: el color de la marca
+   es el que la marca usa en su propio icono. No hay lista escrita a mano de
+   «colores oficiales» que mantener ni que inventar.
+
+   ⚠ Leer los píxeles de una imagen de otro dominio exige que ese dominio mande
+     cabeceras CORS. Como la copia que se muestrea se pide con
+     `crossOrigin="anonymous"`, un servidor que no las mande hace que **la
+     descarga falle** (salta `onerror`) en vez de dejar el lienzo contaminado;
+     de una u otra forma, se cae al color de respaldo. Y el respaldo no es una
+     paleta genérica: es **el mismo color que ese token ya lleva en su fila de
+     la tabla**, sacado del hash de su dirección.
+
+   ⚠ Esa copia es una petición aparte de la que pinta el `<img>` de la fila:
+     el navegador guarda por separado las respuestas con y sin CORS. Es una
+     imagen de 32×32 por token y una sola vez por sesión. */
+
+const RADIO_EXT = 140, RADIO_INT = 84, CENTRO = 160;   // unidades del viewBox 320×320
+const RADIO_MEDIO = (RADIO_EXT + RADIO_INT) / 2;
+const ARCO_MIN_LOGO = 34;    // arco mínimo, en unidades, para que quepa el logo
+const SALTO_SEL = 9;         // cuánto sale la porción elegida
+
+let distSel = null;          // key del token elegido, o null
+let distTrozos = [];         // lo último calculado, para resaltar sin repintar
+let distSuma = 0;
+const colorLogo = new Map(); // url del logo → '#rrggbb' | null (null = no se pudo)
+
+/** Hue determinista de una semilla. Compartido con `gradientFor` para que el
+ *  color del quesito y el del círculo de la fila sean el mismo. */
+function hashHue(seed){
+  let h=0; for(let i=0;i<seed.length;i++){h=(h*31+seed.charCodeAt(i))|0;}
+  return Math.abs(h)%360;
+}
+
+/** El color de respaldo, en sólido. */
+function colorRespaldo(t){
+  return `hsl(${hashHue(t.address||t.symbol||'?')} 70% 58%)`;
+}
+
+/** El color con el que se pinta la porción: el del logo si se pudo leer. */
+function colorDe(t){
+  const c = t.logo ? colorLogo.get(t.logo) : null;
+  return c || colorRespaldo(t);
+}
+
+/** RGB → HSL, con L y S metidos en un rango que se vea sobre fondo oscuro.
+ *  Un logo casi negro daría una porción invisible; uno casi blanco, un
+ *  fogonazo. Se conserva el TONO, que es lo que identifica a la marca. */
+function aColorLegible(r,g,b){
+  r/=255; g/=255; b/=255;
+  const mx=Math.max(r,g,b), mn=Math.min(r,g,b), l=(mx+mn)/2, d=mx-mn;
+  let h=0, s=0;
+  if(d){
+    s = l>0.5 ? d/(2-mx-mn) : d/(mx+mn);
+    if(mx===r)      h=((g-b)/d+(g<b?6:0));
+    else if(mx===g) h=((b-r)/d+2);
+    else            h=((r-g)/d+4);
+    h*=60;
+  }
+  return `hsl(${Math.round(h)} ${Math.round(Math.min(0.92,Math.max(0.48,s))*100)}% ${
+    Math.round(Math.min(0.68,Math.max(0.46,l))*100)}%)`;
+}
+
+/** Muestrea el color dominante del logo. Devuelve null si no se puede. */
+function leerColorDelLogo(url){
+  if(colorLogo.has(url))return Promise.resolve(colorLogo.get(url));
+  return new Promise(res=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    const fin=v=>{colorLogo.set(url,v);res(v);};
+    img.onerror=()=>fin(null);
+    img.onload=()=>{
+      try{
+        const N=24, cv=document.createElement('canvas');
+        cv.width=cv.height=N;
+        const g=cv.getContext('2d',{willReadFrequently:true});
+        g.drawImage(img,0,0,N,N);
+        const d=g.getImageData(0,0,N,N).data;
+        /* Se agrupa por tono en 24 cubos y se pesa por saturación: así manda el
+           color de la marca y no el gris del fondo del icono, que suele ocupar
+           más superficie. */
+        const cubos=new Array(24).fill(0).map(()=>({p:0,r:0,g:0,b:0}));
+        for(let i=0;i<d.length;i+=4){
+          const a=d[i+3]/255; if(a<0.5)continue;
+          const r=d[i],vg=d[i+1],b=d[i+2];
+          const mx=Math.max(r,vg,b), mn=Math.min(r,vg,b);
+          if(mx<26||mn>236)continue;            // casi negro o casi blanco
+          const sat=(mx-mn)/mx; if(sat<0.16)continue;   // gris: no dice nada
+          let h=0, dd=mx-mn;
+          if(mx===r)       h=((vg-b)/dd+(vg<b?6:0));
+          else if(mx===vg) h=((b-r)/dd+2);
+          else             h=((r-vg)/dd+4);
+          const k=Math.floor(((h*60)%360)/15), peso=sat*a;
+          cubos[k].p+=peso; cubos[k].r+=r*peso; cubos[k].g+=vg*peso; cubos[k].b+=b*peso;
+        }
+        const mejor=cubos.reduce((a,c)=>c.p>a.p?c:a,cubos[0]);
+        if(mejor.p<=0)return fin(null);         // icono sin color: mejor el respaldo
+        fin(aColorLegible(mejor.r/mejor.p, mejor.g/mejor.p, mejor.b/mejor.p));
+      }catch(e){ fin(null); }   // lienzo contaminado u otro fallo: al respaldo
+    };
+    img.src=url;
+  });
+}
+
+/** Muestrea los que falten. Se llama al cargar datos y al abrir el modal, así
+ *  que lo normal es que al abrir ya estén todos y no cambie nada a la vista. */
+async function precargarColores(){
+  const urls=[...new Set(tokensParaLista().map(t=>t.logo).filter(u=>u&&!colorLogo.has(u)))];
+  if(!urls.length)return false;
+  await Promise.all(urls.map(leerColorDelLogo));
+  return urls.some(u=>colorLogo.get(u));        // ¿cambió algún color?
+}
+
+/** Cuota del portfolio. Sin signo: no es una variación, es una parte de un
+ *  todo, y un «+» delante la haría leer como una subida. */
+function fmtCuota(p){
+  if(!isFinite(p))return '—';
+  if(p>0&&p<0.1)return '<0.1%';
+  return p.toFixed(1)+'%';
+}
+
+/** El `d` de un sector de corona circular. */
+function sectorPath(a0,a1){
+  const x=(r,a)=>(CENTRO+r*Math.cos(a)).toFixed(2), y=(r,a)=>(CENTRO+r*Math.sin(a)).toFixed(2);
+  // Un arco de más de media vuelta necesita el «large-arc-flag» a 1, o SVG
+  // dibuja el trozo corto y la porción sale del revés.
+  const grande=(a1-a0)>Math.PI?1:0;
+  return `M${x(RADIO_EXT,a0)},${y(RADIO_EXT,a0)}`
+       + `A${RADIO_EXT},${RADIO_EXT} 0 ${grande} 1 ${x(RADIO_EXT,a1)},${y(RADIO_EXT,a1)}`
+       + `L${x(RADIO_INT,a1)},${y(RADIO_INT,a1)}`
+       + `A${RADIO_INT},${RADIO_INT} 0 ${grande} 0 ${x(RADIO_INT,a0)},${y(RADIO_INT,a0)}`
+       + 'Z';
+}
+
+/** Los tokens del gráfico: exactamente los de la tabla. Si no se ve en la
+ *  lista, no se ve en el quesito — el polvo tampoco entra aquí. */
+function tokensDelReparto(){
+  return tokensParaLista().filter(t=>t.value>0).sort((a,b)=>b.value-a.value);
+}
+
+function renderDist(animar=false){
+  const lista=tokensDelReparto();
+  const total=lista.reduce((s,t)=>s+t.value,0);
+  const graf=$('distGraf'), ley=$('distLeyenda');
+
+  $('distN').textContent=lista.length===1?'1 posición':`${lista.length} posiciones`;
+
+  if(!lista.length||!total){
+    graf.querySelectorAll('svg').forEach(s=>s.remove());
+    ley.innerHTML='';
+    distTrozos=[]; distSuma=0; distSel=null;
+    $('distCentro').innerHTML='<span class="dz-pista">Sin tokens</span>';
+    return;
   }
 
-  // Donut distribución
-  const sorted=[...vis].sort((a,b)=>b.value-a.value);
-  const colors=['#FF3D9A','#9B5DE5','#28E0E6','#2BE3A7'];
-  const top=sorted.slice(0,3);
-  const otherVal=sorted.slice(3).reduce((s,t)=>s+t.value,0);
-  const segs=top.map((t,i)=>({label:t.symbol,val:t.value,color:colors[i]}));
-  if(otherVal>0)segs.push({label:'Otros',val:otherVal,color:colors[3]});
-  if(!total){$('stDonut').innerHTML='<span class="sub" style="margin:0">Sin tokens todavía</span>';return;}
-  let off=0;
-  const circles=segs.map(s=>{
-    const pct=Math.round(s.val/total*100);
-    const c=`<circle cx="18" cy="18" r="15.9" fill="none" stroke="${s.color}" stroke-width="4.2" stroke-dasharray="${pct} 100" stroke-dashoffset="${-off}"/>`;
-    off+=pct;return c;
+  let ang=-Math.PI/2;
+  const trozos=lista.map((t,i)=>{
+    const cuota=t.value/total*100, span=(t.value/total)*Math.PI*2;
+    const pad=Math.min(0.014,span*0.16);       // separación entre porciones
+    const a0=ang+pad/2, a1=ang+span-pad/2;
+    ang+=span;
+    const medio=(a0+a1)/2;
+    return { t, i, cuota, a0:Math.min(a0,a1), a1:Math.max(a0,a1), medio, span,
+             color:colorDe(t),
+             lx:CENTRO+RADIO_MEDIO*Math.cos(medio), ly:CENTRO+RADIO_MEDIO*Math.sin(medio) };
+  });
+
+  const sectores=trozos.map(s=>`<path class="dist-sector" d="${sectorPath(s.a0,s.a1)}"
+      fill="${s.color}" style="color:${s.color};animation-delay:${(s.i*38)}ms"
+      data-k="${escapeHtml(s.t.key)}" tabindex="0" role="button"
+      aria-label="${escapeHtml(s.t.symbol||'?')}, ${fmtCuota(s.cuota)} del portfolio, ${fmtUsd(s.t.value)}"></path>`).join('');
+
+  // Logos sobre el anillo, solo donde caben sin pisarse.
+  const logos=trozos.map(s=>{
+    if(!s.t.logo||s.span*RADIO_MEDIO<ARCO_MIN_LOGO)return '';
+    const L=26;
+    return `<image class="dist-logo" href="${escapeHtml(s.t.logo)}" x="${(s.lx-L/2).toFixed(2)}"
+       y="${(s.ly-L/2).toFixed(2)}" width="${L}" height="${L}" clip-path="url(#distRedondo)"
+       preserveAspectRatio="xMidYMid slice"/>`;
   }).join('');
-  const legend=segs.map(s=>`<span><i style="background:${s.color}"></i>${escapeHtml(s.label)} ${Math.round(s.val/total*100)}%</span>`).join('');
-  $('stDonut').innerHTML=`<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#241a30" stroke-width="4.2"/>${circles}</svg><div class="legend">${legend}</div>`;
+
+  const svg=`<svg viewBox="0 0 320 320" role="img"
+      aria-label="Reparto del portfolio entre ${lista.length} posiciones. El detalle está en la lista de al lado.">
+    <defs>
+      <clipPath id="distRedondo" clipPathUnits="objectBoundingBox">
+        <circle cx=".5" cy=".5" r=".5"/>
+      </clipPath>
+      <!-- El bisel: claro arriba a la izquierda, oscuro abajo a la derecha.
+           Va ENCIMA de las porciones y sin capturar el ratón. Es luz, no
+           geometría: los ángulos no se tocan. -->
+      <linearGradient id="distLustre" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0"   stop-color="#fff" stop-opacity=".20"/>
+        <stop offset=".46" stop-color="#fff" stop-opacity="0"/>
+        <stop offset=".62" stop-color="#000" stop-opacity=".06"/>
+        <stop offset="1"   stop-color="#000" stop-opacity=".34"/>
+      </linearGradient>
+    </defs>
+    <circle cx="${CENTRO}" cy="${CENTRO}" r="${RADIO_MEDIO}" fill="none"
+            stroke="#1A1226" stroke-width="${RADIO_EXT-RADIO_INT}"/>
+    <g>${sectores}</g>
+    <circle cx="${CENTRO}" cy="${CENTRO}" r="${RADIO_MEDIO}" fill="none" pointer-events="none"
+            stroke="url(#distLustre)" stroke-width="${RADIO_EXT-RADIO_INT}"/>
+    ${logos}
+  </svg>`;
+
+  graf.querySelectorAll('svg').forEach(s=>s.remove());
+  graf.insertAdjacentHTML('afterbegin',svg);
+  graf.classList.toggle('animar',animar);
+
+  ley.innerHTML=trozos.map(s=>`<li><button class="dl-fila" data-k="${escapeHtml(s.t.key)}">
+      <span class="tk" data-color="${s.color}" style="background:${gradientFor(s.t.address)};box-shadow:0 0 0 2px ${s.color}">${
+        s.t.logo?`<img src="${escapeHtml(s.t.logo)}" alt="" onerror="this.remove()">`:''}${
+        escapeHtml((s.t.symbol||'?')[0].toUpperCase())}</span>
+      <span><span class="dl-sym">${escapeHtml(s.t.symbol||'?')}</span>
+        <span class="dl-nom">${escapeHtml(s.t.name||'')}</span></span>
+      <span class="dl-num"><b>${fmtCuota(s.cuota)}</b><span>${fmtUsd(s.t.value)}</span></span>
+    </button></li>`).join('');
+
+  distTrozos=trozos; distSuma=total;
+  // Si el token elegido ya no está (se vendió, cambió el filtro), se suelta.
+  if(distSel&&!trozos.some(s=>s.t.key===distSel))distSel=null;
+  pintarSeleccion();
+}
+
+/** Resalta lo elegido y actualiza el centro. Separado del pintado porque se
+ *  llama en cada pasada del ratón y repintar el SVG entero reiniciaría la
+ *  animación de entrada en cada movimiento. */
+function pintarSeleccion(){
+  const graf=$('distGraf'), trozos=distTrozos;
+  graf.classList.toggle('hay-sel',!!distSel);
+  const sel=trozos.find(s=>s.t.key===distSel)||null;
+
+  graf.querySelectorAll('.dist-sector').forEach(p=>{
+    const s=trozos.find(x=>x.t.key===p.dataset.k);
+    const on=!!sel&&s===sel;
+    p.classList.toggle('sel',on);
+    p.style.transform=on
+      ? `translate(${(Math.cos(s.medio)*SALTO_SEL).toFixed(2)}px,${(Math.sin(s.medio)*SALTO_SEL).toFixed(2)}px)`
+      : '';
+  });
+  $('distLeyenda').querySelectorAll('.dl-fila').forEach(b=>
+    b.classList.toggle('sel',!!sel&&b.dataset.k===distSel));
+
+  const centro=$('distCentro');
+  centro.innerHTML=sel
+    ? `<div><div class="dz-sym">${escapeHtml(sel.t.symbol||'?')}</div>
+         <div class="dz-pct" style="color:${sel.color}">${fmtCuota(sel.cuota)}</div>
+         <div class="dz-val">${fmtUsd(sel.t.value)}</div></div>`
+    : `<div><div class="dz-pct">${fmtUsd(distSuma)}</div>
+         <div class="dz-pista">Toca una porción</div></div>`;
+  ajustarCentro();
+}
+
+/**
+ * Encoge la cifra del centro hasta que quepa en el agujero.
+ *
+ * No es un capricho: con cuerpo fijo, «$10,508.82» se salía por los dos lados y
+ * se montaba encima del anillo. El ancho útil es el del cuadrado inscrito en el
+ * agujero, y el JS es quien lo sabe porque depende de cuántos caracteres tenga
+ * el número, que cambia con la cartera.
+ */
+function ajustarCentro(){
+  const el=$('distCentro').querySelector('.dz-pct');
+  if(!el)return;
+  const ancho=$('distGraf').clientWidth;
+  if(!ancho)return;
+  // Radio del agujero = 84/320 del ancho; el cuadrado inscrito mide r·√2.
+  const util=ancho*(84/320)*Math.SQRT2*0.94;
+  const n=Math.max(1,el.textContent.trim().length);
+  // 0,60 em por carácter en Space Grotesk con cifras tabulares, medido a ojo
+  // sobre el peor caso: «$10,508.82». Se recorta arriba para que un «3.1%» no
+  // salga descomunal.
+  el.style.fontSize=Math.max(15,Math.min(34,util/(n*0.60)))+'px';
+}
+
+/** Elegir es alternar: volver a tocar la misma porción la suelta. */
+function elegirDist(k){
+  if(!k)return;
+  distSel = distSel===k ? null : k;
+  pintarSeleccion();
+}
+
+/* Delegación sobre los dos contenedores, que sí son estables: el SVG y la
+   leyenda se rehacen enteros en cada repintado y unos oyentes puestos sobre
+   ellos se perderían. */
+$('distGraf').addEventListener('click',e=>{
+  const p=e.target.closest('.dist-sector'); if(p)elegirDist(p.dataset.k);
+});
+$('distGraf').addEventListener('keydown',e=>{
+  if(e.key!=='Enter'&&e.key!==' ')return;
+  const p=e.target.closest('.dist-sector'); if(!p)return;
+  e.preventDefault(); elegirDist(p.dataset.k);
+});
+$('distLeyenda').addEventListener('click',e=>{
+  const b=e.target.closest('.dl-fila'); if(b)elegirDist(b.dataset.k);
+});
+// Al girar el móvil el agujero cambia de tamaño y la cifra tiene que seguirle.
+addEventListener('resize',()=>{ if($('distModal').classList.contains('show'))ajustarCentro(); });
+
+async function abrirDist(){
+  if(!tokensDelReparto().length)return;
+  closeModals();
+  distSel=null;
+  $('distModal').classList.add('show');
+  renderDist(true);
+  // Por si algún logo llegó tarde: se muestrea y solo se repinta si cambia algo.
+  if(await precargarColores())renderDist();
 }
 
 function renderWalletBar(){
