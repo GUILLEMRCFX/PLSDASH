@@ -2,7 +2,7 @@
   "name": "PLSDASH",
   "short_name": "PLSDASH",
   "description": "Portfolio tracker en tiempo real para PulseChain",
-  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#030208",
   "theme_color": "#030208",
