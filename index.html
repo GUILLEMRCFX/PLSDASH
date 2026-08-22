@@ -401,6 +401,19 @@
   <link rel="icon" type="image/png" sizes="48x48" href="/icons/plsdash-48x48.png">
   <!-- iOS aplica su propia máscara: se le da el arte a pelo, sin recortar. -->
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180x180.png">
+  <!-- ⚠ El manifiesto NO lleva `start_url`, y es a propósito: sin él, instalar
+       desde /p/<código> deja ese URL grabado en el icono, que es el único modo
+       de que la app abra tu cartera con el almacenamiento vacío (iOS borra el
+       localStorage de una app instalada tras 7 días sin abrirla). Un
+       `start_url` estático no puede llevar el código de nadie.
+
+       Por eso mismo lleva `"scope": "/"` explícito: sin `start_url`, el ámbito
+       por omisión sería la carpeta del documento de instalación —`/p/`—, y
+       como /p/<código> rebota a «/» por el 404.html, cada arranque se saldría
+       del ámbito y abriría el navegador en vez de la app.
+
+       El arranque por «/» lo cubre `init()`, que recupera el código de la
+       caché. Ver la nota larga allí. -->
   <link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body data-view="combined">
@@ -1990,16 +2003,41 @@ async function init(){
   const m=location.pathname.match(/^\/p\/([A-Za-z0-9_-]{3,32})$/);
   if(m){
     await loadPortfolio(m[1]);
-  }else{
-    // Modo local: cargar caché.
-    try{
-      const cached=JSON.parse(localStorage.getItem(LS_KEY)||'null');
-      if(cached&&!cached.code&&cached.data)applyData(cached.data);
-    }catch(e){}
-    updateCodeBadge();
-    render();
-    if(state.wallets.length)refresh();
+    startTimers();
+    return;
   }
+
+  let cached=null;
+  try{cached=JSON.parse(localStorage.getItem(LS_KEY)||'null');}catch(e){}
+
+  /* ⚠ ENTRAR POR «/» CON UN PORTFOLIO EN LA NUBE NO ES MODO LOCAL.
+     Aquí estaba el fallo del iPhone. El guardián decía `!cached.code`, o sea:
+     «si la caché tiene código, ignórala». Y la app instalada en la pantalla de
+     inicio arranca SIEMPRE por «/» —el `start_url` del manifiesto es estático y
+     no puede llevar el código de nadie—, así que el icono abría la aplicación
+     vacía teniendo la cartera guardada dos líneas más abajo.
+
+     Que `state.code` esté puesto es justo lo que dice que el usuario tiene un
+     portfolio en la nube. Se desconecta con el botón de desconectar, que pone
+     `code` a null y lo guarda; hasta entonces, entrar por «/» es entrar en SU
+     portfolio, se llegue desde el icono, desde un marcador o escribiendo el
+     dominio.
+
+     No se reescribe la barra de direcciones a `/p/<código>`: el logotipo de la
+     cabecera navega a «/» y quedaría convertido en un botón que no hace nada.
+     Quién eres se ve en la insignia del código, y el botón de copiar URL la
+     construye desde `state.code`, así que compartir sigue funcionando igual. */
+  if(cached&&cached.code){
+    await loadPortfolio(cached.code);
+    startTimers();
+    return;
+  }
+
+  // Modo local de verdad: sin código, solo la caché del navegador.
+  if(cached&&cached.data)applyData(cached.data);
+  updateCodeBadge();
+  render();
+  if(state.wallets.length)refresh();
   startTimers();
 }
 init();
