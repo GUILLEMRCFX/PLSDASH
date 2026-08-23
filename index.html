@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<!-- `black-translucent` declara EXPLÍCITAMENTE que la barra de estado se pinta
+     encima de la página. Sin este meta, con `apple-mobile-web-app-capable=yes`
+     y `viewport-fit=cover`, lo que iOS reporta en `env(safe-area-inset-top)`
+     depende de la versión: en unas da el recorte y en otras da 0, y con 0 el
+     reloj y la batería se comen la marca. Declarándolo, el inset es siempre
+     real y `.wrap` puede reservarlo. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0C0710">
 <meta name="description" content="PLSDASH — Portfolio tracker en tiempo real para PulseChain. Pega tus wallets y mira todos tus tokens, precios y valor total.">
 <title>PLSDASH — PulseChain Portfolio</title>
@@ -58,7 +65,11 @@
       radial-gradient(680px 520px at 8% 26%,rgba(255,61,154,.07),transparent 60%),
       radial-gradient(720px 560px at 70% 108%,rgba(155,93,229,.10),transparent 60%);
   }
-  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:max(0px,var(--sat)) calc(22px + var(--sar)) calc(80px + var(--sab)) calc(22px + var(--sal))}
+  /* El relleno superior era EXACTAMENTE el recorte, sin un píxel de aire: la
+     marca quedaba pegada al borde inferior de la barra de estado. Ahora el
+     recorte se suma a un margen propio, así que en el navegador (recorte 0)
+     se comporta igual que antes y en la app instalada respira. */
+  .wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:calc(10px + var(--sat)) calc(22px + var(--sar)) calc(80px + var(--sab)) calc(22px + var(--sal))}
 
   /* ---------- NAV ---------- */
   nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0 30px;gap:16px}
@@ -289,11 +300,6 @@
   .hist-note{padding:14px 22px;text-align:center;font-size:11px;color:var(--faint);font-family:var(--mono);border-top:1px solid var(--line)}
 
   /* ---------- TIMEFRAME + GRÁFICO ---------- */
-  .tf-seg{display:flex;gap:3px;background:var(--bg-2);border:1px solid var(--line);padding:3px;border-radius:10px}
-  .tf-seg button{font-family:var(--body);font-weight:600;font-size:11.5px;color:var(--dim);background:none;border:none;padding:6px 10px;border-radius:7px;cursor:pointer;transition:.15s}
-  .tf-seg button.on{background:var(--surface-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
-  .tf-seg button:hover:not(.on){color:var(--text)}
-  .tf-seg button:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
   .chartbtn{margin-left:auto;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:none;border:1px solid transparent;color:var(--faint);cursor:pointer;flex-shrink:0;transition:.15s}
   .chartbtn:hover{background:var(--bg-2);border-color:var(--line);color:var(--cyan)}
   .chartbtn:focus-visible{outline:2px solid var(--cyan);outline-offset:1px}
@@ -552,11 +558,6 @@
         <button class="tab" onclick="setView('history',this)">Historial</button>
       </div>
       <div class="head-tools">
-        <div class="tf-seg" id="tfSeg" role="group" aria-label="Periodo del cambio de precio">
-          <button class="on" onclick="setTimeframe('24h',this)">24H</button>
-          <button onclick="setTimeframe('7d',this)">7D</button>
-          <button onclick="setTimeframe('30d',this)">30D</button>
-        </div>
         <button class="tool" id="sortTool" onclick="cycleSort()">
           <svg viewBox="0 0 24 24" fill="none"><path d="M3 6h18M7 12h10M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
           <span id="sortLbl">Valor</span>
@@ -723,7 +724,6 @@ const PULSECHAIN_RPC    = 'https://rpc.pulsechain.com';
 const PULSECHAIN_SCAN   = 'https://api.scan.pulsechain.com';
 const BLOCKSCOUT_API    = 'https://api.scan.pulsechain.com/api/v2';
 // GeckoTerminal: velas diarias para el cambio a 7d/30d (DexScreener solo da 24h).
-const GECKOTERMINAL_API = 'https://api.geckoterminal.com/api/v2';
 const CHAIN_ID          = 'pulsechain';
 const REFRESH_MS        = 30000;
 
@@ -746,7 +746,6 @@ const state = {
   customTokens: [],      // [address(lowercase)]
   view: 'combined',
   sort: 'value',         // value | change | name
-  timeframe: '24h',      // 24h | 7d | 30d (periodo del cambio de precio)
   /* El polvo NO se enseña salvo que se pida. Antes era al revés: el filtro
      era opcional y por omisión se veía todo, así que la cartera arrancaba
      llena de tokens de céntimos.
@@ -764,9 +763,6 @@ const state = {
 const UMBRAL_DUST_USD = 1;
 
 // Cambio extendido (7d/30d) por token, calculado con velas de GeckoTerminal.
-const extCache = new Map();   // priceAddr -> {pct7, pct30, ts}
-const EXT_TTL = 600000;       // 10 min
-let extLoading = false;
 
 // Datos vivos calculados en cada refresh.
 let tokensCombined = [];     // [{key,address,name,symbol,decimals,balance,price,change24,logo,value,custom,perWallet:{}}]
@@ -1155,6 +1151,10 @@ async function refresh(){
 
       t.value=t.balance*t.price;
       arr.push(t);
+      // El polvo entra en la lista —lo despliega el botón— pero no suma en
+      // ningún total, aquí tampoco: si sumara, la cabecera de cada wallet
+      // volvería a discrepar de la cifra grande.
+      if(esDust(t))continue;
       for(const [w,amt] of Object.entries(t.perWallet)){
         perWalletTotals[w]=(perWalletTotals[w]||0)+amt*t.price;
       }
@@ -1301,9 +1301,8 @@ function render(){
   }else{
     // Por wallet: agrupar.
     let html='';
-    // El porcentaje de cada wallet se mide contra el total real, no contra
-    // lo que se esté viendo: el filtro de polvo no toca la contabilidad.
-    const total=tokensCombined.reduce((s,t)=>s+t.value,0);
+    // Contra el mismo total que el héroe: ver la nota de `updateHeader()`.
+    const total=tokensParaLista().reduce((s,t)=>s+t.value,0);
     for(const w of state.wallets){
       const addr=lc(w.address);
       const wtokens=list.filter(t=>t.perWallet[addr]>0).map(t=>{
@@ -1329,17 +1328,27 @@ function render(){
   updateHeader();
   renderStats();
   renderWalletBar();
-  if(state.timeframe!=='24h')ensureExtendedChanges();   // carga 7d/30d en segundo plano
 }
 
 function updateHeader(){
-  const total=tokensCombined.reduce((s,t)=>s+t.value,0);
+  /* ⚠ UN SOLO TOTAL EN TODA LA PÁGINA, y es el de lo que se ve.
+     Antes había dos: la cifra del héroe sumaba TAMBIÉN el polvo y el centro del
+     radial no, así que la misma cartera se leía 10.509,08 arriba y 10.508,82 en
+     el gráfico, sin nada que explicara los 26 céntimos de diferencia.
+     La regla de antes —«el polvo se esconde, no se resta»— era defendible por sí
+     sola, pero convivía con un gráfico que sí lo restaba, y dos números que no
+     cuadran son peores que un número que redondea a la baja de forma declarada.
+     Ahora el total, el reparto, el recuento de la cabecera y la lista miran todos
+     `tokensParaLista()`, y **cuánto se está escondiendo lo dice el propio botón
+     del polvo** al pie de la lista: «1 token bajo 1,00 $ · 0,26 $». */
+  const visibles=tokensParaLista();
+  const total=visibles.reduce((s,t)=>s+t.value,0);
   const [w,c]=total.toFixed(2).split('.');
   $('totalVal').innerHTML=(total>=0?'$':'-$')+Math.abs(+w).toLocaleString('en-US')+'<span class="cents">.'+c+'</span>';
 
   // Cambio del portfolio en el periodo seleccionado (24h / 7d / 30d).
   let prev=0,has=false;
-  for(const t of tokensCombined){
+  for(const t of visibles){
     const chg=tokenChange(t);
     if(chg!=null&&t.price!=null){has=true;prev+=t.value/(1+chg/100);}
     else prev+=t.value;
@@ -1353,15 +1362,14 @@ function updateHeader(){
     return;
   }
   const up=diff>=0;
-  const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tfPeriodWord()}</span><span class="dot-sep"></span>`:'';
+  const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} hoy</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
   meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${tokensParaLista().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
 }
 
 function renderStats(){
-  const vis=tokensCombined.filter(t=>t.value>0);
+  const vis=tokensParaLista().filter(t=>t.value>0);   // el mismo total que el héroe
   // Cambio del periodo seleccionado.
-  $('st24Title').textContent='Cambio '+state.timeframe;
   let prev=0,total=0,has=false;
   for(const t of vis){total+=t.value;const chg=tokenChange(t);if(chg!=null){has=true;prev+=t.value/(1+chg/100);}else prev+=t.value;}
   const diff=total-prev;
@@ -1814,58 +1822,38 @@ function togglePolvo(){
 }
 
 /* ============================================================
-   PERIODO DEL CAMBIO DE PRECIO (24h / 7d / 30d)
-   24h viene de DexScreener (tiempo real). 7d/30d se calculan con
-   velas diarias de GeckoTerminal: precio actual vs cierre de hace
-   N días. Sin dato → se muestra "—".
-   ============================================================ */
-function setTimeframe(tf,el){
-  state.timeframe=tf;
-  if(el){el.parentElement.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on');}
-  render();
-}
+   CAMBIO DE PRECIO — 24 h y solo 24 h
+   ============================================================
+
+   Aquí hubo un selector de 24H / 7D / 30D. Los dos tramos largos se han
+   retirado porque **decían un número falso**, y lo decían en grande: en una
+   cartera real el botón 30D anunciaba −2.090.417,21 $ (−99,5 %).
+
+   Tenía dos averías encadenadas, y las dos son de fondo:
+
+   1. No hay histórico de cartera en ninguna parte. El valor «de hace 30 días»
+      se RECONSTRUÍA con `valor / (1 + cambio/100)`, y esa expresión **diverge**
+      cuando el cambio se acerca a −100 %: a −99,5 % multiplica por 200, a
+      −99,99 % por diez mil. Una sola posición de 83 $ bastaba para inventar
+      2,09 millones de dólares de pasado.
+
+   2. La fuente de los tramos largos era GeckoTerminal, y cuando un pool tenía
+      menos de 30 días de velas se cogía **la más antigua que hubiera** y se
+      etiquetaba como «hace 30 días». Un token recién lanzado que se desploma
+      daba ese −99,99 % sin que nada avisara.
+
+   Y por debajo de las dos, una asunción falsa: reconstruir el pasado así da por
+   hecho que **tenías el mismo saldo hace 30 días**. Para cualquier token que
+   compraste o te llegó después, no es cierto.
+
+   ⚠ Para recuperarlos hace falta un histórico de cartera de verdad —una foto
+     diaria de saldos y valores—, no una fórmula. Mientras no exista, un botón
+     menos es mejor que un número inventado.
+
+   El 24 h se queda porque no se reconstruye nada: `change24` viene de
+   DexScreener medido sobre su propia ventana móvil. */
 function tokenChange(t){
-  if(state.timeframe==='24h')return t.change24!=null?t.change24:null;
-  const c=extCache.get(t.priceAddr);
-  if(!c)return null;                                  // aún cargando o sin histórico
-  return state.timeframe==='7d'?c.pct7:c.pct30;
-}
-// "hoy" / "en 7d" / "en 30d" para la frase del hero.
-function tfPeriodWord(){return state.timeframe==='24h'?'hoy':('en '+state.timeframe);}
-async function fetchExtendedChange(priceAddr,pair,livePrice){
-  const cached=extCache.get(priceAddr);
-  if(cached&&Date.now()-cached.ts<EXT_TTL)return cached;
-  if(!pair||livePrice==null){const r={pct7:null,pct30:null,ts:Date.now()};extCache.set(priceAddr,r);return r;}
-  try{
-    const res=await fetch(`${GECKOTERMINAL_API}/networks/${CHAIN_ID}/pools/${pair}/ohlcv/day?aggregate=1&limit=31&currency=usd`);
-    if(!res.ok)throw 0;
-    const j=await res.json();
-    const list=j&&j.data&&j.data.attributes&&j.data.attributes.ohlcv_list;
-    if(!Array.isArray(list)||!list.length)throw 0;
-    // [ts(s),o,h,l,c,v] → ascendente por tiempo, sólo cierres válidos.
-    const rows=list.map(x=>({ts:x[0]*1000,close:parseFloat(x[4])})).filter(r=>r.close>0).sort((a,b)=>a.ts-b.ts);
-    if(!rows.length)throw 0;
-    const now=Date.now();
-    const closeAgo=days=>{const target=now-days*86400000;let best=rows[0];for(const r of rows){if(r.ts<=target)best=r;}return best.close;};
-    const c7=closeAgo(7),c30=closeAgo(30);
-    const out={pct7:c7>0?(livePrice-c7)/c7*100:null,pct30:c30>0?(livePrice-c30)/c30*100:null,ts:Date.now()};
-    extCache.set(priceAddr,out);return out;
-  }catch(e){
-    const r={pct7:null,pct30:null,ts:Date.now()};extCache.set(priceAddr,r);return r;
-  }
-}
-async function ensureExtendedChanges(){
-  if(state.timeframe==='24h'||extLoading)return;
-  const need=tokensCombined.filter(t=>t.pair&&t.price!=null).filter(t=>{
-    const c=extCache.get(t.priceAddr);return !c||Date.now()-c.ts>EXT_TTL;
-  });
-  if(!need.length)return;
-  extLoading=true;
-  try{
-    // Secuencial: respeta el rate limit de GeckoTerminal (~30/min).
-    for(const t of need)await fetchExtendedChange(t.priceAddr,t.pair,t.price);
-  }finally{extLoading=false;}
-  render();
+  return t.change24 != null ? t.change24 : null;
 }
 
 /* ---------- gráfico en vivo (DexScreener embed) ---------- */
