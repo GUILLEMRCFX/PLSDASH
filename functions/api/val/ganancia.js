@@ -246,16 +246,22 @@ async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas, propios
  * INSERT OR IGNORE: el índice de retirada es la clave primaria, así que
  * reprocesar un tramo no duplica nada.
  *
- * `precio_pls` se deja a NULL a propósito; la columna existe pero no se
- * necesita ninguna valoración histórica.
+ * ⚠ Aquí se nombraba `precio_pls` y se insertaba NULL. La columna se ha
+ *   borrado: llevaba 484 filas a NULL y nadie la leía, y seguir nombrándola
+ *   habría dejado este INSERT apuntando a una columna que ya no existe — o sea
+ *   `/api/val/ganancia` en 500 y el panel entero sin ganancias.
+ *
+ *   Si algún día se quiere valorar cada barrido al precio de su día, la columna
+ *   vuelve Y se rellena en el mismo cambio. Lo que no vuelve es una columna
+ *   vacía esperando a alguien.
  */
 async function guardar(db, nuevas) {
   if (!nuevas.length) return 0;
 
   const stmt = db.prepare(
     'INSERT OR IGNORE INTO barridos'
-    + ' (indice_retirada, ts, validador, cantidad, bloque, es_bloque, precio_pls)'
-    + ' VALUES (?, ?, ?, ?, ?, ?, NULL)'
+    + ' (indice_retirada, ts, validador, cantidad, bloque, es_bloque)'
+    + ' VALUES (?, ?, ?, ?, ?, ?)'
   );
 
   let escritas = 0;
