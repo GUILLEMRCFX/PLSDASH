@@ -34,6 +34,7 @@
 
 import { gananciaAcumulada, ritmoDiario } from '/val/compartido/ganancias.js';
 import { ACTIVACION_TS } from '../datos.js';
+import { desglosarSaldo } from './aportaciones.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
 
 /**
@@ -90,6 +91,41 @@ export function panelTrayectoria(datos) {
 
   const hayPrecio = precio && precio.disponible !== false && precio.precio > 0;
 
+  /* ── La barra, partida en dos: lo ganado y lo aportado ──────────────────
+     ⚠ NO se descuenta lo aportado del progreso, y esa fue una decisión, no un
+       descuido. Para depositar hacen falta 32M PLS EN LA WALLET, vengan de
+       donde vengan: restar lo aportado diría que estás más lejos de lo que
+       estás, que es la mentira contraria pero mentira igual.
+
+       Lo que sí engañaba era no poder ver cuánto del avance has comprado y
+       cuánto has ganado. Así que se separa: el tramo cian es lo generado
+       validando, el naranja lo que has puesto tú.
+
+     El PLAZO sigue saliendo de lo que falta al ritmo medido, que es correcto:
+     si aportas, faltará menos y el plazo se acortará — pero por haber puesto
+     dinero, no por ganar más rápido, y ahora la barra lo enseña. */
+  /* ⚠ Y solo se parte cuando la cuenta CUADRA. Si ha salido PLS de la wallet
+     —`restoVisible`— no hay forma de saber si lo que salió era ganado o
+     aportado: cualquier reparto sería una convención inventada con pinta de
+     dato. En ese caso la barra se deja entera y el pie dice el total aportado
+     sin fingir que se sabe cuánto de ello sigue ahí. */
+  const desglose = deWallet ? desglosarSaldo(datos) : null;
+  const cuadra = desglose && desglose.hayRegistro && !desglose.restoVisible;
+  const aportado = cuadra ? Math.min(Number(desglose.aportado) || 0, reunido) : 0;
+  const pctAportado = Math.max(0, Math.min(100, (aportado / deposito) * 100));
+  const pctGanado = Math.max(0, pct - pctAportado);
+
+  const barra = aportado > 0
+    ? `<i class="a-ganado" style="width:${pctGanado.toFixed(2)}%"></i>`
+      + `<i class="a-aportado" style="width:${pctAportado.toFixed(2)}%"></i>`
+    : `<i class="a-ganado" style="width:${pct.toFixed(2)}%"></i>`;
+
+  const pieBarra = aportado > 0
+    ? `${fmtCompacto(reunido - aportado)} generados · ${fmtCompacto(aportado)} aportados`
+    : desglose && desglose.hayRegistro
+      ? `saldo de la wallet · ${fmtCompacto(desglose.aportado)} aportados en total`
+      : (deWallet ? 'saldo de la wallet' : 'lo generado');
+
   return `
     <section class="panel" aria-labelledby="pt-t">
       <header class="p-cab">
@@ -106,10 +142,10 @@ export function panelTrayectoria(datos) {
       </div>
 
       <div class="avance" role="presentation">
-        <div class="a-barra"><i style="width:${pct.toFixed(2)}%"></i></div>
+        <div class="a-barra">${barra}</div>
         <div class="a-pie">
           <span class="mono">${fmtCompacto(reunido)} de ${fmtCompacto(deposito)} PLS</span>
-          <span>${deWallet ? 'saldo de la wallet' : 'lo generado'}</span>
+          <span>${escapar(pieBarra)}</span>
         </div>
       </div>
 

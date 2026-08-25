@@ -15,6 +15,7 @@
  *   /api/val/historico?rango=precio→ [{ts, precio_pls}] histórico del precio
  *   /api/val/ganancia              → barridos reconciliados contra la cadena
  *   /api/val/eventos?limit=60      → registro de vida (activacion, barrido, bloque)
+ *   /api/val/aportaciones          → lo que has puesto tú de tu bolsillo
  *   /api/precio                    → precio de PLS (ver functions/api/precio.js)
  *
  * Ninguno bloquea a los demás: se piden en paralelo y lo que falle se anota en
@@ -50,6 +51,7 @@ export async function cargarTodo() {
     daily:        `${API}/historico?rango=todo`,
     ganancia:     `${API}/ganancia`,
     eventos:      `${API}/eventos?limit=60`,
+    aportaciones: `${API}/aportaciones`,
     precioSerie:  `${API}/historico?rango=precio`,
     precio:       '/api/precio',
   };
@@ -60,6 +62,9 @@ export async function cargarTodo() {
   const salida = {
     estado: null, serie: [], snapshots24h: [], daily: [], ganancia: null,
     eventos: [], precioSerie: [], precio: null,
+    // `null` y no `{}`: distingue «aún no ha llegado o ha fallado» de «no has
+    // apuntado ninguna». El panel dice cosas distintas en cada caso.
+    aportaciones: null,
     fallos: [],
     // Un 401 en los endpoints del panel no es «está roto»: es «no has metido
     // el PIN». Son dos mensajes muy distintos y confundirlos manda a mirar el
@@ -78,6 +83,7 @@ export async function cargarTodo() {
     const v = r.value;
     if (nombre === 'estado' || nombre === 'ganancia' || nombre === 'precio') salida[nombre] = v;
     else if (nombre === 'eventos') salida.eventos = v.eventos || [];
+    else if (nombre === 'aportaciones') salida.aportaciones = v;
     else salida[nombre] = v.datos || [];
   });
 
