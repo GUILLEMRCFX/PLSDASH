@@ -33,7 +33,14 @@
  *
  * ## Cómo se usa
  *
- * `htmlPulso(datos)` para pintarlo con el resto del panel, y `latir(raiz)` en
+ * `htmlPulso(datos, alFinal)` para pintarlo con el resto del panel. `alFinal`
+ * es HTML que se cuela al final de su primera línea: lo usa «Resumen» para
+ * meter ahí la palabra de estado. Sin esa ranura, el pulso y la palabra eran
+ * dos hermanos de una fila flexible y la línea de tiempo se quedaba a media
+ * anchura de la tarjeta — que es justo lo que hace que no se pueda leer de
+ * reojo.
+ *
+ * `htmlPulso(datos)` a secas y `latir(raiz)` en
  * un intervalo de un segundo para que los dígitos corran. `latir` no repinta el
  * panel: reescribe solo este nodo, leyendo `Date.now()` en vivo y el
  * `generado_ts` que el propio nodo lleva guardado en su `dataset`. Así el
@@ -45,6 +52,14 @@ export const PERIODO_S = 180;
 
 /** Margen antes de declararlo tarde. Ver la nota de arriba. */
 export const GRACIA_S = 60;
+
+/** La ventana entera que dibuja la línea de tiempo: plazo más margen. */
+export const VENTANA_S = PERIODO_S + GRACIA_S;
+
+/** Dónde cae el final del plazo dentro de esa ventana, en tanto por uno.
+ *  Es la marca de la línea: a su izquierda el dato viene con tiempo, a su
+ *  derecha está entrando, y pasada la línea entera es que no llega. */
+export const MARCA = PERIODO_S / VENTANA_S;
 
 /** Segundos → «1:23» o «12:04». Siempre con dos dígitos de segundos. */
 function reloj(s) {
@@ -74,21 +89,25 @@ export function estadoPulso(generadoTs, ahoraS) {
 
   const edad = ahoraS - ts;
   const falta = PERIODO_S - edad;
+  // Posición sobre la ventana entera —plazo más margen—, de 0 a 1. Es lo que
+  // dibuja la línea de tiempo: el hueco recorrido a la izquierda del cursor es
+  // tiempo transcurrido de verdad, no una barra de progreso decorativa.
+  const avance = Math.max(0, Math.min(1, edad / VENTANA_S));
 
   if (falta > 0) {
     return {
-      tarde: false, eti: 'Dato nuevo en', resto: reloj(falta),
+      tarde: false, avance, eti: 'Dato nuevo en', resto: reloj(falta),
       aria: `Próximo dato del NUC en ${reloj(falta)}.`,
     };
   }
-  if (edad <= PERIODO_S + GRACIA_S) {
+  if (edad <= VENTANA_S) {
     return {
-      tarde: false, eti: 'Dato nuevo', resto: 'llegando',
+      tarde: false, avance, eti: 'Dato nuevo', resto: 'llegando',
       aria: 'El NUC está en plazo; el dato nuevo está entrando.',
     };
   }
   return {
-    tarde: true, eti: 'Sin señal desde hace', resto: reloj(edad),
+    tarde: true, avance: 1, eti: 'Sin señal desde hace', resto: reloj(edad),
     aria: `El NUC no reporta desde hace ${reloj(edad)}. Lo que ves es el último dato bueno.`,
   };
 }
@@ -100,16 +119,28 @@ export function estadoPulso(generadoTs, ahoraS) {
  * pero no interrumpir a media frase — el dato de la pantalla sigue siendo
  * válido, solo es viejo.
  */
-export function htmlPulso(datos) {
+export function htmlPulso(datos, alFinal = '') {
   const ts = Number(datos?.estado?.generado_ts) || 0;
   const p = estadoPulso(ts, Math.floor(Date.now() / 1000));
   return `
-    <p class="pulso${p.tarde ? ' tarde' : ''}" id="pulso" data-ts="${ts}"
-       role="status" aria-live="polite" aria-label="${p.aria}">
-      <i class="luz" aria-hidden="true"></i>
-      <span class="p-eti">${p.eti}</span>
-      <b class="resto">${p.resto}</b>
-    </p>`;
+    <div class="pulso${p.tarde ? ' tarde' : ''}" id="pulso" data-ts="${ts}"
+         role="status" aria-live="polite" aria-label="${p.aria}">
+      <div class="pl-cab">
+        <i class="luz" aria-hidden="true"></i>
+        <span class="p-eti">${p.eti}</span>
+        <b class="resto">${p.resto}</b>
+        ${alFinal}
+      </div>
+      <!-- La línea de tiempo. Va oculta a los lectores de pantalla porque no
+           añade nada a lo que la etiqueta de arriba ya dice en palabras: es la
+           misma cuenta, dibujada. La marca es el final del plazo del cron.
+           (Sin acentos graves aquí dentro: cerrarían la plantilla. Es la
+           tercera vez que pasa; por eso queda escrito.) -->
+      <div class="pl-linea" aria-hidden="true">
+        <span class="pl-lleno" style="width:${(p.avance * 100).toFixed(1)}%"></span>
+        <i class="pl-marca" style="left:${(MARCA * 100).toFixed(1)}%"></i>
+      </div>
+    </div>`;
 }
 
 /**
@@ -136,7 +167,11 @@ export function latir(raiz = document) {
   // congelado a mitad de onda.
   const eti = el.querySelector('.p-eti');
   const resto = el.querySelector('.resto');
+  const lleno = el.querySelector('.pl-lleno');
   if (eti && eti.textContent !== p.eti) eti.textContent = p.eti;
   if (resto && resto.textContent !== p.resto) resto.textContent = p.resto;
+  // El ancho se escribe cada segundo; la transición del CSS lo lleva de un
+  // punto al siguiente para que avance liso en vez de a saltos de segundo.
+  if (lleno) lleno.style.width = `${(p.avance * 100).toFixed(1)}%`;
   return p.tarde ? 'tarde' : 'ok';
 }

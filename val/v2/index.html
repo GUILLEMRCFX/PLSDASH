@@ -19,132 +19,111 @@
        nivel de negro entre las celdas y con él se va el contraste — que es
        donde de verdad se juega la sensación de nitidez. */
     margin:0;min-height:100%;background:var(--negro);color:var(--cian-suave);
-    font-family:var(--mono);
+    font-family:var(--texto);
     -webkit-text-size-adjust:100%;
   }
 
   /* ───────────────────────────────────────────── retícula
-     Móvil: esfera arriba, barra de pestañas debajo y la vista activa al pie.
-     Escritorio: la esfera se queda con la izquierda entera y fija, y las
-     pestañas con su contenido ocupan la derecha. */
+     Una sola columna, centrada. La esfera ya no comparte pantalla con nada:
+     tiene su propia pestaña y ahí ocupa lo que haya. */
   .marco{
-    display:grid;
-    grid-template-columns:1fr;
-    gap:12px;
+    display:block;
     padding:12px;
-    /* ⚠ El recorte SUPERIOR también, no solo el de abajo. Faltaba, y en la app
-       instalada del iPhone la esfera arrancaba a 12px del borde de la pantalla,
-       por debajo del reloj y la batería. Los laterales van igual: en horizontal
-       con el notch a un lado, sin ellos el panel se mete debajo. */
     padding-top:calc(12px + env(safe-area-inset-top,0px));
     padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
     padding-left:calc(12px + env(safe-area-inset-left,0px));
     padding-right:calc(12px + env(safe-area-inset-right,0px));
-    max-width:1680px;margin:0 auto;
+    /* 1100 y no 1680: a lo ancho de una pantalla grande, el contenido de un
+       panel se estiraba hasta que la etiqueta y su cifra quedaban a un palmo la
+       una de la otra y había que recorrer la línea con el dedo. */
+    max-width:1100px;margin:0 auto;
   }
 
-  /* La altura de la esfera en móvil NO es un gusto, es una cuenta.
-     «Resumen» mide 375px y tiene que caber entero sin desplazarse, así que a
-     la esfera le toca lo que sobre después de la barra de pestañas (52px) y
-     los márgenes (48px): alto − 100 − 375. De ahí los tres escalones. La
-     esfera es lo bonito; «Resumen» es para lo que se abre el panel, y cuando
-     compiten gana la respuesta.
+  /* ───────────────────────────────────────────── la esfera, en su pestaña
+     Antes vivía fija encima del contenido y se comía el primer tercio del móvil
+     para responder algo que cabe en una línea. Ahora es una pestaña más y
+     ocupa lo que le sobra a la barra: quien la quiera ver, la abre.
 
-       alto útil   esfera    le queda a Resumen
-        844        338 (40%)      406
-        750        225 (30%)      425
-        667        170 (mín)      397
-
-     `dvh` y no `vh`: con `vh` la cuenta se haría sobre la pantalla completa e
-     ignoraría la barra del navegador, que es precisamente el trozo que falta. */
+     Dos cosas salen gratis de este cambio y conviene dejarlas escritas:
+       · Deja de dibujarse cuando no se ve. El `IntersectionObserver` de
+         `esfera.js` ya apagaba el bucle si el contenedor salía de pantalla; con
+         la pestaña oculta el efecto es el mismo, y en el móvil eso es batería.
+       · Se remide sola al volver, por el `ResizeObserver` del mismo módulo. */
   #escena{
     position:relative;
-    height:clamp(170px,40dvh,360px);
-    /* Suelo absoluto: los escalones de abajo sustituyen la altura entera, así
-       que sin esto un móvil apaisado dejaría la esfera en una raya. */
-    min-height:150px;
-    /* La esfera se lleva el gesto entero dentro de su caja; fuera de ella la
-       página se desplaza con normalidad. */
+    width:100%;
+    /* Lo que queda de pantalla quitando la barra de pestañas (60), el pie que
+       explica qué codifica cada cosa (~76 en tres líneas a 390px), los huecos
+       y los márgenes. Con 150 el pie se salía por abajo y había que desplazar
+       para leer la leyenda de lo que estabas mirando. */
+    height:calc(100dvh - 240px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    min-height:260px;
+    max-height:820px;
+    /* La esfera se lleva el gesto entero dentro de su caja. */
     touch-action:none;
   }
   #escena canvas{display:block;width:100%;height:100%}
 
   /* Rótulo del nodo señalado. Se coloca con `transform` y no con `top/left`
      porque se mueve en cada fotograma mientras la esfera gira: `transform` no
-     provoca reflujo. `translate(-50%,-140%)` lo deja centrado y por encima del
-     nodo, para que el dedo no lo tape en táctil. */
+     provoca reflujo. */
   #rotulo{
     position:absolute;left:0;top:0;margin:0;
     pointer-events:none;
-    font:400 11px/1.25 var(--mono);
+    font:500 12px/1.25 var(--texto);
     white-space:nowrap;
-    padding:5px 8px;
-    border-radius:7px;
-    background:rgba(6,14,20,.88);
+    padding:6px 10px;
+    border-radius:8px;
+    background:rgba(6,14,20,.9);
     border:1px solid var(--borde-vivo);
     backdrop-filter:blur(6px);
     -webkit-backdrop-filter:blur(6px);
-    display:flex;gap:8px;align-items:baseline;
+    display:flex;gap:9px;align-items:baseline;
     transform-origin:0 0;
   }
   #rotulo[hidden]{display:none}
-  #rotulo .r-id{color:var(--cian);letter-spacing:.04em}
-  #rotulo .r-blq{color:var(--apagado);font-size:10px}
+  #rotulo .r-id{color:var(--cian);letter-spacing:.02em;font-weight:600}
+  #rotulo .r-blq{color:var(--apagado);font-size:11px}
   #rotulo.inactivo .r-id{color:var(--naranja)}
 
-  @media (max-height:800px){ #escena{height:30dvh} }
-  @media (max-height:700px){ #escena{height:24dvh} }
+  /* Pie de la pestaña de la esfera: qué codifica lo que se está viendo. Sin
+     esto, un punto más gordo que otro es decoración. */
+  .esfera-pie{
+    margin:10px 2px 0;
+    display:flex;flex-wrap:wrap;gap:6px 18px;
+    font:400 12px/1.5 var(--texto);color:var(--apagado);
+  }
+  .esfera-pie b{color:var(--cian-suave);font-weight:600}
 
   #contenido{min-width:0}
 
-  /* Las cuatro vistas viven a la vez en el DOM y solo una se enseña. Cambiar
-     de pestaña no vuelve a pedir datos ni a construir HTML: enseña lo que ya
-     estaba pintado, que es lo que hace que el cambio sea instantáneo. */
+  /* Las vistas viven a la vez en el DOM y solo una se enseña. Cambiar de
+     pestaña no vuelve a pedir datos ni a construir HTML. */
   .vista{
     display:grid;
     grid-template-columns:1fr;
-    gap:12px;
+    gap:14px;
     align-content:start;
-    /* Sin esto, `min-width:auto` deja que el contenido más ancho —una barra de
-       pestañas larga, una tabla— estire la columna de la retícula y la página
-       entera se desplace en horizontal. Nunca se nota en escritorio. */
     min-width:0;
   }
 
-  @media (min-width:1000px){
-    .marco{
-      grid-template-columns:minmax(0,1fr) minmax(520px,.9fr);
-      grid-template-areas:"escena contenido";
-      gap:18px;padding:18px;
-      align-items:start;
-      min-height:100dvh;
-    }
-    #escena{
-      grid-area:escena;
-      height:calc(100dvh - 36px);max-height:none;
-      position:sticky;top:18px;
-    }
-    #contenido{
-      grid-area:contenido;
-      display:flex;flex-direction:column;gap:18px;
-    }
-    /* En escritorio hay ancho para dos columnas de paneles. `auto-fit` con un
-       mínimo de 290px las crea solas cuando caben y las deshace cuando no:
-       «Resumen» y «Validadores», que traen un solo panel, ocupan el ancho
-       entero sin que haya que decírselo. */
-    /* `align-items:start` y no el estirado por omisión: con cuatro paneles en
-       dos columnas, estirar iguala la altura de cada fila y el panel corto se
-       queda con un palmo de vidrio vacío debajo de su último dato. Cada uno a
-       su altura queda desigual por abajo, y desigual es mejor que hueco. */
+  @media (min-width:820px){
+    .marco{padding:20px;padding-top:calc(20px + env(safe-area-inset-top,0px))}
     .vista{
-      grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+      /* 340 y no 290: por debajo de eso una tarjeta con etiqueta y cifra en la
+         misma línea empieza a partir palabras. */
+      grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
       gap:18px;
+      /* Cada panel a su altura: estirar iguala las filas y deja al panel corto
+         con un palmo de vidrio vacío debajo de su último dato. */
       align-items:start;
     }
+    /* La esfera nunca se parte en columnas. */
+    #v-esfera{grid-template-columns:1fr}
   }
 
   #cargando{
-    font:400 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+    font:400 11px/1 var(--texto);letter-spacing:.16em;text-transform:uppercase;
     color:var(--apagado);padding:18px 2px;
   }
 </style>
@@ -152,27 +131,38 @@
 <body>
 
 <main class="marco">
-  <div id="escena">
-    <!-- `aria-hidden`: la esfera es decoración con dato, y el mismo dato está
-         en la tabla del panel de Validadores, que sí se puede leer y recorrer.
-         Anunciar un rótulo que aparece al pasar el ratón no aporta nada ahí. -->
-    <p id="rotulo" hidden aria-hidden="true">
-      <span class="r-id"></span><span class="r-blq"></span>
-    </p>
-  </div>
-
   <div id="contenido">
     <nav class="pestanas" role="tablist" aria-label="Secciones del panel">
       <button type="button" role="tab" id="t-resumen"     aria-controls="v-resumen"     aria-selected="true">Resumen</button>
       <button type="button" role="tab" id="t-ganancias"   aria-controls="v-ganancias"   aria-selected="false" tabindex="-1">Ganancias</button>
       <button type="button" role="tab" id="t-validadores" aria-controls="v-validadores" aria-selected="false" tabindex="-1">Validadores</button>
       <button type="button" role="tab" id="t-nodo"        aria-controls="v-nodo"        aria-selected="false" tabindex="-1">Nodo</button>
+      <button type="button" role="tab" id="t-esfera"      aria-controls="v-esfera"      aria-selected="false" tabindex="-1">Esfera</button>
     </nav>
 
     <div class="vista" role="tabpanel" id="v-resumen"     aria-labelledby="t-resumen"     tabindex="0"></div>
     <div class="vista" role="tabpanel" id="v-ganancias"   aria-labelledby="t-ganancias"   tabindex="0" hidden></div>
     <div class="vista" role="tabpanel" id="v-validadores" aria-labelledby="t-validadores" tabindex="0" hidden></div>
     <div class="vista" role="tabpanel" id="v-nodo"        aria-labelledby="t-nodo"        tabindex="0" hidden></div>
+
+    <!-- ⚠ Esta vista NO la repinta `pintar()`. Las otras cuatro se regeneran
+         enteras en cada refresco con `innerHTML`, y hacerlo aquí arrancaría el
+         lienzo de WebGL del DOM cada 18 segundos: se perdería el contexto y con
+         él la esfera. Lo marca `estatica: true` en `PESTANAS`. -->
+    <div class="vista" role="tabpanel" id="v-esfera" aria-labelledby="t-esfera" tabindex="0" hidden>
+      <div id="escena">
+        <!-- `aria-hidden`: la esfera es decoración con dato, y el mismo dato
+             está en la tabla de Validadores, que sí se puede leer y recorrer. -->
+        <p id="rotulo" hidden aria-hidden="true">
+          <span class="r-id"></span><span class="r-blq"></span>
+        </p>
+      </div>
+      <p class="esfera-pie">
+        <span>Un punto por validador · <b>el tamaño</b> son sus bloques propuestos</span>
+        <span><b>El brillo</b> sube con el ciclo de barrido y cae al cobrarlo</span>
+        <span><b>Gris</b> = dato viejo · toca un punto para ver cuál es</span>
+      </p>
+    </div>
   </div>
 </main>
 
@@ -184,7 +174,7 @@
   import { crearEsfera } from './escena/esfera.js';
   import { escenaDesde } from './escena/estado-escena.js';
   import { cargarTodo } from './datos.js';
-  import { panelResumen, engancharResumen } from './paneles/resumen.js';
+  import { panelResumen, engancharResumen, tictac } from './paneles/resumen.js';
   import { panelGanancias } from './paneles/ganancias.js';
   import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
   import { panelTrayectoria } from './paneles/trayectoria.js';
@@ -252,6 +242,9 @@
     { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelTrayectoria, panelPrecio] },
     { id: 'validadores', paneles: [panelValidadores] },
     { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
+    // `estatica`: su HTML lo escribió el documento y no se regenera nunca. Ver
+    // el aviso junto a `#v-esfera` en el marcado.
+    { id: 'esfera',      paneles: [], estatica: true },
   ];
 
   const tabs = PESTANAS.map(p => document.getElementById(`t-${p.id}`));
@@ -315,6 +308,39 @@
 
   let ultimos = null;
 
+  /* ───────────────────────────────────────── destellos de bloque
+
+     Un bloque propuesto es el único suceso PUNTUAL que tiene el panel: los
+     demás números son magnitudes que suben y bajan. La esfera lo marca con un
+     golpe de luz en el nodo de ese validador y una onda que sale de él.
+
+     De dónde sale el hecho: del registro de eventos, `tipo === 'bloque'`, que
+     los escribe `/api/val/ganancia` al reconciliar los barridos contra la
+     cadena. No se inventa ninguno.
+
+     ⚠ Solo destellan los bloques que llegan NUEVOS. En el primer pintado se
+       apunta el más reciente sin encender nada: si no, abrir el panel dispararía
+       de golpe los sesenta últimos bloques del histórico, que es una fiesta que
+       no significa nada. */
+  let ultimoBloqueTs = null;
+
+  function destellarBloquesNuevos(datos) {
+    const bloques = (datos.eventos || [])
+      .filter(e => e.tipo === 'bloque' && Number.isFinite(Number(e.ts)))
+      .sort((a, b) => Number(a.ts) - Number(b.ts));
+    if (!bloques.length) return;
+
+    if (ultimoBloqueTs == null) {          // primer pintado: solo tomar nota
+      ultimoBloqueTs = Number(bloques[bloques.length - 1].ts);
+      return;
+    }
+    for (const b of bloques) {
+      if (Number(b.ts) <= ultimoBloqueTs) continue;
+      ultimoBloqueTs = Number(b.ts);
+      if (b.validador != null) esfera.destello(Number(b.validador));
+    }
+  }
+
   function pintar(datos) {
     ultimos = datos;
 
@@ -322,8 +348,10 @@
     // no dentro de ninguna: sus nodos son los validadores reales, su brillo el
     // avance del ciclo de barrido y su color la frescura del dato.
     esfera.actualizar(escenaDesde(datos, datos.ahoraS));
+    destellarBloquesNuevos(datos);
 
     PESTANAS.forEach((p, i) => {
+      if (p.estatica) return;
       vistas[i].innerHTML = p.paneles.map(fn => fn(datos)).join('');
     });
     // Las dos capas interactivas se pierden con el HTML, que se regenera
@@ -331,6 +359,10 @@
     engancharCiclo(document, datos);
     engancharResumen(document, () => pintar(ultimos));
     window.__datos = datos;
+    // Ganchos de diagnóstico, como `__esfera`: desde la consola se puede forzar
+    // un repintado sin esperar 18 segundos, y la prueba del bloque 2 lo usa para
+    // comprobar que el repintado NO se lleva el lienzo de la esfera por delante.
+    window.__pintar = () => pintar(ultimos);
   }
 
   /* ───────────────────────────────────────────── refresco
@@ -348,14 +380,17 @@
       // `cargarTodo` ya absorbe los fallos por endpoint; llegar aquí es un
       // fallo del propio módulo, y callarlo dejaría la pantalla de carga fija.
       console.error('[val/v2] no se pudieron cargar los datos:', e);
-      vistas[activa].innerHTML =
+      // Nunca sobre la vista de la esfera: se llevaría el lienzo por delante.
+      const destino = PESTANAS[activa].estatica ? vistas[0] : vistas[activa];
+      destino.innerHTML =
         '<section class="panel" data-alerta><p class="p-aviso">'
         + 'No se pudieron cargar los datos del panel.</p></section>';
     }
   }
 
   activar(activa, { mover: false, animar: false, sellarHash: false });
-  vistas[activa].innerHTML = '<div id="cargando">Cargando…</div>';
+  if (!PESTANAS[activa].estatica)
+    vistas[activa].innerHTML = '<div id="cargando">Cargando…</div>';
   refrescar();
   setInterval(refrescar, REFRESCO_MS);
 
@@ -367,11 +402,22 @@
   // repinta el panel con los datos que ya hay: la palabra de estado y la franja
   // de alerta las decide `panelResumen`, y sin este aviso tardarían hasta 18
   // segundos en enterarse de lo que el pulso ya está diciendo en naranja.
+  //
+  // Y en el mismo tic corre el contador de ganancias: al ritmo medido, la cifra
+  // avanza del orden de un PLS por segundo, así que el último dígito cambia
+  // cada vez. Ver la nota de `tictac()`.
   let pulsoPrevio = null;
   setInterval(() => {
     const ahora = latir();
     if (ahora && pulsoPrevio && ahora !== pulsoPrevio && ultimos) pintar(ultimos);
     if (ahora) pulsoPrevio = ahora;
+    tictac();
+    /* El ciclo de barrido dura ~8,1 h y su avance solo se recalculaba con los
+       datos, cada 18 s. Recalcularlo cada segundo con el reloj de ahora es lo
+       que hace que el brillo suba de forma continua en vez de a escalones —y,
+       sobre todo, que la CAÍDA al cobrarse el barrido se vea cuando pasa. Es
+       la misma cuenta, con la hora al día: no se inventa nada. */
+    if (ultimos) esfera.actualizar(escenaDesde(ultimos, Math.floor(Date.now() / 1000)));
   }, 1000);
 </script>
 </body>

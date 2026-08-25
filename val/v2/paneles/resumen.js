@@ -124,18 +124,26 @@ export function panelResumen(datos) {
   const conmutable = acum != null && hayPrecio;
   const enUsd = conmutable && unidad === 'usd';
 
+  /* Lo que necesita el contador para seguir corriendo entre refrescos. Va en
+     el propio nodo y no en una variable de módulo para que sobreviva al
+     repintado, que regenera el HTML entero. `tasa` en PLS por segundo. */
+  const tasa = ritmo && ritmo.plsDia > 0 ? ritmo.plsDia / 86400 : 0;
+  const datosTic = acum == null ? '' :
+    ` data-base="${acum.total}" data-tasa="${tasa}" data-desde="${Date.now()}"` +
+    (enUsd && hayPrecio ? ` data-precio="${precio.precio}"` : '');
+
   const portada = acum == null
     ? '<span class="p-num" aria-disabled="true">–</span>'
     : conmutable
-      ? `<button type="button" class="p-num" data-unidad="${unidad}"
+      ? `<button type="button" class="p-num" data-unidad="${unidad}"${datosTic}
                  aria-label="Total generado: ${
                    enUsd ? `${fmt(acum.total * precio.precio, 2)} dólares`
                          : `${fmt(acum.total)} PLS`
                  }. Pulsa para cambiar de unidad.">${
-          enUsd ? `${fmt(acum.total * precio.precio, 2)}<span class="u">USD</span>`
-                : `${fmt(acum.total)}<span class="u">PLS</span>`
+          enUsd ? `<span class="p-cifra">${fmt(acum.total * precio.precio, 2)}</span><span class="u">USD</span>`
+                : `<span class="p-cifra">${fmt(acum.total)}</span><span class="u">PLS</span>`
         }</button>`
-      : `<span class="p-num">${fmt(acum.total)}<span class="u">PLS</span></span>`;
+      : `<span class="p-num"${datosTic}><span class="p-cifra">${fmt(acum.total)}</span><span class="u">PLS</span></span>`;
 
   // El pie cabe en una línea a 390px. «Toca para ver en dólares» la partía en
   // dos y el panel crecía 24px justo donde no sobran.
@@ -165,8 +173,8 @@ export function panelResumen(datos) {
              tiene prohibido desplazarse. La fila la ocupan las dos cosas que
              sí hacen falta: si el dato es de ahora, y si algo va mal. -->
         <h2 id="prs-t" class="oculto">${TITULO}</h2>
-        ${htmlPulso(datos)}
-        <span class="p-marca ${alerta ? 'alerta' : 'bien'}">${escapar(salud.palabra)}</span>
+        ${htmlPulso(datos,
+          `<span class="p-marca ${alerta ? 'alerta' : 'bien'}">${escapar(salud.palabra)}</span>`)}
       </header>
 
       ${salud.nota ? `<p class="p-aviso">${escapar(salud.nota)}</p>` : ''}
@@ -212,4 +220,48 @@ export function engancharResumen(raiz, repintar) {
     guardarUnidad(unidad);
     repintar();
   });
+}
+
+/**
+ * El contador corre entre refrescos.
+ *
+ * ## Por qué esto no es adorno
+ *
+ * La cifra real solo cambia cuando el NUC empuja, cada 3 minutos. Entre medias
+ * quedaba clavada, y una cifra clavada en un panel de algo que gana PLS cada
+ * segundo dice algo falso: que no está pasando nada.
+ *
+ * Lo que se dibuja aquí es la MISMA proyección que ya está escrita dos líneas
+ * más abajo, en la fila «Hora» de la tabla de ritmo: el ritmo diario medido
+ * sobre los últimos días cerrados, repartido por segundo. La velocidad a la que
+ * corren los dígitos ES ese dato. Si el ritmo baja, el contador corre más
+ * despacio.
+ *
+ * ⚠ LO QUE ESTO NO ES: una lectura en vivo de la cadena. Es una interpolación
+ *   entre dos lecturas reales, y por eso **se vuelve a anclar en cada refresco**
+ *   —`data-base` se reescribe con el total de verdad—. Si la proyección se
+ *   hubiera adelantado, la cifra retrocede al llegar el dato bueno. Se prefiere
+ *   ese salto ocasional a fingir precisión: el pulso, justo encima, dice
+ *   siempre de cuándo es la última lectura de verdad.
+ *
+ * ⚠ Sin ritmo medido, `tasa` vale 0 y el contador NO se mueve. No se inventa
+ *   una velocidad por defecto.
+ */
+export function tictac(raiz = document) {
+  const el = raiz.querySelector('.p-num[data-base]');
+  if (!el) return;
+  const cifra = el.querySelector('.p-cifra');
+  if (!cifra) return;
+
+  const base = Number(el.dataset.base);
+  const tasa = Number(el.dataset.tasa);
+  const desde = Number(el.dataset.desde);
+  if (!Number.isFinite(base) || !(tasa > 0) || !Number.isFinite(desde)) return;
+
+  const pls = base + tasa * ((Date.now() - desde) / 1000);
+  const precio = Number(el.dataset.precio);
+  const txt = Number.isFinite(precio) && precio > 0
+    ? fmt(pls * precio, 2)
+    : fmt(pls);
+  if (cifra.textContent !== txt) cifra.textContent = txt;
 }
