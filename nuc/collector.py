@@ -64,9 +64,16 @@ def get_json(url):
         return None
 
 
-def prom_query(query):
-    """Consulta Prometheus y devuelve el primer valor como float, o None."""
+def prom_query(query, momento=None):
+    """Consulta Prometheus y devuelve el primer valor como float, o None.
+
+    `momento` es un unix ts opcional: sin el, Prometheus evalua «ahora». Se
+    anadio para poder cerrar un dia consultando el final de ESE dia y no el
+    instante en que se ejecuta el cierre, que puede ser horas despues.
+    """
     url = f"{PROM}/api/v1/query?query={urllib.parse.quote(query)}"
+    if momento is not None:
+        url += f"&time={int(momento)}"
     data = get_json(url)
     try:
         result = data["data"]["result"]

@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<!-- Declara que la barra de estado se pinta encima; sin esto el recorte que
+     reporta iOS depende de la version. Ver la nota de `.marco`. -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>PLSDASH · núcleo</title>
 <link rel="icon" href="/favicon.ico">
 <link rel="stylesheet" href="/val/v2/paneles/estilo.css">
@@ -28,7 +32,14 @@
     grid-template-columns:1fr;
     gap:12px;
     padding:12px;
+    /* ⚠ El recorte SUPERIOR también, no solo el de abajo. Faltaba, y en la app
+       instalada del iPhone la esfera arrancaba a 12px del borde de la pantalla,
+       por debajo del reloj y la batería. Los laterales van igual: en horizontal
+       con el notch a un lado, sin ellos el panel se mete debajo. */
+    padding-top:calc(12px + env(safe-area-inset-top,0px));
     padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+    padding-left:calc(12px + env(safe-area-inset-left,0px));
+    padding-right:calc(12px + env(safe-area-inset-right,0px));
     max-width:1680px;margin:0 auto;
   }
 

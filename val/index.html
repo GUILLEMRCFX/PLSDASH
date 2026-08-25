@@ -313,10 +313,6 @@ input[type=text].fld{
   font-weight:500;cursor:pointer;margin-top:4px;
 }
 .btn:hover{border-color:#a855f755}
-.toggle{width:38px;height:22px;border-radius:12px;background:var(--line);border:none;position:relative;cursor:pointer;flex:none}
-.toggle.on{background:#38d98a44}
-.toggle i{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--mute);transition:transform .15s}
-.toggle.on i{background:var(--ok);transform:translateX(16px)}
 
 .foot{text-align:center;font-size:10.5px;color:var(--mute);margin-top:32px;line-height:1.7}
 
@@ -706,16 +702,11 @@ input[type=text].fld{
     </div>
   </div>
 
-  <div class="eyebrow">Avisos</div>
-  <div class="card">
-    <div class="nrow"><div class="l">Validador inactivo</div><button class="toggle on" data-alert="inactivo"><i></i></button></div>
-    <div class="nrow"><div class="l">Nodo desincronizado</div><button class="toggle on" data-alert="desync"><i></i></button></div>
-    <div class="nrow"><div class="l">Disco &gt; 85 %</div><button class="toggle on" data-alert="disco"><i></i></button></div>
-    <div class="nrow"><div class="l">Bloque propuesto</div><button class="toggle" data-alert="bloque"><i></i></button></div>
-    <div style="font-size:11px;color:var(--mute);margin-top:12px;line-height:1.6">
-      Los avisos los envía el NUC directamente a Telegram, no el dashboard. Estos interruptores se guardan solo en este dispositivo, como recordatorio de qué tienes activado allí.
-    </div>
-  </div>
+  <!-- Aquí había cuatro interruptores de «Avisos». No encendían ni apagaban
+       nada: los avisos los manda el NUC por su cuenta y estos botones solo
+       guardaban un 0 o un 1 en el localStorage del teléfono, «como
+       recordatorio». Un control que no controla enseña a desconfiar de los que
+       sí lo hacen. Si algún día el panel puede decirle algo al NUC, vuelven. -->
 
 </section>
 
@@ -1699,16 +1690,6 @@ import {
     renderTools();
   });
 
-
-  document.querySelectorAll('.toggle').forEach(t => {
-    const key = 'val_alert_' + t.dataset.alert;
-    const saved = localStorage.getItem(key);
-    if (saved !== null) t.classList.toggle('on', saved === '1');
-    t.addEventListener('click', () => {
-      t.classList.toggle('on');
-      localStorage.setItem(key, t.classList.contains('on') ? '1' : '0');
-    });
-  });
 
   // ---------- ciclo de vida ----------
   let syncTimer = null;
