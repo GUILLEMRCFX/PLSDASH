@@ -2,8 +2,9 @@
  * PLSDASH v2 — lenguaje visual de los paneles.
  *
  * Las reglas están escritas para reutilizarse, no para resolver el panel que
- * las estrenó. Desde el 21-ago-2026 el tablero son cuatro pestañas —Resumen,
- * Ganancias, Validadores, Nodo— con la esfera de fondo en todas.
+ * las estrenó. Desde el 25-ago-2026 el tablero son cinco pestañas —Resumen,
+ * Ganancias, Validadores, Nodo y Esfera—, y la esfera ya no va de fondo en
+ * todas: tiene la suya y ahí ocupa la pantalla.
  *
  * Los principios, y el porqué:
  *
@@ -42,11 +43,16 @@
  *    y late más rápido. La regla que sobrevive es esa: en un panel de
  *    vigilancia, el estado no puede depender de que alguien vaya a buscarlo.
  *
- * 2. `tabular-nums` EN LAS CIFRAS GRANDES. La guía lo marca como antipatrón
- *    —iguala el ancho de los dígitos y un «121» queda suelto a tamaño
- *    grande—. No aplica: la tipografía es monoespaciada, así que los dígitos
- *    ya miden lo mismo y la propiedad no cambia nada. Y en un panel que se
- *    refresca solo, que los números no bailen al actualizarse se agradece.
+ * 2. `tabular-nums` EN LAS CIFRAS GRANDES. ⚠ ESTA NOTA CAMBIÓ EL 25-AGO-2026.
+ *
+ *    Decía que la propiedad daba igual «porque la tipografía es monoespaciada».
+ *    Con el cambio a Inter y Space Grotesk eso dejó de ser cierto: ahora los
+ *    dígitos tienen anchos distintos y la propiedad SÍ hace algo.
+ *
+ *    Se mantiene, y ahora por un motivo de verdad: este panel se repinta solo
+ *    cada 18 segundos, y sin anchos fijos un contador que pasa de 9 a 10 empuja
+ *    todo lo que tiene a la derecha. La guía la desaconseja para una cifra
+ *    quieta; esta no lo está.
  *
  * 3. TRES COLORES, CON VERDE. ⚠ ESTA DECISIÓN CAMBIÓ EL 19-AGO-2026.
  *
@@ -72,6 +78,37 @@
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
+/* ─────────────────────────────────────────────── tipografía, alojada aquí
+
+   Las dos familias van EN EL REPOSITORIO y no en Google Fonts, al revés que la
+   portada. Tres razones, por orden de peso:
+
+     1. Este panel es privado y va detrás de un PIN. Que su tipografía dependa
+        de un tercero es un acoplamiento que no compra nada: si ese tercero
+        falla o tarda, el panel se lee con la letra del sistema.
+     2. Se puede comprobar. Desde la máquina de desarrollo, Chromium no llega a
+        fonts.gstatic.com ni a través del proxy, así que con el enlace externo
+        las capturas salían con la tipografía de respaldo — y entonces lo que se
+        estaría revisando no es lo que se ve en producción.
+     3. Son 69 KB los dos, una sola vez, y con `swap` no bloquean el pintado.
+
+   Son ficheros VARIABLES: los seis que sirve Google —tres pesos por familia—
+   resultaron ser dos, byte a byte idénticos entre pesos. De ahí el rango
+   `font-weight: 100 900` en vez de una cara por peso.
+
+   Subconjunto latin. Si algún día hay que escribir en cirílico o griego, hay
+   que traerse los otros subconjuntos. */
+@font-face {
+  font-family: 'Inter';
+  src: url('/val/v2/fuentes/Inter-var.woff2') format('woff2');
+  font-weight: 100 900; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/val/v2/fuentes/SpaceGrotesk-var.woff2') format('woff2');
+  font-weight: 300 700; font-style: normal; font-display: swap;
+}
+
 :root {
   --negro:      #000;
   --cian:       #2ad4f0;   /* 11,77:1 sobre negro */
@@ -90,7 +127,22 @@
   --borde:      rgba(42, 212, 240, .14);
   --borde-vivo: rgba(42, 212, 240, .28);
 
-  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* ─────────────────────────────────────────────────────── tipografía
+     Las MISMAS dos familias que la portada pública, y en los mismos papeles:
+     Inter para leer, Space Grotesk para las cifras. Antes esto era JetBrains
+     Mono en todo, y el panel parecía de otro autor que el resto del sitio —
+     y además de otra época: una terminal.
+
+     Inter en el texto se lee bastante mejor a tamaño pequeño; Space Grotesk en
+     los números les da el peso de titular que necesitan sin gritar.
+
+     `--tecnico` es una monoespaciada de verdad, y se reserva para lo que SÍ es
+     técnico: direcciones 0x y claves públicas, donde alinear los caracteres
+     ayuda a compararlos de un vistazo. Mismo criterio que `--tech` en la
+     portada. */
+  --texto:   'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cifra:   'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --tecnico: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Relleno de las tarjetas de vidrio. Ver el comentario de `.panel`. */
   --vidrio: rgba(6, 14, 20, .78);
@@ -175,16 +227,28 @@
 }
 .p-cab h2 {
   margin: 0;
-  font: 400 11px/1 var(--mono);
-  letter-spacing: .18em; text-transform: uppercase;
-  color: var(--apagado);
+  font: 600 13px/1.2 var(--texto);
+  letter-spacing: .08em; text-transform: uppercase;
+  color: var(--cian-suave);
 }
 .p-marca {
-  font: 400 10.5px/1 var(--mono);
-  letter-spacing: .12em; text-transform: uppercase;
+  font: 600 12px/1.2 var(--texto);
+  letter-spacing: .06em; text-transform: uppercase;
   color: var(--cian); opacity: .8;
 }
 .p-marca.alerta { color: var(--naranja); opacity: 1; }
+
+
+/* ─────────────────────────────────────────── sobre las versalitas
+   Quedan SOLO en dos sitios: el título de cada panel (`.p-cab h2`) y su marca
+   de estado (`.p-marca`). Ahí funcionan: son el rótulo de una sección, se leen
+   una vez y luego se ignoran.
+
+   Se han quitado de todas las ETIQUETAS DE DATO —«hora», «día», «rendimiento»,
+   «validadores»— donde eran cinco o seis palabras seguidas en mayúsculas con
+   tracking ancho, que es exactamente lo que hacía falta descifrar en vez de
+   leer. En caja normal se leen de un vistazo, que es el criterio de este
+   bloque. */
 
 /* ─────────────────────────────────────────────── cifras */
 
@@ -193,16 +257,16 @@
 .cifra { display: flex; flex-direction: column; gap: 5px; }
 
 .c-num {
-  font: 400 38px/1 var(--mono);
+  font: 600 40px/1.05 var(--cifra);
   color: var(--cian);
-  letter-spacing: -.01em;
+  letter-spacing: -.02em;
   font-variant-numeric: tabular-nums;   /* que no bailen al actualizarse */
   word-break: break-word;
 }
 .c-num .u,                              /* unidad: PLS, $ */
 .c-num .de {                            /* «/10» de «10 de 10» */
-  font-size: .45em; color: var(--apagado); letter-spacing: .06em;
-  margin-left: .28em;
+  font-size: .42em; color: var(--apagado); letter-spacing: .04em;
+  margin-left: .26em; font-weight: 500;
 }
 /* El «%» no es una unidad que acompañe: forma parte del número. A .45em
    parecía un superíndice y hacía dudar de si el 99,90 era el dato o no. */
@@ -212,13 +276,15 @@
 .c-num.alerta { color: var(--naranja); }
 
 .c-eti {
-  font: 400 10.5px/1.4 var(--mono);
-  letter-spacing: .16em; text-transform: uppercase;
+  font: 500 12px/1.4 var(--texto);
+  letter-spacing: .01em; 
   color: var(--apagado);
 }
 .c-sub {
-  font: 400 11.5px/1.45 var(--mono);
-  color: var(--cian-suave); opacity: .72;
+  /* Sin `opacity`. Apagar un texto que ya es recesivo por color lo bajaba a
+     4,1:1 y era el sitio donde vive casi toda la explicación del panel. */
+  font: 400 13px/1.5 var(--texto);
+  color: var(--cian-suave);
 }
 .c-sub.alerta { color: var(--naranja); opacity: 1; }
 
@@ -248,13 +314,13 @@
    no volverla translúcida — la opacidad compone contra el fondo y hunde el
    contraste real sin que se vea venir en la hoja de estilos. */
 .p-fondo dt {
-  font: 400 10px/1 var(--mono);
-  letter-spacing: .14em; text-transform: uppercase;
+  font: 400 12px/1 var(--texto);
+  letter-spacing: .01em; 
   color: var(--apagado);
 }
 .p-fondo dd {
   margin: 0;
-  font: 400 13px/1.2 var(--mono);
+  font: 400 13px/1.2 var(--texto);
   color: var(--cian-suave);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -264,7 +330,7 @@
 /* Aviso dentro del panel. Va debajo de la cabecera y ocupa el ancho entero:
    si hay algo que decir, se dice donde se lee, no en una esquina. */
 .p-aviso {
-  font: 400 11.5px/1.45 var(--mono);
+  font: 400 12px/1.45 var(--texto);
   color: var(--naranja);
   border: 1px solid rgba(255, 138, 61, .3);
   border-radius: 7px;
@@ -272,7 +338,7 @@
 }
 
 .vacio {
-  font: 400 11.5px/1.45 var(--mono);
+  font: 400 12px/1.45 var(--texto);
   color: var(--apagado);
 }
 
@@ -294,17 +360,17 @@
 .rfila:nth-child(odd) { background: rgba(42, 212, 240, .045); }
 
 .r-per {
-  font: 400 10px/1.2 var(--mono);
-  letter-spacing: .14em; text-transform: uppercase;
+  font: 400 12px/1.2 var(--texto);
+  letter-spacing: .01em; 
   color: var(--apagado);
 }
-.r-pls {
-  font: 400 15px/1.2 var(--mono);
+.r-pls { font-family: var(--cifra); font-weight: 600;
+  font: 400 15px/1.2 var(--texto);
   color: var(--cian); text-align: right;
 }
 .r-pls .u { font-size: .58em; color: var(--apagado); margin-left: .3em; }
 .r-usd {
-  font: 400 12px/1.2 var(--mono);
+  font: 400 12px/1.2 var(--texto);
   color: var(--cian-suave); text-align: right; min-width: 5.2em;
 }
 
@@ -318,15 +384,15 @@
 .e-cab {
   display: grid; grid-template-columns: auto 1fr auto;
   align-items: baseline; gap: 0 8px;
-  font: 400 12px/1.25 var(--mono); font-variant-numeric: tabular-nums;
+  font: 400 12px/1.25 var(--texto); font-variant-numeric: tabular-nums;
 }
-.e-fecha { color: var(--apagado); font-size: 11px; }
+.e-fecha { color: var(--apagado); font-size: 12px; }
 .e-tipo  { color: var(--cian-suave); }
 .e-pls   { color: var(--cian); text-align: right; }
 .e-pls .u { font-size: .6em; color: var(--apagado); margin-left: .3em; }
 .e-sub {
   margin-top: 3px;
-  font: 400 10.5px/1.3 var(--mono);
+  font: 400 12px/1.3 var(--texto);
   color: var(--naranja);
   letter-spacing: .04em;
 }
@@ -358,8 +424,8 @@
 .s-pie {
   display: flex; justify-content: space-between; gap: 8px;
   margin-top: 7px;
-  font: 400 10px/1 var(--mono);
-  letter-spacing: .12em; text-transform: uppercase;
+  font: 400 12px/1 var(--texto);
+  letter-spacing: .01em; 
   color: var(--apagado);
 }
 .s-pie > span:nth-child(2) {
@@ -372,11 +438,11 @@
 .a-barra > i { display: block; height: 100%; background: var(--cian); border-radius: 2px; }
 .a-pie {
   display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
-  font: 400 11px/1.3 var(--mono); color: var(--cian-suave); opacity: .8;
+  font: 400 12px/1.3 var(--texto); color: var(--cian-suave); opacity: .8;
 }
 .a-pie b { font-weight: 400; color: var(--cian); }
 .a-pie b.tarde { color: var(--naranja); }
-.a-pie > span { color: var(--apagado); opacity: 1; font-size: 10px; letter-spacing: .1em; }
+.a-pie > span { color: var(--apagado); opacity: 1; font-size: 12px; letter-spacing: .1em; }
 
 /* ─────────────────────────────────────────────── lista de validadores */
 
@@ -397,7 +463,7 @@
   padding: 7px 8px;
   border-radius: 5px;
   text-decoration: none;
-  font: 400 12px/1.25 var(--mono);
+  font: 400 12px/1.25 var(--texto);
   font-variant-numeric: tabular-nums;
   background: linear-gradient(to right,
     rgba(42, 212, 240, .13) 0, rgba(42, 212, 240, .13) var(--barra),
@@ -424,14 +490,14 @@
 .vfila > span { position: relative; z-index: 1; }
 
 .v-id   { color: var(--cian-suave); }
-.v-marca{ color: var(--naranja); font-size: 11px; }
+.v-marca{ color: var(--naranja); font-size: 12px; }
 .v-gan  { color: var(--cian); text-align: right; }
-.v-bal  { color: var(--apagado); font-size: 11px; }
+.v-bal  { color: var(--apagado); font-size: 12px; }
 /* La nota ocupa la fila entera debajo: es texto, no una columna más. */
 .v-nota {
   grid-column: 1 / -1;
-  color: var(--naranja); font-size: 10px;
-  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--naranja); font-size: 12px;
+  letter-spacing: .01em; 
   margin-top: 3px;
 }
 
@@ -488,12 +554,21 @@
 .pestanas::-webkit-scrollbar { display: none; }
 
 .pestanas button {
-  flex: 1 1 auto;
-  font: 400 11.5px/1 var(--mono);
-  letter-spacing: .14em; text-transform: uppercase;
+  /* ⚠ `flex: 1 1 auto` con `text-transform:uppercase` y `.14em` de tracking:
+     con cuatro pestañas cabía justo y con la quinta —Esfera— la última se
+     quedaba cortada fuera de la barra a 390px. La barra ya se desplaza en
+     horizontal, pero una pestaña a la que hay que arrastrar para llegar es una
+     pestaña que no existe.
+
+     Se arregla donde estaba el gasto: fuera las versalitas y el tracking ancho.
+     En caja normal las cinco caben en 390 sin desplazar nada, y de paso se leen
+     mejor — que es de lo que va todo este bloque. */
+  flex: 0 1 auto;
+  font: 500 14px/1 var(--texto);
+  letter-spacing: 0;
   color: var(--apagado);
   background: none; border: 0; border-radius: 10px;
-  padding: 12px 14px;
+  padding: 11px 13px;
   min-height: 42px;            /* objetivo táctil */
   cursor: pointer;
   white-space: nowrap;
@@ -530,7 +605,7 @@
 
 .pulso {
   display: flex; align-items: center; gap: 10px;
-  font: 400 11.5px/1 var(--mono);
+  font: 400 12px/1 var(--texto);
   color: var(--apagado);
 }
 .pulso .luz {
@@ -540,7 +615,7 @@
   animation: latido 3s ease-out infinite;
   flex: none;
 }
-.pulso .resto { color: var(--verde); font-variant-numeric: tabular-nums; }
+.pulso .resto { font-family: var(--cifra); font-weight: 600; color: var(--verde); font-variant-numeric: tabular-nums; }
 
 @keyframes latido {
   0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, .5); }
@@ -569,8 +644,8 @@
 /* La cifra que se mira veinte veces al día. Escala con el ancho para llenar
    la tarjeta sin desbordarla en 390px. */
 .portada { display: flex; flex-direction: column; gap: 8px; }
-.portada .p-num {
-  font: 400 clamp(38px, 11vw, 62px)/1 var(--mono);
+.portada .p-num { font-family: var(--cifra);
+  font: 400 clamp(38px, 11vw, 62px)/1 var(--texto);
   color: var(--cian);
   /* Halo tenue: la cifra parece emitir luz en vez de estar impresa, que es lo
      que la emparenta con la esfera de detrás. No toca el contraste — el halo
@@ -591,8 +666,8 @@
   font-size: .34em; color: var(--apagado); margin-left: .3em; letter-spacing: .06em;
 }
 .portada .p-pie {
-  font: 400 11px/1.4 var(--mono);
-  letter-spacing: .14em; text-transform: uppercase;
+  font: 400 12px/1.4 var(--texto);
+  letter-spacing: .01em; 
   color: var(--apagado);
 }
 
@@ -609,7 +684,7 @@
 /* La etiqueta del pulso hereda el color del contenedor (`.pulso` o
    `.pulso.tarde`), que es lo que hace que la línea entera cambie de una vez
    en vez de quedarse a medio pintar. */
-.pulso .p-eti { letter-spacing: .1em; text-transform: uppercase; font-size: 10.5px; }
+.pulso .p-eti { letter-spacing: .1em;  font-size: 12px; }
 .pulso .resto { font-weight: 400; }
 
 /* ─────────────────────────────────────────────── precio: histórico
@@ -647,7 +722,7 @@
 .pg-pie {
   display: flex; justify-content: space-between; gap: 10px;
   margin-top: 7px;
-  font: 400 10.5px/1.3 var(--mono);
+  font: 400 12px/1.3 var(--texto);
   color: var(--apagado);
 }
 /* El porcentaje va en el color de la línea para que se lean como el mismo
@@ -676,7 +751,7 @@
    que es y «VALID.» no. A 10,5px con 0,06em caben los cuatro con holgura. */
 @media (max-width: 460px) {
   .pestanas button {
-    font-size: 10.5px;
+    font-size: 12px;
     letter-spacing: .06em;
     padding: 12px 7px;
   }
