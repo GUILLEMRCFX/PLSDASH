@@ -299,6 +299,27 @@ def guardar_eventos(cfg, eventos):
             log(f"Evento FALLÓ: {ev[2]}")
 
 
+def guardar_validadores_dia(cfg, datos, fecha):
+    """Detalle por validador del dia → `validador_diario`.
+
+    ⚠ NO BORRAR SIN MIRAR QUIEN LO LEE. Esta tabla se dio por muerta en la
+      auditoria del 23-ago y no lo estaba: la lee `/api/val/validadores`, y ese
+      endpoint lo pide el panel v1 con `api('/validadores')` — el literal
+      «api/val/validadores» no aparece en ninguna parte del codigo porque la URL
+      se compone al vuelo, asi que un grep del literal no lo encuentra.
+
+      De aqui sale la linea «tu media: X %» bajo la casilla de Efectividad. Si
+      se deja de escribir, esa media se congela en el ultimo dia guardado y se
+      vuelve mas falsa cada dia que pasa.
+    """
+    v = datos.get("validadores") or {}
+    for x in v.get("detalle", []):
+        sql = ("INSERT OR REPLACE INTO validador_diario "
+               "(fecha, indice, balance, ganado, estado) VALUES (?,?,?,?,?)")
+        d1_query(cfg, sql, [fecha, x["indice"], x["balance"], x["ganado"], x["estado"]])
+    log(f"Detalle por validador guardado ({fecha})")
+
+
 def cerrar_dia(cfg, datos, fecha):
     """Cierra el día anterior calculando lo ganado en esa jornada."""
     v = datos.get("validadores") or {}
@@ -384,10 +405,7 @@ def main():
     if previo.get("ultimo_dia") != hoy:
         if previo.get("ultimo_dia"):
             cerrar_dia(cfg, datos, previo["ultimo_dia"])
-        # `guardar_validadores_dia()` escribia `validador_diario`, una tabla de
-        # 165 filas que solo leia `/api/val/validadores`, un endpoint que no
-        # llamaba nadie. Los dos se han retirado; el detalle por validador ya
-        # esta en el estado de KV, que es lo que pintan los paneles.
+        guardar_validadores_dia(cfg, datos, hoy)
         nuevo_dia = hoy
     else:
         log("Cierre diario ya hecho hoy")
