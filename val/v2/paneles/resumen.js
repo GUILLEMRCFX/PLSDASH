@@ -43,6 +43,7 @@ import { gananciaAcumulada, aprValidadorHora } from '/val/compartido/ganancias.j
 import { ACTIVACION_TS, saludGlobal } from '../datos.js';
 import { fmt, fmtPrecio, escapar } from './formato.js';
 import { tablaRitmo } from './ritmo.js';
+import { desglosarSaldo } from './aportaciones.js';
 import { htmlPulso, estadoPulso } from './pulso.js';
 
 export const TITULO = 'Resumen';
@@ -117,6 +118,35 @@ export function panelResumen(datos) {
 
   const ritmo = tablaRitmo(datos);
 
+  /* ── El saldo de la wallet, junto al titular ────────────────────────────
+     Lo GANADO responde «¿cuánto llevo validando?». El SALDO responde «¿cuánto
+     hay?», que desde que se aporta de tu bolsillo es otra pregunta.
+
+     ⚠ El desglose NO cuadra por construcción: `ganado` es todo lo barrido
+       desde siempre, no lo que queda de ello. Lo que sobra o falta se enseña
+       aparte en vez de repartirlo entre los otros dos. Ver la nota de
+       `desglosarSaldo()`. */
+  const d = desglosarSaldo(datos);
+  const saldoUsd = d && hayPrecio ? d.saldo * precio.precio : null;
+  const saldoHtml = !d ? '' : `
+      <button type="button" class="saldo" data-saldo
+        aria-label="Saldo de la wallet: ${fmt(d.saldo)} PLS. Pulsa para cambiar de unidad.">
+        <span class="s-eti">En la wallet</span>
+        <span class="s-num">${
+          unidad === 'usd' && saldoUsd != null
+            ? `${fmt(saldoUsd, 2)}<span class="u">USD</span>`
+            : `${fmt(d.saldo)}<span class="u">PLS</span>`
+        }</span>
+        <span class="s-desglose">${
+          d.hayRegistro
+            ? `${fmt(d.ganado)} ganados · ${fmt(d.aportado)} aportados${
+                d.restoVisible
+                  ? ` · ${fmt(Math.abs(d.resto))} ${d.resto < 0 ? 'salidos' : 'sin identificar'}`
+                  : ''}`
+            : 'todo de validar · aún no has apuntado ninguna aportación'
+        }</span>
+      </button>`;
+
   // ── la portada ────────────────────────────────────────────────────────────
   // Sin precio no hay dólares que enseñar, así que el conmutador desaparece y
   // la cifra vuelve a ser un número. Un botón que no conmuta nada es peor que
@@ -184,6 +214,8 @@ export function panelResumen(datos) {
         <span class="p-pie">${escapar(pie)}</span>
       </div>
 
+      ${saldoHtml}
+
       ${ritmo
         ? ritmo.html
         : '<p class="vacio">Sin ritmo medible todavía.</p>'}
@@ -213,13 +245,15 @@ export function panelResumen(datos) {
  *   la red por tocar un botón.
  */
 export function engancharResumen(raiz, repintar) {
-  const b = raiz.querySelector('.p-num[data-unidad]');
-  if (!b) return;
-  b.addEventListener('click', () => {
+  // El titular y el saldo comparten unidad: son la misma pregunta en dos
+  // recortes, y verlos en unidades distintas a la vez no ayuda a nadie.
+  const cambiar = () => {
     unidad = unidad === 'pls' ? 'usd' : 'pls';
     guardarUnidad(unidad);
     repintar();
-  });
+  };
+  raiz.querySelector('.p-num[data-unidad]')?.addEventListener('click', cambiar);
+  raiz.querySelector('[data-saldo]')?.addEventListener('click', cambiar);
 }
 
 /**

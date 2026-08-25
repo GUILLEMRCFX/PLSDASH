@@ -439,8 +439,17 @@
 
 /* Avance del ciclo actual. */
 .avance { display: flex; flex-direction: column; gap: 7px; }
-.a-barra { height: 3px; background: rgba(42, 212, 240, .16); border-radius: 2px; }
-.a-barra > i { display: block; height: 100%; background: var(--cian); border-radius: 2px; }
+/* La barra del avance va PARTIDA cuando hay aportaciones: cian lo generado
+   validando, naranja lo que has puesto tú. El naranja aquí no es una alerta —es
+   el otro origen del mismo saldo— y por eso el pie lo dice con palabras: quien
+   no distinga los tonos lee «X generados · Y aportados» igual. */
+.a-barra {
+  height: 5px; background: rgba(42, 212, 240, .16); border-radius: 3px;
+  display: flex; overflow: hidden;
+}
+.a-barra > i { display: block; height: 100%; }
+.a-ganado   { background: var(--cian); }
+.a-aportado { background: var(--naranja); }
 .a-pie {
   display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
   font: 400 12px/1.3 var(--texto); color: var(--cian-suave); opacity: .8;
@@ -848,4 +857,77 @@
   .panel.resumen .rfila { padding: 10px 12px; }
   .panel.resumen .r-pls { font-size: 17px; }
   .panel.resumen .r-usd { font-size: 13px; }
+}
+
+/* ─────────────────────────────────────────── saldo de la wallet y aportaciones */
+
+/* El saldo, bajo el titular. Es un botón porque conmuta de unidad, no porque
+   navegue: mismo gesto que la cifra grande de arriba y misma unidad. */
+.saldo {
+  display: flex; flex-direction: column; gap: 3px;
+  width: 100%; text-align: left;
+  background: none; border: 0; border-radius: 10px;
+  padding: 10px 0 2px; margin-top: 2px;
+  border-top: 1px solid var(--borde);
+  color: inherit; font-family: var(--texto); cursor: pointer;
+}
+.s-eti { font: 500 12px/1.4 var(--texto); color: var(--apagado); letter-spacing: .01em; }
+.s-num {
+  font: 600 26px/1.1 var(--cifra); color: var(--cian-suave);
+  font-variant-numeric: tabular-nums;
+}
+.s-num .u { font-size: max(11px, .42em); color: var(--apagado); margin-left: .26em; font-weight: 500; }
+.s-desglose { font: 400 12.5px/1.45 var(--texto); color: var(--apagado); }
+
+/* El formulario. Tres campos en una fila cuando cabe y apilados cuando no: a
+   390px, «Fecha» y «PLS» uno al lado del otro dejaban el botón sin sitio. */
+.ap-form {
+  display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px;
+  align-items: end; margin-bottom: 10px;
+}
+.ap-campo { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.ap-campo > span { font: 500 12px/1.3 var(--texto); color: var(--apagado); }
+.ap-campo input {
+  width: 100%; min-width: 0;
+  background: rgba(0, 0, 0, .35); border: 1px solid var(--borde);
+  border-radius: 9px; padding: 10px 11px;
+  color: var(--cian-suave); font: 500 14px/1.2 var(--texto);
+  font-variant-numeric: tabular-nums;
+}
+.ap-campo input:focus { outline: none; border-color: var(--borde-vivo); }
+.ap-guardar {
+  background: rgba(42, 212, 240, .14); border: 1px solid var(--borde-vivo);
+  border-radius: 9px; padding: 11px 15px; min-height: 42px;
+  color: var(--cian); font: 600 13.5px/1 var(--texto); cursor: pointer;
+}
+.ap-guardar:disabled { opacity: .5; cursor: default; }
+.ap-aviso { margin: 0 0 10px; font: 400 12.5px/1.45 var(--texto); color: var(--apagado); min-height: 1.45em; }
+.ap-aviso.mal { color: var(--naranja); }
+
+.ap-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.ap-fila {
+  display: grid; grid-template-columns: auto 1fr auto auto;
+  align-items: baseline; gap: 10px;
+  padding: 9px 2px; border-top: 1px solid var(--borde);
+  font: 400 13px/1.4 var(--texto);
+}
+.ap-cuando { color: var(--apagado); white-space: nowrap; }
+.ap-pls { font: 600 14px/1.3 var(--cifra); color: var(--cian); font-variant-numeric: tabular-nums; }
+.ap-pls .u { font-size: max(11px, .72em); color: var(--apagado); margin-left: .3em; font-weight: 500; }
+.ap-usd { color: var(--cian-suave); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ap-precio { color: var(--apagado); font-size: 12px; }
+.ap-x {
+  background: none; border: 0; color: var(--apagado);
+  font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px;
+  min-width: 28px; min-height: 28px;      /* objetivo táctil */
+}
+.ap-x:hover { color: var(--naranja); }
+
+@media (max-width: 460px) {
+  .ap-form { grid-template-columns: 1fr 1fr; }
+  .ap-guardar { grid-column: 1 / -1; }
+  /* La columna de dólares se va a su propia línea antes que encogerse hasta
+     partir «0,000014 $» por la mitad. */
+  .ap-fila { grid-template-columns: auto 1fr auto; }
+  .ap-usd { grid-column: 2 / -1; text-align: left; }
 }
