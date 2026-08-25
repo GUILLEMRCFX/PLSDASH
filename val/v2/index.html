@@ -11,6 +11,13 @@
 <title>PLSDASH · núcleo</title>
 <link rel="icon" href="/favicon.ico">
 <link rel="stylesheet" href="/val/v2/paneles/estilo.css">
+<!-- El tema se pone ANTES de pintar: si esperara a los paneles, el panel
+     arrancaría en el tema de omisión y saltaría al elegido a los pocos
+     cientos de milisegundos. Un parpadeo de color en cada carga. -->
+<script type="module">
+  import { aplicarGuardado } from '/val/v2/paneles/tema.js';
+  aplicarGuardado();
+</script>
 <style>
   *{box-sizing:border-box}
   html{height:100%}
@@ -18,7 +25,7 @@
     /* Negro puro. Cualquier degradado de fondo, por tenue que sea, levanta el
        nivel de negro entre las celdas y con él se va el contraste — que es
        donde de verdad se juega la sensación de nitidez. */
-    margin:0;min-height:100%;background:var(--negro);color:var(--cian-suave);
+    margin:0;min-height:100%;background:var(--fondo);color:var(--dato-suave);
     font-family:var(--texto);
     -webkit-text-size-adjust:100%;
   }
@@ -74,7 +81,7 @@
     white-space:nowrap;
     padding:6px 10px;
     border-radius:8px;
-    background:rgba(6,14,20,.9);
+    background:var(--vidrio-denso);
     border:1px solid var(--borde-vivo);
     backdrop-filter:blur(6px);
     -webkit-backdrop-filter:blur(6px);
@@ -82,9 +89,9 @@
     transform-origin:0 0;
   }
   #rotulo[hidden]{display:none}
-  #rotulo .r-id{color:var(--cian);letter-spacing:.02em;font-weight:600}
+  #rotulo .r-id{color:var(--dato);letter-spacing:.02em;font-weight:600}
   #rotulo .r-blq{color:var(--apagado);font-size:11px}
-  #rotulo.inactivo .r-id{color:var(--naranja)}
+  #rotulo.inactivo .r-id{color:var(--acento)}
 
   /* Pie de la pestaña de la esfera: qué codifica lo que se está viendo. Sin
      esto, un punto más gordo que otro es decoración. */
@@ -93,7 +100,7 @@
     display:flex;flex-wrap:wrap;gap:6px 18px;
     font:400 12px/1.5 var(--texto);color:var(--apagado);
   }
-  .esfera-pie b{color:var(--cian-suave);font-weight:600}
+  .esfera-pie b{color:var(--dato-suave);font-weight:600}
 
   #contenido{min-width:0}
 
@@ -185,6 +192,7 @@
   import { panelEstadoGlobal } from './paneles/estado-global.js';
   import { panelRegistro } from './paneles/registro.js';
   import { latir } from './paneles/pulso.js';
+  import { panelTema, engancharTema } from './paneles/tema.js';
 
   const q = new URLSearchParams(location.search);
   // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
@@ -242,7 +250,7 @@
     { id: 'resumen',     paneles: [panelResumen] },
     { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelTrayectoria, panelAportaciones, panelPrecio] },
     { id: 'validadores', paneles: [panelValidadores] },
-    { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
+    { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro, panelTema] },
     // `estatica`: su HTML lo escribió el documento y no se regenera nunca. Ver
     // el aviso junto a `#v-esfera` en el marcado.
     { id: 'esfera',      paneles: [], estatica: true },
@@ -362,6 +370,7 @@
     // Tras apuntar o borrar hay que volver a PEDIR: el histórico vive en D1,
     // no en `ultimos`. Por eso `refrescar` y no `pintar`.
     engancharAportaciones(document, () => refrescar());
+    engancharTema(document, () => pintar(ultimos));
     window.__datos = datos;
     // Ganchos de diagnóstico, como `__esfera`: desde la consola se puede forzar
     // un repintado sin esperar 18 segundos, y la prueba del bloque 2 lo usa para
