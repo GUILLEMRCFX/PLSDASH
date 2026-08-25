@@ -24,13 +24,34 @@ wrangler d1 execute validator-dashboard --remote --file=migraciones/001-limpieza
 O pégalo en la consola de D1 del panel de Cloudflare. El fichero lleva escrito
 qué borra cada línea y por qué.
 
-**Después, comprueba que sigue habiendo datos:**
+**⚠ Asegúrate de estar ejecutando la versión de `main` posterior al PR #37.**
+Una copia anterior de este mismo fichero llevaba un `DROP TABLE
+validador_diario` que no debe ejecutarse: esa tabla alimenta la línea «tu
+media» del v1 y son 165 filas irrecuperables. Compruébalo antes:
+
+```bash
+# Con el ancla `^`: el fichero MENCIONA «DROP TABLE» en un comentario que
+# explica por qué esa tabla no se borra, y sin el ancla saldría un 1 que
+# asusta sin motivo. Lo que importa es que no haya ninguna SENTENCIA.
+grep -c "^DROP TABLE" migraciones/001-limpieza.sql   # tiene que dar 0
+```
+
+**Antes de migrar**, apunta lo que hay:
 
 ```sql
-SELECT COUNT(*) FROM snapshots;   -- 355 o más
-SELECT COUNT(*) FROM barridos;    -- 484 o más
-SELECT COUNT(*) FROM daily;       -- 15 o más
+SELECT (SELECT COUNT(*) FROM snapshots)        AS snapshots,
+       (SELECT COUNT(*) FROM barridos)         AS barridos,
+       (SELECT COUNT(*) FROM daily)            AS daily,
+       (SELECT COUNT(*) FROM validador_diario) AS validador_diario,
+       (SELECT COUNT(*) FROM eventos)          AS eventos;
 ```
+
+**Después, las mismas cinco cifras tienen que salir iguales.** Un `ALTER TABLE
+DROP COLUMN` no borra filas: si alguna baja, algo se ejecutó de más.
+
+La quinta es la importante: **`validador_diario` tiene que seguir ahí**. Si esa
+consulta da «no such table», se ha ejecutado una copia vieja del fichero y esas
+filas ya no se recuperan.
 
 ---
 
