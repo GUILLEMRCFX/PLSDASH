@@ -137,20 +137,31 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   uniformes.uRespiracion.value = reducido ? 0 : 1;
   const uFrescura = { value: 1 };
   const uEnergia  = { value: 0.5 };
+  /* La onda del destello. `uDestDir` es la dirección del nodo que propuso el
+     bloque —o sea, DÓNDE pasó— y `uDestT` los segundos desde entonces. La malla
+     los usa para encender un anillo que sale de ahí y recorre la esfera. */
+  const uDestDir = { value: new THREE.Vector3(0, 1, 0) };
+  const uDestTM  = { value: -1 };
   const materialesLinea = [];
 
   // ─────────────────────────────────────────────── materiales
   function materialCascara() {
     return new THREE.ShaderMaterial({
-      uniforms: { ...uniformes, uFrescura, uEnergia, uColor: { value: CIAN_OSC.clone() } },
+      uniforms: { ...uniformes, uFrescura, uEnergia, uDestDir, uDestT: uDestTM,
+                  uColor: { value: CIAN_OSC.clone() } },
       vertexShader: /* glsl */`
         #include <common>
         ${UNIFORMS_DEFORMACION}
         ${FUNCION_DEFORMACION}
         attribute float aTono;
-        varying float vTono; varying float vBorde;
+        uniform vec3 uDestDir;
+        varying float vTono; varying float vBorde; varying float vAng;
         void main(){
           vTono = aTono;
+          // Distancia ANGULAR al punto donde cayó el bloque, de 0 a 1. Sobre
+          // una esfera es la distancia de verdad: la onda recorre la superficie
+          // igual en todas direcciones en vez de deformarse con la proyección.
+          vAng = acos(clamp(dot(normalize(position), normalize(uDestDir)), -1.0, 1.0)) / 3.14159265;
           vec3 p = deformar(position);
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           vec3 nVista = normalize(normalMatrix * normalize(p));
@@ -159,14 +170,27 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         }`,
       fragmentShader: /* glsl */`
         uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
-        varying float vTono; varying float vBorde;
+        uniform float uDestT;
+        varying float vTono; varying float vBorde; varying float vAng;
         void main(){
           float borde = pow(vBorde, 3.0);
           float matiz = 0.55 + vTono * 0.45;
+
+          /* La onda: un anillo estrecho que sale del nodo y llega al otro polo
+             en 1,6 s, apagándose por el camino. Codifica dos cosas —DÓNDE cayó
+             el bloque y CUÁNDO— y no se repite: pasa una vez por bloque.
+             Se suma al brillo; no cambia la geometría. */
+          float onda = 0.0;
+          if (uDestT >= 0.0) {
+            float frente = uDestT / 1.6;
+            onda = smoothstep(0.09, 0.0, abs(vAng - frente))
+                 * exp(-uDestT * 1.5) * (1.0 - smoothstep(0.85, 1.05, frente));
+          }
           // Muy tenue: la cáscara insinúa volumen y enciende la silueta. Si
           // aporta de más, el negro entre celdas deja de ser negro y toda la
           // nitidez se va con él.
           vec3 col = uColor * matiz * (0.004 + borde * 0.20) * (0.5 + uEnergia * 0.7);
+          col += uColor * onda * 0.75;
           col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
           gl_FragColor = vec4(col, 1.0);
         }`,
@@ -411,7 +435,11 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   const matNodo = new THREE.ShaderMaterial({
     uniforms: { ...uniformes, uFrescura, uEnergia,
       uTam: { value: cfg.halo }, uColor: { value: NARANJA.clone() },
-      uSenalado: { value: -1 } },
+      uSenalado: { value: -1 },
+      /* Destello de bloque. `uDestIdx` es el índice del validador que acaba de
+         proponer uno; `uDestT`, los segundos transcurridos desde entonces, o
+         -1 cuando no hay ninguno vivo. Ver `destello()` más abajo. */
+      uDestIdx: { value: -1 }, uDestT: { value: -1 } },
     vertexShader: /* glsl */`
       #include <common>
       ${UNIFORMS_DEFORMACION}
@@ -422,15 +450,21 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       attribute float aIndice;
       uniform float uTam;
       uniform float uSenalado;
+      uniform float uDestIdx; uniform float uDestT;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
+      varying float vDest;
       void main(){
         vP = position.xy; vI = aInt; vAct = aAct;
         vSen = abs(aIndice - uSenalado) < 0.5 ? 1.0 : 0.0;
+        // Envolvente del destello: sube en 120 ms y cae en ~1,4 s. Corta, para
+        // que se lea como un golpe y no como una animación en bucle.
+        float mio = abs(aIndice - uDestIdx) < 0.5 && uDestT >= 0.0 ? 1.0 : 0.0;
+        vDest = mio * smoothstep(0.0, 0.12, uDestT) * exp(-uDestT * 2.1);
         // El quad crece con la intensidad para que quepa el halo. El núcleo se
         // compensa en el fragmento para no crecer con él.
         float s = TAM_MIN + aInt * TAM_RANGO;
         vec4 mv = modelViewMatrix * vec4(deformar(aDir), 1.0);
-        mv.xy += position.xy * s * uTam * (1.0 + vSen * 0.18);
+        mv.xy += position.xy * s * uTam * (1.0 + vSen * 0.18 + vDest * 1.10);
         gl_Position = projectionMatrix * mv;
       }`
       .replace(/TAM_MIN/g, TAM_MIN.toFixed(3))
@@ -438,6 +472,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     fragmentShader: /* glsl */`
       uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
+      varying float vDest;
       void main(){
         float r = length(vP) * 2.0;
 
@@ -457,11 +492,15 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         float i = nucleo * (0.85 + vI * 0.55) + halo * (0.55 + vI * 0.9);
         i *= (0.45 + vAct * 0.55);
         i *= (1.0 + vSen * 0.85);
+        // El destello suma un halo ancho además de subir el brillo: el punto
+        // no solo se pone más fuerte, se HINCHA. Eso es lo que se ve de reojo.
+        i += vDest * (exp(-pow(r / 1.15, 2.0)) * 0.9 + nucleo * 1.6);
         if (i < 0.004) discard;
 
         // El núcleo tira a blanco y el halo se queda naranja: es lo que lo hace
         // leerse como una estrella y no como un borrón de color.
         vec3 c = mix(uColor, vec3(1.0), nucleo * 0.80);
+        c = mix(c, vec3(1.0), clamp(vDest, 0.0, 1.0) * 0.55);   // el golpe va a blanco
         c *= (0.75 + uEnergia * 0.5);
         c = mix(vec3(dot(c, vec3(0.33))), c, uFrescura);
         gl_FragColor = vec4(c * i, i);
@@ -717,6 +756,30 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     if (estado.frescura != null) frescuraObjetivo = Math.max(0, Math.min(1, estado.frescura));
   }
 
+  /**
+   * Un bloque propuesto: el nodo de ese validador da un golpe de luz y una onda
+   * sale de él y recorre la esfera.
+   *
+   * Es el único movimiento de la escena que responde a un HECHO PUNTUAL y no a
+   * una magnitud continua, y por eso se ve: pasa una vez, dura segundo y medio
+   * y no vuelve hasta el siguiente bloque —hoy, uno de cada catorce barridos—.
+   *
+   * @param {number} indiceValidador  el índice REAL del validador, no su
+   *   posición en el array. La traducción se hace aquí porque fuera nadie sabe
+   *   —ni tiene por qué— en qué orden se repartieron los nodos por la esfera.
+   * @returns {boolean} false si ese validador no está en la escena.
+   */
+  function destello(indiceValidador) {
+    const i = metaNodos.findIndex(m => Number(m.indice) === Number(indiceValidador));
+    if (i < 0 || !dirNodos[i]) return false;
+    matNodo.uniforms.uDestIdx.value = i;
+    uDestDir.value.copy(dirNodos[i]);
+    destelloT0 = performance.now();
+    matNodo.uniforms.uDestT.value = 0;
+    uDestTM.value = 0;
+    return true;
+  }
+
   // ─────────────────────────────────────────────── bucle
   const vigilante = new Vigilante(() => {
     // Lo único barato que queda es bajar resolución. La geometría no se toca:
@@ -727,6 +790,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   });
 
   let raf = null, ultimo = performance.now(), visible = true, reloj = 0;
+  let destelloT0 = -1;   // instante del último bloque, en ms de `performance.now()`
   let fps = 0, muestrasFps = 0, acumFps = 0, fotogramas = 0;
 
   function bucle(ahora) {
@@ -754,6 +818,22 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     uEnergia.value  += (energiaObjetivo  - uEnergia.value)  * k * 0.5;
     uFrescura.value += (frescuraObjetivo - uFrescura.value) * k * 0.5;
 
+    /* El destello corre contra el RELOJ, no acumulando `dt`.
+       ⚠ Acumular `dt` parecía equivalente y no lo es: `dt` está acotado a 50 ms
+         por fotograma para que un tirón no dé un salto, así que en una máquina
+         lenta el destello duraba muchísimo más de segundo y medio. Medido: con
+         rasterizado por software, 3,2 s de reloj daban 0,75 s de destello. Un
+         golpe de luz que dura cuatro veces más en el móvil malo que en el bueno
+         no es el mismo dato.
+       A -1 los shaders se lo saltan entero: sin bloque no cuesta nada. */
+    if (destelloT0 >= 0) {
+      const t = (ahora - destelloT0) / 1000;
+      const vivo = t < 2.6;               // más allá, la envolvente ya es cero
+      if (!vivo) destelloT0 = -1;
+      matNodo.uniforms.uDestT.value = vivo ? t : -1;
+      uDestTM.value = vivo ? t : -1;
+    }
+
     renderer.render(escena, camara);
 
     // El rótulo del nodo señalado tiene que seguirlo mientras la esfera gira.
@@ -770,6 +850,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
 
   return {
     actualizar,
+    destello,
     info: () => {
       const m = MALLA;
       return {
@@ -781,6 +862,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         nodos: nNodos, dpr: renderer.getPixelRatio(), zoom: +zoom.toFixed(2),
         ancho, alto, visible, respiracion: uniformes.uRespiracion.value,
         llamadas: renderer.info.render.calls, reducido,
+        destello: matNodo.uniforms.uDestT.value,
         antialias: renderer.getContext().getContextAttributes().antialias,
       };
     },

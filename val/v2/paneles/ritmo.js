@@ -80,6 +80,9 @@ export function tablaRitmo(datos) {
   }).join('');
 
   return {
+    // El ritmo medido, en PLS por día. Lo usa el contador de «Resumen» para
+    // avanzar entre refrescos: ver la nota de `tictac()` en `resumen.js`.
+    plsDia: ritmo.pls_dia,
     html: `<div class="rlista${hayPrecio ? '' : ' sin-usd'}">${filas}</div>`,
     // Corta a propósito: en «Resumen» esta línea tiene que caber en una sola a
     // 390px, y cada línea de más empuja el panel fuera de la primera pantalla.

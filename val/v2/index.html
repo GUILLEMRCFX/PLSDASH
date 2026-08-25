@@ -52,9 +52,12 @@
   #escena{
     position:relative;
     width:100%;
-    /* Lo que queda de pantalla quitando la barra de pestañas y los márgenes. */
-    height:calc(100dvh - 150px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
-    min-height:280px;
+    /* Lo que queda de pantalla quitando la barra de pestañas (60), el pie que
+       explica qué codifica cada cosa (~76 en tres líneas a 390px), los huecos
+       y los márgenes. Con 150 el pie se salía por abajo y había que desplazar
+       para leer la leyenda de lo que estabas mirando. */
+    height:calc(100dvh - 240px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    min-height:260px;
     max-height:820px;
     /* La esfera se lleva el gesto entero dentro de su caja. */
     touch-action:none;
@@ -171,7 +174,7 @@
   import { crearEsfera } from './escena/esfera.js';
   import { escenaDesde } from './escena/estado-escena.js';
   import { cargarTodo } from './datos.js';
-  import { panelResumen, engancharResumen } from './paneles/resumen.js';
+  import { panelResumen, engancharResumen, tictac } from './paneles/resumen.js';
   import { panelGanancias } from './paneles/ganancias.js';
   import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
   import { panelTrayectoria } from './paneles/trayectoria.js';
@@ -305,6 +308,39 @@
 
   let ultimos = null;
 
+  /* ───────────────────────────────────────── destellos de bloque
+
+     Un bloque propuesto es el único suceso PUNTUAL que tiene el panel: los
+     demás números son magnitudes que suben y bajan. La esfera lo marca con un
+     golpe de luz en el nodo de ese validador y una onda que sale de él.
+
+     De dónde sale el hecho: del registro de eventos, `tipo === 'bloque'`, que
+     los escribe `/api/val/ganancia` al reconciliar los barridos contra la
+     cadena. No se inventa ninguno.
+
+     ⚠ Solo destellan los bloques que llegan NUEVOS. En el primer pintado se
+       apunta el más reciente sin encender nada: si no, abrir el panel dispararía
+       de golpe los sesenta últimos bloques del histórico, que es una fiesta que
+       no significa nada. */
+  let ultimoBloqueTs = null;
+
+  function destellarBloquesNuevos(datos) {
+    const bloques = (datos.eventos || [])
+      .filter(e => e.tipo === 'bloque' && Number.isFinite(Number(e.ts)))
+      .sort((a, b) => Number(a.ts) - Number(b.ts));
+    if (!bloques.length) return;
+
+    if (ultimoBloqueTs == null) {          // primer pintado: solo tomar nota
+      ultimoBloqueTs = Number(bloques[bloques.length - 1].ts);
+      return;
+    }
+    for (const b of bloques) {
+      if (Number(b.ts) <= ultimoBloqueTs) continue;
+      ultimoBloqueTs = Number(b.ts);
+      if (b.validador != null) esfera.destello(Number(b.validador));
+    }
+  }
+
   function pintar(datos) {
     ultimos = datos;
 
@@ -312,6 +348,7 @@
     // no dentro de ninguna: sus nodos son los validadores reales, su brillo el
     // avance del ciclo de barrido y su color la frescura del dato.
     esfera.actualizar(escenaDesde(datos, datos.ahoraS));
+    destellarBloquesNuevos(datos);
 
     PESTANAS.forEach((p, i) => {
       if (p.estatica) return;
@@ -322,6 +359,10 @@
     engancharCiclo(document, datos);
     engancharResumen(document, () => pintar(ultimos));
     window.__datos = datos;
+    // Ganchos de diagnóstico, como `__esfera`: desde la consola se puede forzar
+    // un repintado sin esperar 18 segundos, y la prueba del bloque 2 lo usa para
+    // comprobar que el repintado NO se lleva el lienzo de la esfera por delante.
+    window.__pintar = () => pintar(ultimos);
   }
 
   /* ───────────────────────────────────────────── refresco
@@ -361,11 +402,22 @@
   // repinta el panel con los datos que ya hay: la palabra de estado y la franja
   // de alerta las decide `panelResumen`, y sin este aviso tardarían hasta 18
   // segundos en enterarse de lo que el pulso ya está diciendo en naranja.
+  //
+  // Y en el mismo tic corre el contador de ganancias: al ritmo medido, la cifra
+  // avanza del orden de un PLS por segundo, así que el último dígito cambia
+  // cada vez. Ver la nota de `tictac()`.
   let pulsoPrevio = null;
   setInterval(() => {
     const ahora = latir();
     if (ahora && pulsoPrevio && ahora !== pulsoPrevio && ultimos) pintar(ultimos);
     if (ahora) pulsoPrevio = ahora;
+    tictac();
+    /* El ciclo de barrido dura ~8,1 h y su avance solo se recalculaba con los
+       datos, cada 18 s. Recalcularlo cada segundo con el reloj de ahora es lo
+       que hace que el brillo suba de forma continua en vez de a escalones —y,
+       sobre todo, que la CAÍDA al cobrarse el barrido se vea cuando pasa. Es
+       la misma cuenta, con la hora al día: no se inventa nada. */
+    if (ultimos) esfera.actualizar(escenaDesde(ultimos, Math.floor(Date.now() / 1000)));
   }, 1000);
 </script>
 </body>

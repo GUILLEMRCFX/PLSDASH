@@ -250,6 +250,11 @@
    leer. En caja normal se leen de un vistazo, que es el criterio de este
    bloque. */
 
+
+/* Suelo de 11px para las UNIDADES —«PLS», «$», «%»—. Van en `em` para escalar
+   con su cifra, y junto a un número de 16px eso las dejaba en 9,9. Una unidad
+   no es prosa: se reconoce más que se lee. Pero por debajo de 11 deja de
+   reconocerse en un móvil al sol, que es donde se mira este panel. */
 /* ─────────────────────────────────────────────── cifras */
 
 /* La cifra principal del panel. Grande, cian, y con la etiqueta debajo:
@@ -265,7 +270,7 @@
 }
 .c-num .u,                              /* unidad: PLS, $ */
 .c-num .de {                            /* «/10» de «10 de 10» */
-  font-size: .42em; color: var(--apagado); letter-spacing: .04em;
+  font-size: max(11px, .42em); color: var(--apagado); letter-spacing: .04em;
   margin-left: .26em; font-weight: 500;
 }
 /* El «%» no es una unidad que acompañe: forma parte del número. A .45em
@@ -364,11 +369,11 @@
   letter-spacing: .01em; 
   color: var(--apagado);
 }
-.r-pls { font-family: var(--cifra); font-weight: 600;
-  font: 400 15px/1.2 var(--texto);
+.r-pls {
+  font: 600 16px/1.25 var(--cifra);
   color: var(--cian); text-align: right;
 }
-.r-pls .u { font-size: .58em; color: var(--apagado); margin-left: .3em; }
+.r-pls .u { font-size: max(11px, .58em); color: var(--apagado); margin-left: .3em; }
 .r-usd {
   font: 400 12px/1.2 var(--texto);
   color: var(--cian-suave); text-align: right; min-width: 5.2em;
@@ -384,12 +389,12 @@
 .e-cab {
   display: grid; grid-template-columns: auto 1fr auto;
   align-items: baseline; gap: 0 8px;
-  font: 400 12px/1.25 var(--texto); font-variant-numeric: tabular-nums;
+  font: 600 13px/1.25 var(--cifra); font-variant-numeric: tabular-nums;
 }
 .e-fecha { color: var(--apagado); font-size: 12px; }
 .e-tipo  { color: var(--cian-suave); }
 .e-pls   { color: var(--cian); text-align: right; }
-.e-pls .u { font-size: .6em; color: var(--apagado); margin-left: .3em; }
+.e-pls .u { font-size: max(11px, .6em); color: var(--apagado); margin-left: .3em; }
 .e-sub {
   margin-top: 3px;
   font: 400 12px/1.3 var(--texto);
@@ -463,7 +468,7 @@
   padding: 7px 8px;
   border-radius: 5px;
   text-decoration: none;
-  font: 400 12px/1.25 var(--texto);
+  font: 600 13px/1.25 var(--cifra);
   font-variant-numeric: tabular-nums;
   background: linear-gradient(to right,
     rgba(42, 212, 240, .13) 0, rgba(42, 212, 240, .13) var(--barra),
@@ -568,7 +573,9 @@
   letter-spacing: 0;
   color: var(--apagado);
   background: none; border: 0; border-radius: 10px;
-  padding: 11px 13px;
+  /* 11 y no 13: a 390px las cinco sumaban 369px contra 364 de hueco y la barra
+     se quedaba desplazable por cinco píxeles. Medido, no estimado. */
+  padding: 11px 11px;
   min-height: 42px;            /* objetivo táctil */
   cursor: pointer;
   white-space: nowrap;
@@ -603,11 +610,57 @@
    un aviso aparte. En positivo dice «todo llega»; en negativo, que algo pasa.
    Es el mismo elemento cambiando de estado, que es justo lo que se pidió. */
 
+/* ─────────────────────────────────────────── el pulso, como línea de tiempo
+
+   Antes era un punto que latía y una cuenta atrás. La cuenta sigue —es la que
+   se lee— pero ahora va sobre una LÍNEA que representa la ventana entera: los
+   3 minutos del cron más el minuto de margen.
+
+   Lo que codifica cada cosa, que es la única razón para dibujarla:
+     · el ancho recorrido = tiempo transcurrido desde el último dato;
+     · la marca vertical  = dónde vence el plazo del cron;
+     · el tramo entre la marca y el final = el margen, donde el dato «está
+       llegando» y todavía no hay nada que decir;
+     · la línea llena y naranja = se acabó el margen.
+
+   Un contador solo dice cuánto falta. La línea dice además cuánto de la
+   ventana se ha ido, que es lo que permite mirarla de reojo sin leer. */
 .pulso {
-  display: flex; align-items: center; gap: 10px;
-  font: 400 12px/1 var(--texto);
+  display: flex; flex-direction: column; gap: 8px;
+  font: 400 12.5px/1 var(--texto);
   color: var(--apagado);
 }
+.pl-cab { display: flex; align-items: center; gap: 10px; }
+/* La cuenta se separa de la etiqueta y la palabra de estado se va al extremo:
+   los dos datos de la línea, uno en cada punta. */
+.pl-cab .resto { margin-left: auto; }
+.pl-cab .p-marca { margin-left: 4px; }
+/* El pulso ocupa la cabecera entera. Como hermano de la palabra de estado en
+   una fila flexible se quedaba a media anchura y la línea de tiempo con él. */
+.p-cab > .pulso { flex: 1 1 auto; min-width: 0; }
+
+.pl-linea {
+  position: relative;
+  height: 4px; border-radius: 3px;
+  background: rgba(42, 212, 240, .12);
+  overflow: hidden;
+}
+.pl-lleno {
+  position: absolute; inset: 0 auto 0 0;
+  background: var(--verde);
+  border-radius: 3px;
+  /* El ancho se reescribe cada segundo; la transición lo lleva de un punto al
+     siguiente para que avance liso en vez de a saltos. `linear` y no una curva
+     suave: el tiempo pasa a ritmo constante y la línea tiene que decir eso. */
+  transition: width 1s linear, background-color .3s;
+}
+/* Dónde vence el plazo del cron. Un pelo del color del fondo, no un color
+   nuevo: es una referencia, no un dato más. */
+.pl-marca {
+  position: absolute; top: -2px; bottom: -2px; width: 1px;
+  background: rgba(255, 255, 255, .28);
+}
+.pulso.tarde .pl-lleno { background: var(--naranja); }
 .pulso .luz {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--verde);
@@ -615,7 +668,10 @@
   animation: latido 3s ease-out infinite;
   flex: none;
 }
-.pulso .resto { font-family: var(--cifra); font-weight: 600; color: var(--verde); font-variant-numeric: tabular-nums; }
+.pulso .resto {
+  font-family: var(--cifra); color: var(--verde);
+  font-variant-numeric: tabular-nums;
+}
 
 @keyframes latido {
   0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, .5); }
@@ -644,8 +700,8 @@
 /* La cifra que se mira veinte veces al día. Escala con el ancho para llenar
    la tarjeta sin desbordarla en 390px. */
 .portada { display: flex; flex-direction: column; gap: 8px; }
-.portada .p-num { font-family: var(--cifra);
-  font: 400 clamp(38px, 11vw, 62px)/1 var(--texto);
+.portada .p-num {
+  font: 600 clamp(40px, 11.5vw, 66px)/1 var(--cifra);
   color: var(--cian);
   /* Halo tenue: la cifra parece emitir luz en vez de estar impresa, que es lo
      que la emparenta con la esfera de detrás. No toca el contraste — el halo
@@ -685,7 +741,7 @@
    `.pulso.tarde`), que es lo que hace que la línea entera cambie de una vez
    en vez de quedarse a medio pintar. */
 .pulso .p-eti { letter-spacing: .1em;  font-size: 12px; }
-.pulso .resto { font-weight: 400; }
+.pulso .resto { font-weight: 600; }
 
 /* ─────────────────────────────────────────────── precio: histórico
 
@@ -747,15 +803,26 @@
    cortado a la derecha. Cortar la última pestaña es lo peor que puede hacer
    una barra de pestañas — es justo la que hay que ver para saber que existe.
 
-   Se aprieta la letra en vez de recortar los nombres: «VALIDADORES» dice lo
-   que es y «VALID.» no. A 10,5px con 0,06em caben los cuatro con holgura. */
+   Se aprieta la letra en vez de recortar los nombres: «Validadores» dice lo que
+   es y «Valid.» no.
+
+   ⚠ ESTA REGLA CAMBIÓ EL 25-AGO-2026. Decía «a 10,5px con 0,06em caben los
+     CUATRO con holgura», y con la quinta —Esfera— dejó de ser verdad: sumaban
+     369px contra 364 de hueco y la barra se quedaba desplazable por cinco
+     píxeles. Una pestaña a la que hay que arrastrar para llegar es una pestaña
+     que no existe.
+
+     Lo que sobraba era el tracking, que estaba puesto para unas versalitas que
+     ya no hay. Con 0 y el relleno a 6px caben las cinco con 30px de sobra, y a
+     12px de cuerpo. Medido, no estimado. */
 @media (max-width: 460px) {
   .pestanas button {
-    font-size: 12px;
-    letter-spacing: .06em;
-    padding: 12px 7px;
+    font-size: 12.5px;
+    letter-spacing: 0;
+    padding: 12px 6px;
   }
 }
+
 
 /* ─────────────────────────────────────────────── auxiliares */
 
