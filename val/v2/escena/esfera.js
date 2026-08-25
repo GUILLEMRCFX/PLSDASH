@@ -56,9 +56,36 @@ import { construirCeldas, campoInterior } from './celdas.js';
 import { ESCALONES, elegirEscalon, Vigilante } from './calidad.js';
 import { crearUniformsDeformacion, inyectar, UNIFORMS_DEFORMACION, FUNCION_DEFORMACION } from './deformacion.js';
 
+/* ─────────────────────────────────────────────── el color, del tema
+
+   La esfera lee EXACTAMENTE DOS tokens del CSS: `--dato` y `--acento`. Ni uno
+   más, y eso fue una decisión: meter el tema entero en el shader habría
+   significado seis uniformes nuevos, seis rutas de actualización y una
+   comprobación por tema. Con dos, la escena sigue el tema sin saber que existen
+   los temas.
+
+   El tercer color —la cáscara— se DERIVA del primero bajándole el brillo, en
+   vez de ser un token propio: es el mismo cian oscurecido que había antes, solo
+   que ahora el «cian» lo pone el tema.
+
+   ⚠ Los valores de aquí son solo el respaldo para cuando el CSS todavía no ha
+     cargado. En cuanto hay hoja de estilo mandan los tokens. */
 const CIAN     = new THREE.Color(0x2ad4f0);
 const CIAN_OSC = new THREE.Color(0x0b4a68);
 const NARANJA  = new THREE.Color(0xff8a3d);
+
+/** Lee un token de color del CSS. Devuelve null si no hay o no se entiende. */
+function tokenColor(nombre) {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(nombre).trim();
+    if (!v) return null;
+    const c = new THREE.Color();
+    c.setStyle(v);            // acepta #rgb, #rrggbb, rgb(), hsl()
+    return c;
+  } catch {
+    return null;
+  }
+}
 // Negro puro. Cualquier gris azulado de fondo se come el contraste justo donde
 // la nitidez se juega: entre las celdas.
 const FONDO    = 0x000000;
@@ -731,6 +758,59 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     aplicarCamara();
   }, { passive: false });
 
+  /**
+   * Vuelca los dos tokens del tema sobre los materiales ya creados.
+   *
+   * No se reconstruye nada: son `uColor` de materiales que ya existen, así que
+   * cambiar de tema con la esfera a la vista no da ni un tirón.
+   */
+  function aplicarTema() {
+    const dato = tokenColor('--dato');
+    const acento = tokenColor('--acento');
+    if (!dato && !acento) return false;
+
+    /* ⚠ Cada familia de material llama al uniforme de otra manera, y darlo por
+       hecho no cuesta un error visible: cuesta que el color no cambie y no se
+       sepa por qué. Comprobados uno a uno:
+         · cáscara y atmósfera → `uColor`
+         · líneas (LineMaterial) → `uCian`
+         · puntos y nodos → `uColor`                                          */
+    const poner = (mat, nombre, color) => {
+      const u = mat && mat.uniforms && mat.uniforms[nombre];
+      if (u && u.value && u.value.copy) u.value.copy(color);
+    };
+
+    if (dato) {
+      /* La cáscara es el mismo color, muy oscurecido. Antes era una constante
+         aparte —`CIAN_OSC`, #0b4a68—; derivarla evita que un tema nuevo se
+         olvide de darle valor.
+
+         ⚠ El factor es 0,12 y no un número redondo porque `multiplyScalar` va
+           en espacio LINEAL, no en sRGB. Con 0,20 la cáscara del tema Núcleo
+           salía #0f6674, bastante más clara que el #0b4a68 que tuvo siempre, y
+           Núcleo tiene que verse exactamente como se veía. Medido: el #0b4a68
+           original equivale a un factor lineal de 0,10–0,16 según el canal;
+           0,12 da #094f5b, que es el mismo peso. */
+      poner(matCascara, 'uColor', dato.clone().multiplyScalar(0.12));
+      poner(matAtmosfera, 'uColor', dato);
+      for (const m of materialesLinea) {
+        // La cadena entre nodos va en acento; el resto de líneas, en dato.
+        if (m !== matCadena) poner(m, 'uCian', dato);
+      }
+      for (const m of [matVertices, matCampo]) poner(m, 'uColor', dato);
+    }
+    if (acento) {
+      poner(matNodo, 'uColor', acento);
+      poner(matCadena, 'uCian', acento);
+    }
+    return true;
+  }
+
+  aplicarTema();
+  // El selector avisa por aquí. Ver `paneles/tema.js`.
+  const alCambiarTema = () => aplicarTema();
+  window.addEventListener('plsdash:tema', alCambiarTema);
+
   // ─────────────────────────────────────────────── estado de la app
   let energiaObjetivo = 0.5, frescuraObjetivo = 1;
 
@@ -851,6 +931,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   return {
     actualizar,
     destello,
+    // Para poder forzarlo desde una prueba sin depender del evento.
+    aplicarTema,
     info: () => {
       const m = MALLA;
       return {
@@ -863,6 +945,23 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         ancho, alto, visible, respiracion: uniformes.uRespiracion.value,
         llamadas: renderer.info.render.calls, reducido,
         destello: matNodo.uniforms.uDestT.value,
+        /* Los colores tal como los tiene CADA FAMILIA de material ahora mismo,
+           no como los tiene el CSS. Es la única forma de comprobar desde fuera
+           que el tema llegó al shader y no se quedó en la hoja de estilo.
+
+           ⚠ Van las CUATRO familias, y no por completismo: `poner()` no protesta
+             cuando el uniforme no existe —tiene que no protestar, porque no
+             todos los materiales tienen todos los uniformes—, así que escribir
+             el nombre equivocado no rompe nada: deja el color viejo y calla. Ya
+             pasó con las líneas, que usan `uCian` y no `uColor`. Con solo dos
+             familias aquí, ese fallo volvía a colarse: comprobado sabotéandolo
+             a propósito y viendo que la prueba pasaba igual. */
+        colorDato: '#' + matAtmosfera.uniforms.uColor.value.getHexString(),
+        colorAcento: '#' + matNodo.uniforms.uColor.value.getHexString(),
+        colorLinea: '#' + matPrincipal.uniforms.uCian.value.getHexString(),
+        colorCadena: '#' + matCadena.uniforms.uCian.value.getHexString(),
+        colorVertices: '#' + matVertices.uniforms.uColor.value.getHexString(),
+        colorCascara: '#' + matCascara.uniforms.uColor.value.getHexString(),
         antialias: renderer.getContext().getContextAttributes().antialias,
       };
     },
@@ -870,6 +969,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       cancelAnimationFrame(raf);
       observador.disconnect(); alVer.disconnect();
       document.removeEventListener('visibilitychange', alCambiarPestana);
+      window.removeEventListener('plsdash:tema', alCambiarTema);
       lienzo.removeEventListener('pointermove', alSenalarRef);
       lienzo.removeEventListener('pointerleave', limpiarSenal);
       renderer.dispose();
