@@ -40,8 +40,17 @@ ALTER TABLE daily DROP COLUMN apr_medio;
 --   volverla a crear sería trabajo para acabar donde estamos.
 
 -- ── validador_diario ─────────────────────────────────────────────────────────
--- 165 filas que solo leía `/api/val/validadores`, un endpoint que no llamaba
--- nadie. Los dos se retiran; `push.py` deja de escribirla.
--- El detalle por validador sigue vivo en el estado de KV, que es lo que pintan
--- los paneles.
-DROP TABLE IF EXISTS validador_diario;
+-- ⚠ NO SE BORRA. Aquí había un `DROP TABLE validador_diario`, y era un error.
+--
+--   La auditoría la dio por muerta porque `/api/val/validadores` «no lo llamaba
+--   nadie». Sí lo llama: el panel v1, con `api('/validadores')`. La URL se
+--   compone al vuelo desde `const API = '/api/val'`, así que el literal
+--   «api/val/validadores» no aparece en ningún fichero y el grep no lo vio.
+--
+--   De esta tabla sale la línea «tu media: X %» bajo la casilla de Efectividad
+--   del v1. Y borrarla sería IRREVERSIBLE: es el único histórico por validador
+--   y por día que existe —`snapshots` solo guarda agregados del grupo y KV solo
+--   el instante actual—, así que los 165 días-validador no se recuperarían.
+--
+--   Si algún día se retira la casilla de Efectividad del v1, se retiran a la vez
+--   la llamada, el endpoint y la tabla. Los tres o ninguno.
