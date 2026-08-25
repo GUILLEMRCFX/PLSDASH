@@ -12,11 +12,15 @@
  *     nivel de negro y se lleva por delante el contraste — que es donde se
  *     juega la sensación de nitidez, la misma razón por la que la escena de la
  *     esfera va sobre #000.
- *   · Tres colores: cian para los datos, verde para lo que va bien, naranja
- *     para lo que reclama atención. El color NUNCA viaja solo — siempre
+ *   · Tres papeles de color: uno para los datos, otro para lo que va bien y
+ *     otro para lo que reclama atención. ⚠ Desde el 25-ago-2026 son PAPELES y
+ *     no colores concretos: el tema decide qué color hace cada papel, y el de
+ *     siempre —cian, verde y naranja— es uno de cinco. Ver el bloque TEMAS.
+ *     Lo que no cambia con el tema es que el color NUNCA viaja solo: siempre
  *     acompaña a una palabra o a un número que dice lo mismo.
- *   · Tarjetas translúcidas sobre la escena. La profundidad la sigue dando la
- *     esfera; las tarjetas dejan intuirla detrás en vez de taparla.
+ *   · Tarjetas translúcidas. Nacieron para dejar ver la esfera detrás; desde
+ *     que la esfera tiene pestaña propia van sobre fondo liso, y el tinte lo
+ *     pone `--vidrio`, que también es del tema.
  *   · Las etiquetas son pequeñas y apagadas a propósito. Se leen cuando se
  *     buscan; el resto del tiempo se apartan. Apagadas, no ilegibles: ver
  *     abajo, todo texto pasa el contraste de WCAG.
@@ -75,6 +79,17 @@
  *    para colores de estado. Lo que sí se midió y sí importa: la separación
  *    entre cian y naranja bajo daltonismo es ΔE 21,9 (deuteranopía) y 30,0 en
  *    visión normal, contra umbrales de 8 y 15. El par es seguro.
+ *
+ *    ⚠ ESAS DOS CIFRAS NO SE HAN PODIDO REPRODUCIR (25-ago-2026). Al montar los
+ *      temas hizo falta volver a medir, y para ese par salió ΔE 110,1 con la
+ *      distancia euclídea en Lab y 50,7 con CIEDE2000 — ninguna de las dos da
+ *      30,0, y la de deuteranopía salía MAYOR que la de visión normal, que es
+ *      señal de que el simulador estaba mal. O sea que no se sabe con qué
+ *      fórmula se calcularon, y un número que no se puede recalcular no sirve
+ *      para decidir nada. La conclusión —que el par cian/naranja es seguro—
+ *      sigue en pie por otra vía, que sí se puede repetir: separan 164° de
+ *      tono, y el color nunca es el único canal. Si algún día hay que decidir
+ *      sobre daltonismo de verdad, hay que rehacer la medida, no citar esta.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -109,24 +124,146 @@
   font-weight: 300 700; font-style: normal; font-display: swap;
 }
 
-:root {
-  --negro:      #000;
-  --cian:       #2ad4f0;   /* 11,77:1 sobre negro */
-  --cian-suave: #7fd4ea;   /* 12,51:1 */
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEMAS
+
+   Un tema es un JUEGO DE CINCO COLORES y nada más. No hay una hoja por tema ni
+   reglas duplicadas: las mismas declaraciones de todo el panel leen los mismos
+   cinco tokens, y cambiar de tema es cambiar lo que valen.
+
+   Los nombres dicen el PAPEL, no el color. Antes eran `--cian` y `--naranja`, y
+   con un tema rosa habría quedado `--cian: #ff3d9a`, que es peor que no tener
+   variable. Los papeles son:
+
+     --dato        el color de los números. El que más pesa.
+     --dato-suave  texto secundario que sigue siendo contenido.
+     --apagado     etiquetas. Recesivo A PROPÓSITO, nunca ilegible.
+     --acento      lo que reclama atención, y el segundo origen del saldo.
+     --bien        va todo correcto.
+
+   ⚠ TODOS pasan el contraste, y no de palabra: `temas-test.js` mide los cinco
+     temas de una pasada contra el fondo real de una tarjeta y ninguno baja de
+     4,5:1 —el mínimo de WCAG para texto pequeño—. Si añades un tema y no llega,
+     la prueba lo dice con el número.
+
+   ⚠ Y el color NUNCA viaja solo, en ningún tema. Toda marca de estado lleva su
+     palabra al lado y la barra partida lleva su pie en texto: quien no
+     distinga dos tonos lee exactamente la misma información.
+
+   ⚠ PERO ESO NO BASTA, y aquí está la lección que costó un tema entero.
+
+     La esfera es la excepción: su malla va en `--dato` y la cadena que une los
+     validadores va en `--acento`, y ninguna de las dos lleva palabra al lado.
+     Si esos dos colores están cerca de tono, la constelación desaparece — que
+     es literalmente lo único que la esfera cuenta.
+
+     Así que un tema tiene DOS requisitos, no uno:
+
+       · contraste  ≥ 4,5:1 de cada token contra el fondo de tarjeta;
+       · separación ≥ 100° de tono entre `--dato` y `--acento`, y ≥ 55° entre
+         `--acento` y `--bien`.
+
+     El segundo no se puede medir con la razón de contraste: esa solo mira
+     luminancia. El cian y el naranja de Núcleo dan 1,31:1 —peor que cualquier
+     par de Papel— y se distinguen a la legua porque están en tonos opuestos.
+     Medirlo con la razón fue el error, y dejó pasar un Pulso rosa/violeta con
+     66° donde la cadena no se veía. `temas-test.js` mide ahora las dos cosas.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+:root[data-tema="nucleo"] {
+  --fondo:      #000;
+  --dato:       #2ad4f0;
+  --dato-suave: #7fd4ea;
   /* Antes #4a6b78, que daba 3,67:1 y bajaba a 2,46:1 donde llevaba opacidad:
      por debajo del 4,5:1 que WCAG exige a texto pequeño. Es el color de TODAS
-     las etiquetas, así que era el fallo más extendido del panel y el que hace
-     que un número no se lea en un móvil al sol. Ahora 5,69:1, con holgura
-     sobre el mínimo porque el sol aprieta más que el banco de pruebas. Sigue
-     siendo claramente recesivo frente al cian de los datos. */
-  --apagado:    #628b9b;   /* 5,69:1 */
-  --naranja:    #ff8a3d;   /* 8,95:1 */
-  /* Verde de «va bien». 12,05:1 sobre negro, de sobra para texto pequeño.
-     Entra el 19-ago-2026: ver la nota de arriba. */
-  --verde:      #4ade80;   /* 12,05:1 */
+     las etiquetas, así que era el fallo más extendido del panel. */
+  --apagado:    #628b9b;
+  --acento:     #ff8a3d;
+  --bien:       #4ade80;
   --borde:      rgba(42, 212, 240, .14);
   --borde-vivo: rgba(42, 212, 240, .28);
+  /* El relleno de las tarjetas también es del tema: va teñido con su fondo. */
+  --vidrio:     rgba(6, 14, 20, .78);
+}
 
+/* Pulso — el rosa y el violeta de la portada pública, para que el panel y la
+   web se puedan ver del mismo color el día que apetezca.
+
+   ⚠ EL ACENTO NO ES EL VIOLETA, y no por descuido. Primero lo era, y en la
+     pestaña de la esfera la cadena que une los validadores desaparecía sobre la
+     malla: el rosa y el violeta separan 66° de tono, y los otros cuatro temas
+     separan entre 160° y 180°. Es el mismo par de la portada —allí no molesta
+     porque nunca se cruzan sobre la misma superficie—, así que no era una mala
+     elección mía: era el par.
+
+     El violeta se queda, en `--dato-suave`, que es donde no compite con nada. Y
+     el acento pasa al cian de la portada, que separa 149°. Los dos colores del
+     encargo siguen en el tema; lo que cambia es cuál marca a los validadores.
+     Comparado en captura antes de decidirlo, no calculado a ojo. */
+:root[data-tema="pulso"] {
+  --fondo:      #04020a;
+  --dato:       #ff5cb0;
+  --dato-suave: #c9a4ff;
+  --apagado:    #9a7fae;
+  --acento:     #28e0e6;
+  /* Y el «va bien» se va al verde lima. Era el menta de la portada, que con el
+     acento en cian quedaba a 22° de él — el mismo choque de tono que acababa de
+     arreglarse, movido de sitio. A 84° se separan; el más justo de los cinco
+     temas es Ámbar con 61° y ahí se distinguen sin esfuerzo. */
+  --bien:       #9ae66e;
+  --borde:      rgba(255, 92, 176, .16);
+  --borde-vivo: rgba(255, 92, 176, .32);
+  /* El relleno de las tarjetas también es del tema: va teñido con su fondo. */
+  --vidrio:     rgba(14, 6, 22, .80);
+}
+
+/* Ámbar — cálido. El dato en ámbar y el acento en azul cielo: es el par con
+   más separación de tono de los cinco. */
+:root[data-tema="ambar"] {
+  --fondo:      #0a0703;
+  --dato:       #fbbf24;
+  --dato-suave: #f3d9a4;
+  --apagado:    #a08d6a;
+  --acento:     #56b8f5;
+  --bien:       #86efac;
+  --borde:      rgba(251, 191, 36, .15);
+  --borde-vivo: rgba(251, 191, 36, .30);
+  /* El relleno de las tarjetas también es del tema: va teñido con su fondo. */
+  --vidrio:     rgba(20, 14, 4, .80);
+}
+
+/* Menta — frío y bajo en saturación. El más descansado de los cinco para
+   mirar mucho rato. */
+:root[data-tema="menta"] {
+  --fondo:      #02080a;
+  --dato:       #5eead4;
+  --dato-suave: #b6ede3;
+  --apagado:    #6f9a95;
+  --acento:     #fb7185;
+  --bien:       #a3e635;
+  --borde:      rgba(94, 234, 212, .15);
+  --borde-vivo: rgba(94, 234, 212, .30);
+  /* El relleno de las tarjetas también es del tema: va teñido con su fondo. */
+  --vidrio:     rgba(4, 16, 16, .80);
+}
+
+/* Papel — casi sin color. Todo el peso lo lleva la tipografía y el único color
+   es el del acento. Es el que mejor se lee a pleno sol. */
+:root[data-tema="papel"] {
+  --fondo:      #08080a;
+  --dato:       #ececef;
+  --dato-suave: #c4c4cb;
+  --apagado:    #8e8e99;
+  --acento:     #fbbf24;
+  --bien:       #7ddba1;
+  --borde:      rgba(236, 236, 239, .13);
+  --borde-vivo: rgba(236, 236, 239, .26);
+  /* El relleno de las tarjetas también es del tema: va teñido con su fondo. */
+  --vidrio:     rgba(16, 16, 20, .82);
+}
+
+:root {
   /* ─────────────────────────────────────────────────────── tipografía
      Las MISMAS dos familias que la portada pública, y en los mismos papeles:
      Inter para leer, Space Grotesk para las cifras. Antes esto era JetBrains
@@ -144,8 +281,48 @@
   --cifra:   'Space Grotesk', 'Inter', system-ui, sans-serif;
   --tecnico: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Relleno de las tarjetas de vidrio. Ver el comentario de `.panel`. */
-  --vidrio: rgba(6, 14, 20, .78);
+  /* ─────────────────────────────────────────────────── tintes del tema
+     Los colores del tema no se usan solo como texto: media hoja los usa
+     translúcidos —rayas de tabla, relleno de barras, el fondo de la pestaña
+     abierta, el halo del titular, el área de los gráficos—. Eso estaba escrito
+     como `rgba(<el cian>, .12)` en veinte sitios. La cita va sin el número a
+     propósito: escrita entera, este comentario se cuela en cualquier búsqueda
+     que quiera contar los usos de verdad.
+
+     ⚠ Y ESO ERA EL BLOQUE 3 A MEDIAS, no un detalle. Con los tokens renombrados
+       y los cinco temas puestos, el panel cambiaba de color en el TEXTO y se
+       quedaba en cian en todo lo demás: en la captura del tema Papel la pestaña
+       abierta seguía con su recuadro cian, encima de un panel sin una gota de
+       cian. La comprobación del contraste no lo vio porque mide la paleta, no
+       la pantalla — mide los tokens, y estos no eran tokens.
+
+     Se derivan del color con `color-mix()` en vez de repetir el rgba, así que
+     un tema nuevo los hereda sin escribir ni uno. Los nombres van por papel y
+     no por número: el que se lee es el sitio donde va, no su opacidad.
+
+     Soporte: `color-mix()` está en Chrome 111 y en Safari 16.2 (dic-2022). El
+     panel es privado y se abre desde iPhone y escritorio actuales. */
+  --dato-raya:   color-mix(in srgb, var(--dato)   5%,  transparent);  /* rayas y hover */
+  --dato-velo:   color-mix(in srgb, var(--dato)   10%, transparent);  /* área de gráfico */
+  --dato-tinte:  color-mix(in srgb, var(--dato)   13%, transparent);  /* barras y pestaña abierta */
+  --dato-lecho:  color-mix(in srgb, var(--dato)   16%, transparent);  /* carril vacío de una barra */
+  --dato-halo:   color-mix(in srgb, var(--dato)   22%, transparent);  /* resplandor del titular */
+
+  --acento-velo:  color-mix(in srgb, var(--acento) 10%, transparent);
+  --acento-tinte: color-mix(in srgb, var(--acento) 16%, transparent);
+  --acento-marco: color-mix(in srgb, var(--acento) 30%, transparent);
+  --acento-vivo:  color-mix(in srgb, var(--acento) 55%, transparent);
+  --acento-pulso: color-mix(in srgb, var(--acento) 70%, transparent);
+
+  /* Más denso que `--vidrio` porque el rótulo de la esfera va sobre la escena,
+     no sobre el fondo de la página: ahí detrás puede haber un nodo a tope de
+     brillo. Se deriva del fondo DEL TEMA — estaba escrito a fuego como el azul
+     muy oscuro de Núcleo, así que en tema Papel o Ámbar el rótulo salía azul. */
+  --vidrio-denso: color-mix(in srgb, var(--fondo) 90%, transparent);
+
+  --bien-velo:  color-mix(in srgb, var(--bien) 10%, transparent);
+  --bien-pulso: color-mix(in srgb, var(--bien) 50%, transparent);
+  --bien-vivo:  color-mix(in srgb, var(--bien) 55%, transparent);
 }
 
 /* ─────────────────────────────────────────────── panel */
@@ -214,11 +391,11 @@
    —el NUC lleva rato sin reportar—, que es justo el caso en el que un panel
    silencioso hace más daño que no tener panel. Barra superior, borde entero y
    la palabra en naranja: se ve desde el otro lado de la habitación. */
-.panel[data-alerta] { border-color: rgba(255, 138, 61, .55); }
+.panel[data-alerta] { border-color: var(--acento-vivo); }
 .panel[data-alerta]::before {
   content: '';
   position: absolute; left: -1px; right: -1px; top: -1px; height: 3px;
-  background: var(--naranja);
+  background: var(--acento);
   border-radius: 10px 10px 0 0;
 }
 
@@ -229,14 +406,14 @@
   margin: 0;
   font: 600 13px/1.2 var(--texto);
   letter-spacing: .08em; text-transform: uppercase;
-  color: var(--cian-suave);
+  color: var(--dato-suave);
 }
 .p-marca {
   font: 600 12px/1.2 var(--texto);
   letter-spacing: .06em; text-transform: uppercase;
-  color: var(--cian); opacity: .8;
+  color: var(--dato); opacity: .8;
 }
-.p-marca.alerta { color: var(--naranja); opacity: 1; }
+.p-marca.alerta { color: var(--acento); opacity: 1; }
 
 
 /* ─────────────────────────────────────────── sobre las versalitas
@@ -263,7 +440,7 @@
 
 .c-num {
   font: 600 40px/1.05 var(--cifra);
-  color: var(--cian);
+  color: var(--dato);
   letter-spacing: -.02em;
   font-variant-numeric: tabular-nums;   /* que no bailen al actualizarse */
   word-break: break-word;
@@ -276,9 +453,9 @@
 /* El «%» no es una unidad que acompañe: forma parte del número. A .45em
    parecía un superíndice y hacía dudar de si el 99,90 era el dato o no. */
 .c-num .u.pct {
-  font-size: .62em; color: var(--cian); opacity: .75; margin-left: .06em;
+  font-size: .62em; color: var(--dato); opacity: .75; margin-left: .06em;
 }
-.c-num.alerta { color: var(--naranja); }
+.c-num.alerta { color: var(--acento); }
 
 .c-eti {
   font: 500 12px/1.4 var(--texto);
@@ -289,9 +466,9 @@
   /* Sin `opacity`. Apagar un texto que ya es recesivo por color lo bajaba a
      4,1:1 y era el sitio donde vive casi toda la explicación del panel. */
   font: 400 13px/1.5 var(--texto);
-  color: var(--cian-suave);
+  color: var(--dato-suave);
 }
-.c-sub.alerta { color: var(--naranja); opacity: 1; }
+.c-sub.alerta { color: var(--acento); opacity: 1; }
 
 /* Fila de cifras secundarias: mismo lenguaje, la mitad de tamaño. */
 .rejilla {
@@ -326,18 +503,18 @@
 .p-fondo dd {
   margin: 0;
   font: 400 13px/1.2 var(--texto);
-  color: var(--cian-suave);
+  color: var(--dato-suave);
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
-.p-fondo dd.alerta { color: var(--naranja); }
+.p-fondo dd.alerta { color: var(--acento); }
 
 /* Aviso dentro del panel. Va debajo de la cabecera y ocupa el ancho entero:
    si hay algo que decir, se dice donde se lee, no en una esquina. */
 .p-aviso {
   font: 400 12px/1.45 var(--texto);
-  color: var(--naranja);
-  border: 1px solid rgba(255, 138, 61, .3);
+  color: var(--acento);
+  border: 1px solid var(--acento-marco);
   border-radius: 7px;
   padding: 9px 11px;
 }
@@ -362,7 +539,7 @@
   font-variant-numeric: tabular-nums;
 }
 .rlista.sin-usd .rfila { grid-template-columns: 4.6em 1fr; }
-.rfila:nth-child(odd) { background: rgba(42, 212, 240, .045); }
+.rfila:nth-child(odd) { background: var(--dato-raya); }
 
 .r-per {
   font: 400 12px/1.2 var(--texto);
@@ -371,12 +548,12 @@
 }
 .r-pls {
   font: 600 16px/1.25 var(--cifra);
-  color: var(--cian); text-align: right;
+  color: var(--dato); text-align: right;
 }
 .r-pls .u { font-size: max(11px, .58em); color: var(--apagado); margin-left: .3em; }
 .r-usd {
   font: 400 12px/1.2 var(--texto);
-  color: var(--cian-suave); text-align: right; min-width: 5.2em;
+  color: var(--dato-suave); text-align: right; min-width: 5.2em;
 }
 
 /* ─────────────────────────────────────────────── registro de eventos */
@@ -384,7 +561,7 @@
 .elista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .efila {
   padding: 7px 8px; border-radius: 5px;
-  background: rgba(42, 212, 240, .045);
+  background: var(--dato-raya);
 }
 .e-cab {
   display: grid; grid-template-columns: auto 1fr auto;
@@ -392,13 +569,13 @@
   font: 600 13px/1.25 var(--cifra); font-variant-numeric: tabular-nums;
 }
 .e-fecha { color: var(--apagado); font-size: 12px; }
-.e-tipo  { color: var(--cian-suave); }
-.e-pls   { color: var(--cian); text-align: right; }
+.e-tipo  { color: var(--dato-suave); }
+.e-pls   { color: var(--dato); text-align: right; }
 .e-pls .u { font-size: max(11px, .6em); color: var(--apagado); margin-left: .3em; }
 .e-sub {
   margin-top: 3px;
   font: 400 12px/1.3 var(--texto);
-  color: var(--naranja);
+  color: var(--acento);
   letter-spacing: .04em;
 }
 
@@ -412,18 +589,18 @@
 /* `vector-effect` mantiene el grosor real pese al `preserveAspectRatio:none`,
    que si no estiraría la línea horizontalmente y la dejaría en un pelo. */
 .s-linea {
-  fill: none; stroke: var(--cian); stroke-width: 2;
+  fill: none; stroke: var(--dato); stroke-width: 2;
   vector-effect: non-scaling-stroke;
   stroke-linejoin: round; stroke-linecap: round;
 }
 /* La caída se dibuja aparte y en naranja: es el barrido, el único momento en
    que el número baja, y es lo que hace que la forma se entienda. */
 .s-caida {
-  stroke: var(--naranja); stroke-width: 1.5; opacity: .85;
+  stroke: var(--acento); stroke-width: 1.5; opacity: .85;
   vector-effect: non-scaling-stroke;
 }
 .s-cursor {
-  stroke: var(--cian-suave); stroke-width: 1; opacity: .5;
+  stroke: var(--dato-suave); stroke-width: 1; opacity: .5;
   vector-effect: non-scaling-stroke;
 }
 .s-pie {
@@ -434,7 +611,7 @@
   color: var(--apagado);
 }
 .s-pie > span:nth-child(2) {
-  text-transform: none; letter-spacing: 0; color: var(--cian-suave);
+  text-transform: none; letter-spacing: 0; color: var(--dato-suave);
 }
 
 /* Avance del ciclo actual. */
@@ -444,18 +621,18 @@
    el otro origen del mismo saldo— y por eso el pie lo dice con palabras: quien
    no distinga los tonos lee «X generados · Y aportados» igual. */
 .a-barra {
-  height: 5px; background: rgba(42, 212, 240, .16); border-radius: 3px;
+  height: 5px; background: var(--dato-lecho); border-radius: 3px;
   display: flex; overflow: hidden;
 }
 .a-barra > i { display: block; height: 100%; }
-.a-ganado   { background: var(--cian); }
-.a-aportado { background: var(--naranja); }
+.a-ganado   { background: var(--dato); }
+.a-aportado { background: var(--acento); }
 .a-pie {
   display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
-  font: 400 12px/1.3 var(--texto); color: var(--cian-suave); opacity: .8;
+  font: 400 12px/1.3 var(--texto); color: var(--dato-suave); opacity: .8;
 }
-.a-pie b { font-weight: 400; color: var(--cian); }
-.a-pie b.tarde { color: var(--naranja); }
+.a-pie b { font-weight: 400; color: var(--dato); }
+.a-pie b.tarde { color: var(--acento); }
 .a-pie > span { color: var(--apagado); opacity: 1; font-size: 12px; letter-spacing: .1em; }
 
 /* ─────────────────────────────────────────────── lista de validadores */
@@ -480,11 +657,11 @@
   font: 600 13px/1.25 var(--cifra);
   font-variant-numeric: tabular-nums;
   background: linear-gradient(to right,
-    rgba(42, 212, 240, .13) 0, rgba(42, 212, 240, .13) var(--barra),
+    var(--dato-tinte) 0, var(--dato-tinte) var(--barra),
     transparent var(--barra), transparent 100%);
   position: relative;
 }
-.vfila:hover { background-color: rgba(42, 212, 240, .05); }
+.vfila:hover { background-color: var(--dato-raya); }
 
 /* Marca de la referencia del grupo.
    Sin ella la barra apenas discrimina: los diez validadores ganan casi lo
@@ -495,42 +672,42 @@
 .vfila::after {
   content: '';
   position: absolute; top: 4px; bottom: 4px; left: var(--ref, -99px);
-  width: 1px; background: var(--cian-suave); opacity: .38;
+  width: 1px; background: var(--dato-suave); opacity: .38;
 }
-.vfila.mal::after { background: var(--naranja); opacity: .55; }
+.vfila.mal::after { background: var(--acento); opacity: .55; }
 
 /* El texto por encima de la marca: si no, la línea cruza los dígitos y a este
    tamaño eso se lee como un número mal impreso. */
 .vfila > span { position: relative; z-index: 1; }
 
-.v-id   { color: var(--cian-suave); }
-.v-marca{ color: var(--naranja); font-size: 12px; }
-.v-gan  { color: var(--cian); text-align: right; }
+.v-id   { color: var(--dato-suave); }
+.v-marca{ color: var(--acento); font-size: 12px; }
+.v-gan  { color: var(--dato); text-align: right; }
 .v-bal  { color: var(--apagado); font-size: 12px; }
 /* La nota ocupa la fila entera debajo: es texto, no una columna más. */
 .v-nota {
   grid-column: 1 / -1;
-  color: var(--naranja); font-size: 12px;
+  color: var(--acento); font-size: 12px;
   letter-spacing: .01em; 
   margin-top: 3px;
 }
 
 .vfila.mal {
   background: linear-gradient(to right,
-    rgba(255, 138, 61, .16) 0, rgba(255, 138, 61, .16) var(--barra),
+    var(--acento-tinte) 0, var(--acento-tinte) var(--barra),
     transparent var(--barra), transparent 100%);
 }
 .vfila.mal .v-id,
-.vfila.mal .v-gan { color: var(--naranja); }
+.vfila.mal .v-gan { color: var(--acento); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PESTAÑAS, PULSO Y ANIMACIÓN
    ═══════════════════════════════════════════════════════════════════════════ */
 
-.c-num.bien { color: var(--verde); }
-.c-sub.bien { color: var(--verde); opacity: 1; }
-.p-marca.bien { color: var(--verde); opacity: 1; }
-.p-fondo dd.bien { color: var(--verde); }
+.c-num.bien { color: var(--bien); }
+.c-sub.bien { color: var(--bien); opacity: 1; }
+.p-marca.bien { color: var(--bien); opacity: 1; }
+.p-fondo dd.bien { color: var(--bien); }
 
 /* ─────────────────────────────────────────────── barra de pestañas */
 
@@ -590,11 +767,11 @@
   white-space: nowrap;
   transition: color .18s, background .18s;
 }
-.pestanas button:hover { color: var(--cian-suave); }
+.pestanas button:hover { color: var(--dato-suave); }
 .pestanas button[aria-selected="true"] {
-  color: var(--cian);
-  background: rgba(42, 212, 240, .12);
-  box-shadow: inset 0 0 0 1px rgba(42, 212, 240, .28);
+  color: var(--dato);
+  background: var(--dato-tinte);
+  box-shadow: inset 0 0 0 1px var(--borde-vivo);
 }
 
 /* La pestaña entra con un desvanecido corto. Suficiente para que se lea como
@@ -651,12 +828,12 @@
 .pl-linea {
   position: relative;
   height: 4px; border-radius: 3px;
-  background: rgba(42, 212, 240, .12);
+  background: var(--dato-tinte);
   overflow: hidden;
 }
 .pl-lleno {
   position: absolute; inset: 0 auto 0 0;
-  background: var(--verde);
+  background: var(--bien);
   border-radius: 3px;
   /* El ancho se reescribe cada segundo; la transición lo lleva de un punto al
      siguiente para que avance liso en vez de a saltos. `linear` y no una curva
@@ -669,39 +846,39 @@
   position: absolute; top: -2px; bottom: -2px; width: 1px;
   background: rgba(255, 255, 255, .28);
 }
-.pulso.tarde .pl-lleno { background: var(--naranja); }
+.pulso.tarde .pl-lleno { background: var(--acento); }
 .pulso .luz {
   width: 8px; height: 8px; border-radius: 50%;
-  background: var(--verde);
-  box-shadow: 0 0 0 0 rgba(74, 222, 128, .55);
+  background: var(--bien);
+  box-shadow: 0 0 0 0 var(--bien-vivo);
   animation: latido 3s ease-out infinite;
   flex: none;
 }
 .pulso .resto {
-  font-family: var(--cifra); color: var(--verde);
+  font-family: var(--cifra); color: var(--bien);
   font-variant-numeric: tabular-nums;
 }
 
 @keyframes latido {
-  0%   { box-shadow: 0 0 0 0 rgba(74, 222, 128, .5); }
-  70%  { box-shadow: 0 0 0 9px rgba(74, 222, 128, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+  0%   { box-shadow: 0 0 0 0 var(--bien-pulso); }
+  70%  { box-shadow: 0 0 0 9px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 /* Pasado de largo. El latido se acelera y cambia a naranja: el mismo elemento
    que decía «todo llega» ahora dice «algo pasa», sin que aparezca nada nuevo
    en pantalla que haya que aprender a interpretar. */
-.pulso.tarde { color: var(--naranja); }
+.pulso.tarde { color: var(--acento); }
 .pulso.tarde .luz {
-  background: var(--naranja);
+  background: var(--acento);
   animation: latido-tarde 1.1s ease-out infinite;
 }
-.pulso.tarde .resto { color: var(--naranja); }
+.pulso.tarde .resto { color: var(--acento); }
 
 @keyframes latido-tarde {
-  0%   { box-shadow: 0 0 0 0 rgba(255, 138, 61, .7); }
-  70%  { box-shadow: 0 0 0 11px rgba(255, 138, 61, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 138, 61, 0); }
+  0%   { box-shadow: 0 0 0 0 var(--acento-pulso); }
+  70%  { box-shadow: 0 0 0 11px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
 
 /* ─────────────────────────────────────────────── cifra de portada */
@@ -711,7 +888,7 @@
 .portada { display: flex; flex-direction: column; gap: 8px; }
 .portada .p-num {
   font: 600 clamp(40px, 11.5vw, 66px)/1 var(--cifra);
-  color: var(--cian);
+  color: var(--dato);
   /* Halo tenue: la cifra parece emitir luz en vez de estar impresa, que es lo
      que la emparenta con la esfera de detrás. No toca el contraste — el halo
      cae ALREDEDOR del trazo, no encima, y a .22 el fondo que levanta está muy
@@ -719,14 +896,14 @@
      —el método está en la nota de `.panel`, arriba—: la cifra pasa de 11,09:1
      a 11,04:1 al añadir el halo. Cinco centésimas, dentro del propio ruido de
      la medida. */
-  text-shadow: 0 0 26px rgba(42, 212, 240, .22);
+  text-shadow: 0 0 26px var(--dato-halo);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.02em;
   background: none; border: 0; padding: 0;
   text-align: left; cursor: pointer;
   transition: color .18s;
 }
-.portada .p-num:hover { color: var(--verde); }
+.portada .p-num:hover { color: var(--bien); }
 .portada .p-num .u {
   font-size: .34em; color: var(--apagado); margin-left: .3em; letter-spacing: .06em;
 }
@@ -766,7 +943,7 @@
 
 .pg-linea {
   fill: none;
-  stroke: var(--cian);
+  stroke: var(--dato);
   stroke-width: 1.4;
   /* `preserveAspectRatio="none"` estira el viewBox, y con él el grosor del
      trazo. `non-scaling-stroke` lo mantiene en píxeles reales: sin esto la
@@ -774,12 +951,12 @@
   vector-effect: non-scaling-stroke;
   stroke-linejoin: round;
 }
-.pg-area { fill: rgba(42, 212, 240, .10); stroke: none; }
+.pg-area { fill: var(--dato-velo); stroke: none; }
 
-.pgraf.sube .pg-linea { stroke: var(--verde); }
-.pgraf.sube .pg-area  { fill: rgba(74, 222, 128, .10); }
-.pgraf.baja .pg-linea { stroke: var(--naranja); }
-.pgraf.baja .pg-area  { fill: rgba(255, 138, 61, .10); }
+.pgraf.sube .pg-linea { stroke: var(--bien); }
+.pgraf.sube .pg-area  { fill: var(--bien-velo); }
+.pgraf.baja .pg-linea { stroke: var(--acento); }
+.pgraf.baja .pg-area  { fill: var(--acento-velo); }
 
 /* En minúsculas y sin espaciado, al revés que las demás etiquetas: es un pie
    de figura y no un rótulo, y en versalitas espaciadas los dos bloques no
@@ -792,8 +969,8 @@
 }
 /* El porcentaje va en el color de la línea para que se lean como el mismo
    dato — y lleva su signo delante, que es lo que de verdad lo dice. */
-.pgraf.sube .pg-cambio { color: var(--verde); }
-.pgraf.baja .pg-cambio { color: var(--naranja); }
+.pgraf.sube .pg-cambio { color: var(--bien); }
+.pgraf.baja .pg-cambio { color: var(--acento); }
 
 /* ─────────────────────────────────────────────── resumen: densidad
 
@@ -873,7 +1050,7 @@
 }
 .s-eti { font: 500 12px/1.4 var(--texto); color: var(--apagado); letter-spacing: .01em; }
 .s-num {
-  font: 600 26px/1.1 var(--cifra); color: var(--cian-suave);
+  font: 600 26px/1.1 var(--cifra); color: var(--dato-suave);
   font-variant-numeric: tabular-nums;
 }
 .s-num .u { font-size: max(11px, .42em); color: var(--apagado); margin-left: .26em; font-weight: 500; }
@@ -891,18 +1068,18 @@
   width: 100%; min-width: 0;
   background: rgba(0, 0, 0, .35); border: 1px solid var(--borde);
   border-radius: 9px; padding: 10px 11px;
-  color: var(--cian-suave); font: 500 14px/1.2 var(--texto);
+  color: var(--dato-suave); font: 500 14px/1.2 var(--texto);
   font-variant-numeric: tabular-nums;
 }
 .ap-campo input:focus { outline: none; border-color: var(--borde-vivo); }
 .ap-guardar {
-  background: rgba(42, 212, 240, .14); border: 1px solid var(--borde-vivo);
+  background: var(--dato-tinte); border: 1px solid var(--borde-vivo);
   border-radius: 9px; padding: 11px 15px; min-height: 42px;
-  color: var(--cian); font: 600 13.5px/1 var(--texto); cursor: pointer;
+  color: var(--dato); font: 600 13.5px/1 var(--texto); cursor: pointer;
 }
 .ap-guardar:disabled { opacity: .5; cursor: default; }
 .ap-aviso { margin: 0 0 10px; font: 400 12.5px/1.45 var(--texto); color: var(--apagado); min-height: 1.45em; }
-.ap-aviso.mal { color: var(--naranja); }
+.ap-aviso.mal { color: var(--acento); }
 
 .ap-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .ap-fila {
@@ -912,16 +1089,16 @@
   font: 400 13px/1.4 var(--texto);
 }
 .ap-cuando { color: var(--apagado); white-space: nowrap; }
-.ap-pls { font: 600 14px/1.3 var(--cifra); color: var(--cian); font-variant-numeric: tabular-nums; }
+.ap-pls { font: 600 14px/1.3 var(--cifra); color: var(--dato); font-variant-numeric: tabular-nums; }
 .ap-pls .u { font-size: max(11px, .72em); color: var(--apagado); margin-left: .3em; font-weight: 500; }
-.ap-usd { color: var(--cian-suave); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ap-usd { color: var(--dato-suave); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ap-precio { color: var(--apagado); font-size: 12px; }
 .ap-x {
   background: none; border: 0; color: var(--apagado);
   font-size: 18px; line-height: 1; cursor: pointer; padding: 0 4px;
   min-width: 28px; min-height: 28px;      /* objetivo táctil */
 }
-.ap-x:hover { color: var(--naranja); }
+.ap-x:hover { color: var(--acento); }
 
 @media (max-width: 460px) {
   .ap-form { grid-template-columns: 1fr 1fr; }
@@ -931,3 +1108,42 @@
   .ap-fila { grid-template-columns: auto 1fr auto; }
   .ap-usd { grid-column: 2 / -1; text-align: left; }
 }
+
+/* ─────────────────────────────────────────── el selector de tema */
+
+.tm-fila { display: flex; flex-wrap: wrap; gap: 8px; }
+.tm-op {
+  display: flex; align-items: center; gap: 9px;
+  background: rgba(0, 0, 0, .3); border: 1px solid var(--borde);
+  border-radius: 11px; padding: 9px 12px 9px 9px; min-height: 42px;
+  color: var(--apagado); font: 500 13px/1 var(--texto); cursor: pointer;
+}
+.tm-op:hover { color: var(--dato-suave); border-color: var(--borde-vivo); }
+.tm-op.puesto { color: var(--dato); border-color: var(--borde-vivo); background: rgba(255, 255, 255, .05); }
+
+/* La muestra enseña los tres colores que cambian, no uno: con un solo cuadrado
+   no se sabe cómo va a quedar el panel. */
+.tm-muestra { display: flex; border-radius: 5px; overflow: hidden; flex: none; }
+.tm-muestra i { display: block; width: 9px; height: 18px; }
+
+/* ⚠ Los colores de CADA muestra van escritos aquí y NO leen las variables:
+   las variables valen lo que valga el tema PUESTO, así que las cinco muestras
+   saldrían idénticas y del color activo. Es la única duplicación del sistema de
+   temas, y está aquí a propósito. Si se añade un tema, se añaden sus tres
+   colores aquí también — y `temas-test.js` comprueba que coinciden con los del
+   tema de verdad, para que no se queden viejos. */
+.tm-muestra[data-de="nucleo"] .tm-c1 { background: #2ad4f0; }
+.tm-muestra[data-de="nucleo"] .tm-c2 { background: #ff8a3d; }
+.tm-muestra[data-de="nucleo"] .tm-c3 { background: #4ade80; }
+.tm-muestra[data-de="menta"]  .tm-c1 { background: #5eead4; }
+.tm-muestra[data-de="menta"]  .tm-c2 { background: #fb7185; }
+.tm-muestra[data-de="menta"]  .tm-c3 { background: #a3e635; }
+.tm-muestra[data-de="pulso"]  .tm-c1 { background: #ff5cb0; }
+.tm-muestra[data-de="pulso"]  .tm-c2 { background: #28e0e6; }
+.tm-muestra[data-de="pulso"]  .tm-c3 { background: #9ae66e; }
+.tm-muestra[data-de="ambar"]  .tm-c1 { background: #fbbf24; }
+.tm-muestra[data-de="ambar"]  .tm-c2 { background: #56b8f5; }
+.tm-muestra[data-de="ambar"]  .tm-c3 { background: #86efac; }
+.tm-muestra[data-de="papel"]  .tm-c1 { background: #ececef; }
+.tm-muestra[data-de="papel"]  .tm-c2 { background: #fbbf24; }
+.tm-muestra[data-de="papel"]  .tm-c3 { background: #7ddba1; }
