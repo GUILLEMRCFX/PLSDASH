@@ -69,38 +69,91 @@ export function aplicarGuardado() {
 
 export const TITULO = 'Tema';
 
+/**
+ * El panel es SOLO su cabecera: el rótulo «Tema» y, a la derecha, el nombre del
+ * que está puesto, que despliega los cinco. Antes era una fila de botones con
+ * tres cuadraditos de color cada uno, y ocupaba una tarjeta entera para algo que
+ * se toca una vez al mes.
+ *
+ * Cada nombre va escrito en el color de SU tema, que es lo que sustituye a las
+ * muestras: el nombre es la muestra. Por qué no es un `<select>`, en el CSS.
+ */
 export function panelTema() {
   const actual = temaGuardado();
-  const muestras = TEMAS.map(t => `
-    <button type="button" class="tm-op${t.id === actual ? ' puesto' : ''}"
-            data-tema="${t.id}" aria-pressed="${t.id === actual}"
-            title="${t.nombre} · ${t.pista}">
-      <!-- La muestra enseña los TRES colores que de verdad cambian de sitio a
-           sitio: el dato, el acento y el «va bien». Un solo cuadrado de color
-           no dice cómo va a quedar el panel. -->
-      <span class="tm-muestra" data-de="${t.id}" aria-hidden="true">
-        <i class="tm-c1"></i><i class="tm-c2"></i><i class="tm-c3"></i>
-      </span>
-      <span class="tm-nombre">${t.nombre}</span>
-    </button>`).join('');
+  const puesto = TEMAS.find(t => t.id === actual) || TEMAS[0];
+
+  const opciones = TEMAS.map(t => `
+    <button type="button" class="tm-op" role="menuitemradio"
+            data-tema="${t.id}" aria-checked="${t.id === actual}"
+            title="${t.nombre} · ${t.pista}">${t.nombre}</button>`).join('');
 
   return `
-    <section class="panel" aria-labelledby="ptm-t">
-      <header class="p-cab"><h2 id="ptm-t">${TITULO}</h2></header>
-      <div class="tm-fila" role="group" aria-label="Tema de color del panel">
-        ${muestras}
-      </div>
-      <p class="c-sub">Se guarda en este dispositivo. Los cinco pasan el contraste
-        mínimo de texto pequeño; la comprobación los mide de una pasada.</p>
+    <section class="panel tema" aria-labelledby="ptm-t">
+      <header class="p-cab">
+        <h2 id="ptm-t">${TITULO}</h2>
+        <div class="tm">
+          <button type="button" class="tm-abrir" id="tmAbrir"
+                  aria-expanded="false" aria-haspopup="true"
+                  aria-label="Tema de color: ${puesto.nombre}. Cambiar">${puesto.nombre}</button>
+          <div class="tm-lista" id="tmLista" role="menu" aria-labelledby="tmAbrir" hidden>
+            ${opciones}
+          </div>
+        </div>
+      </header>
     </section>`;
 }
 
 export function engancharTema(raiz, repintar) {
-  raiz.querySelectorAll('.tm-op').forEach(b => {
+  const abrir = raiz.querySelector('#tmAbrir');
+  const lista = raiz.querySelector('#tmLista');
+  if (!abrir || !lista) return;
+
+  const cerrar = () => {
+    lista.hidden = true;
+    abrir.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', alTocarFuera, true);
+    document.removeEventListener('keydown', alTeclear, true);
+  };
+  /* ⚠ En captura y en el listener de fuera: el HTML del panel se REGENERA entero
+     cada 18 segundos, así que este nodo puede haber dejado de estar en el
+     documento cuando el evento llega. Sin comprobarlo, el desplegable de un
+     repintado anterior seguía capturando los clics del nuevo. */
+  function alTocarFuera(ev) {
+    if (!abrir.isConnected) return cerrar();
+    if (!lista.contains(ev.target) && ev.target !== abrir) cerrar();
+  }
+  function alTeclear(ev) {
+    if (ev.key === 'Escape') { cerrar(); abrir.focus(); }
+  }
+
+  abrir.addEventListener('click', () => {
+    if (!lista.hidden) return cerrar();
+
+    lista.hidden = false;
+    abrir.setAttribute('aria-expanded', 'true');
+
+    /* ⚠ Y AHORA, HACIA DÓNDE. El panel del tema es el último de su columna, así
+       que en un móvil está al final del recorrido: desplegando siempre hacia
+       abajo, los últimos nombres caen fuera de la ventana. Medido a 390×844,
+       «Papel» quedaba justo pegado al borde y con menos alto se salía.
+       Se mide DESPUÉS de mostrarla —oculta no tiene altura— y se voltea solo si
+       de verdad no cabe: hacia arriba por sistema sería peor en escritorio. */
+    lista.classList.remove('arriba');
+    const caja = lista.getBoundingClientRect();
+    const debajo = window.innerHeight - abrir.getBoundingClientRect().bottom;
+    if (caja.height + 16 > debajo) lista.classList.add('arriba');
+
+    document.addEventListener('pointerdown', alTocarFuera, true);
+    document.addEventListener('keydown', alTeclear, true);
+    lista.querySelector('.tm-op[aria-checked="true"]')?.focus();
+  });
+
+  lista.querySelectorAll('.tm-op').forEach(b => {
     b.addEventListener('click', () => {
       aplicarTema(b.dataset.tema);
-      // Repintar para que las marcas de «puesto» se pongan al día. El color
-      // en sí ya ha cambiado: lo hace el CSS con el atributo del `<html>`.
+      cerrar();
+      // Repintar para que el nombre del disparador y la marca se pongan al día.
+      // El color en sí ya ha cambiado: lo hace el CSS con el atributo del <html>.
       repintar();
     });
   });

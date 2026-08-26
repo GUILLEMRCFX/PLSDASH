@@ -1109,41 +1109,92 @@
   .ap-usd { grid-column: 2 / -1; text-align: left; }
 }
 
-/* ─────────────────────────────────────────── el selector de tema */
 
-.tm-fila { display: flex; flex-wrap: wrap; gap: 8px; }
-.tm-op {
-  display: flex; align-items: center; gap: 9px;
-  background: rgba(0, 0, 0, .3); border: 1px solid var(--borde);
-  border-radius: 11px; padding: 9px 12px 9px 9px; min-height: 42px;
-  color: var(--apagado); font: 500 13px/1 var(--texto); cursor: pointer;
+/* ─────────────────────────────────────────── el selector de tema
+
+   Va EN EL TÍTULO del panel y se despliega. Antes era una fila de cinco
+   botones, cada uno con tres cuadraditos de color, y ocupaba una tarjeta
+   entera para una preferencia que se toca una vez al mes. Ahora el panel es
+   solo su cabecera: «TEMA» y, a la derecha, el nombre del que está puesto.
+
+   ⚠ Y NO ES UN `<select>`, aunque lo parezca. El requisito es que cada nombre
+     se lea en el color de su tema, y el `color` de un `<option>` lo ignoran
+     tanto Safari en iPhone como Chrome en Android: ahí las opciones las pinta
+     el sistema con su propia paleta. Un `<select>` daría cinco nombres grises
+     en el único sitio donde el color ES la información. De ahí el desplegable
+     propio, con su `aria-expanded` y su cierre con Escape. */
+
+.tm { position: relative; }
+
+/* El disparador se lee como la marca de estado de los demás paneles —misma
+   caja, mismas versalitas—, así que la cabecera no cambia de aire por llevar
+   un control dentro. */
+.tm-abrir {
+  display: flex; align-items: center; gap: 7px;
+  background: none; border: 0; padding: 2px 0; margin: 0;
+  font: 600 12px/1.2 var(--texto);
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--dato); cursor: pointer;
 }
-.tm-op:hover { color: var(--dato-suave); border-color: var(--borde-vivo); }
-.tm-op.puesto { color: var(--dato); border-color: var(--borde-vivo); background: rgba(255, 255, 255, .05); }
+.tm-abrir:hover { opacity: .75; }
+.tm-abrir::after {
+  content: ''; flex: none;
+  width: 7px; height: 7px; margin-bottom: 2px;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform .15s;
+}
+.tm-abrir[aria-expanded="true"]::after { transform: rotate(-135deg) translate(-1px, -1px); }
 
-/* La muestra enseña los tres colores que cambian, no uno: con un solo cuadrado
-   no se sabe cómo va a quedar el panel. */
-.tm-muestra { display: flex; border-radius: 5px; overflow: hidden; flex: none; }
-.tm-muestra i { display: block; width: 9px; height: 18px; }
+.tm-lista {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30;
+  display: flex; flex-direction: column; min-width: 148px;
+  padding: 5px; margin: 0;
+  border: 1px solid var(--borde-vivo); border-radius: 11px;
+  /* ⚠ OPACO, no vidrio. Primero llevaba el fondo translúcido y desenfoque, como
+     las tarjetas, y en el móvil se abría justo encima del Registro: los
+     importes de los barridos se leían ENTRE los nombres de los temas. El
+     desenfoque no llegaba a taparlos porque el texto de debajo es brillante y
+     el fondo dejaba pasar un 10 %. Un desplegable tapa; para eso se abre.
+     El tinte del tema es lo que evita que parezca un agujero negro encima del
+     panel, y sigue siendo opaco porque `--fondo` lo es. */
+  background: color-mix(in srgb, var(--dato) 7%, var(--fondo));
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .55);
+}
+.tm-lista[hidden] { display: none; }
+/* Cuando no cabe por abajo. Lo decide `tema.js` midiendo, no el CSS: aquí no
+   se sabe cuánto sitio queda hasta el borde de la ventana. */
+.tm-lista.arriba { top: auto; bottom: calc(100% + 8px); }
 
-/* ⚠ Los colores de CADA muestra van escritos aquí y NO leen las variables:
-   las variables valen lo que valga el tema PUESTO, así que las cinco muestras
-   saldrían idénticas y del color activo. Es la única duplicación del sistema de
-   temas, y está aquí a propósito. Si se añade un tema, se añaden sus tres
-   colores aquí también — y `temas-test.js` comprueba que coinciden con los del
-   tema de verdad, para que no se queden viejos. */
-.tm-muestra[data-de="nucleo"] .tm-c1 { background: #2ad4f0; }
-.tm-muestra[data-de="nucleo"] .tm-c2 { background: #ff8a3d; }
-.tm-muestra[data-de="nucleo"] .tm-c3 { background: #4ade80; }
-.tm-muestra[data-de="menta"]  .tm-c1 { background: #5eead4; }
-.tm-muestra[data-de="menta"]  .tm-c2 { background: #fb7185; }
-.tm-muestra[data-de="menta"]  .tm-c3 { background: #a3e635; }
-.tm-muestra[data-de="pulso"]  .tm-c1 { background: #ff5cb0; }
-.tm-muestra[data-de="pulso"]  .tm-c2 { background: #28e0e6; }
-.tm-muestra[data-de="pulso"]  .tm-c3 { background: #9ae66e; }
-.tm-muestra[data-de="ambar"]  .tm-c1 { background: #fbbf24; }
-.tm-muestra[data-de="ambar"]  .tm-c2 { background: #56b8f5; }
-.tm-muestra[data-de="ambar"]  .tm-c3 { background: #86efac; }
-.tm-muestra[data-de="papel"]  .tm-c1 { background: #ececef; }
-.tm-muestra[data-de="papel"]  .tm-c2 { background: #fbbf24; }
-.tm-muestra[data-de="papel"]  .tm-c3 { background: #7ddba1; }
+.tm-op {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: none; border: 0; border-radius: 7px;
+  padding: 9px 10px; min-height: 40px;      /* 40 es el mínimo para el dedo */
+  font: 600 14px/1 var(--texto); text-align: left; cursor: pointer;
+}
+.tm-op:hover, .tm-op:focus-visible { background: rgba(255, 255, 255, .06); outline: none; }
+.tm-op:focus-visible { box-shadow: inset 0 0 0 1px currentColor; }
+
+/* La marca del que está puesto no es solo el color: es este palito. El color
+   por sí solo no dice cuál está activo cuando los cinco van coloreados. */
+.tm-op[aria-checked="true"]::after {
+  content: '✓'; font-size: 13px; opacity: .9;
+}
+.tm-op[aria-checked="false"]::after { content: ''; }
+
+/* ⚠ Los colores van escritos aquí y NO leen las variables: una variable vale
+   lo que valga el tema PUESTO, así que los cinco nombres saldrían idénticos y
+   del color activo — que es justo lo contrario de lo que se quiere. Es la
+   única duplicación del sistema de temas y está aquí a propósito. Si se añade
+   un tema se añade su color aquí también, y `temas-test.js` comprueba que
+   coincide con el `--dato` de verdad: si se quedan desparejados, lo dice. */
+.tm-op[data-tema="nucleo"] { color: #2ad4f0; }
+.tm-op[data-tema="menta"]  { color: #5eead4; }
+.tm-op[data-tema="pulso"]  { color: #ff5cb0; }
+.tm-op[data-tema="ambar"]  { color: #fbbf24; }
+.tm-op[data-tema="papel"]  { color: #ececef; }
+
+/* El panel del tema no tiene cuerpo: es una cabecera y ya. Sin esto arrastraba
+   el `gap` de `.panel` y dejaba un hueco vacío debajo del título. */
+.panel.tema { padding-bottom: 14px; }
+.panel.tema .p-cab { align-items: center; }
