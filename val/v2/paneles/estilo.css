@@ -711,8 +711,25 @@
 
 /* ─────────────────────────────────────────────── barra de pestañas */
 
-.pestanas {
-  display: flex; gap: 4px;
+/* ⚠ El aspecto de la barra —fondo, borde, redondeo, desenfoque— vive en
+   `.barra` y NO en `.pestanas`, desde que el engranaje del tema se metió
+   dentro de la barra pero fuera del `<nav role="tablist">`. Así las dos cosas
+   se ven como una sola pieza sin que el engranaje tenga que ser una pestaña.
+
+   Y `.pestanas` conserva su `overflow-x`, que es lo que le deja desplazarse
+   cuando los nombres no caben: el engranaje queda fuera de ese carril y por eso
+   no se lo lleva el desplazamiento — está siempre a mano. */
+.barra {
+  /* ⚠ POSICIONADA Y POR DELANTE, y no es decorativo: el desplegable del tema
+     cuelga de aquí y cae SOBRE la vista de abajo. Sin esto quedaba detrás — no
+     medio tapado, sino inalcanzable: el titular de Resumen se quedaba con los
+     clics y elegir un tema era imposible. El motivo es que `.vista.entrando`
+     lleva animación, y eso le crea contexto de apilamiento propio; al ir
+     después en el documento, se pintaba encima. El `z-index: 30` de la lista no
+     podía nada contra eso, porque compite dentro de otro contexto.
+     Lo cazó la prueba al no poder pulsar un nombre. */
+  position: relative; z-index: 40;
+  display: flex; align-items: stretch; gap: 4px;
   padding: 4px;
   border-radius: 13px;
   background: var(--vidrio);
@@ -739,6 +756,19 @@
   backdrop-filter: blur(16px) saturate(1.25);
   -webkit-backdrop-filter: blur(16px) saturate(1.25);
   border: 1px solid var(--borde);
+  /* Sin recorte: el desplegable del tema cuelga por debajo de la barra. */
+  overflow: visible;
+}
+
+.pestanas {
+  display: flex; gap: 4px;
+  /* ⚠ `0 1 auto` y no `1 1 auto`: la fila mide lo que miden sus pestañas y NO
+     se estira. Estirándose, en una pantalla ancha el engranaje se iba al
+     extremo derecho de la barra y quedaba a un palmo de «Esfera» — que es
+     justo donde se pidió que estuviera, al lado. Encoger sí: por eso el `1` del
+     medio y el `min-width: 0`, que es lo que le permite ceder sitio y
+     desplazarse en un móvil estrecho en vez de empujar al engranaje fuera. */
+  min-width: 0; flex: 0 1 auto;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1001,11 +1031,30 @@
      Lo que sobraba era el tracking, que estaba puesto para unas versalitas que
      ya no hay. Con 0 y el relleno a 6px caben las cinco con 30px de sobra, y a
      12px de cuerpo. Medido, no estimado. */
+/* ⚠ EL TRAMO ESTRECHO, Y POR QUÉ ESTOS NÚMEROS Y NO OTROS.
+
+   Las cinco pestañas suman 335px de texto y relleno. El engranaje del tema le
+   quita a la fila 46px de hueco (42 de botón y 4 de separación), y eso rompía
+   dos anchos que antes cabían:
+
+       ancho   hueco antes   hueco con engranaje   suman
+        430        404              350             335   cabía y cabe
+        390        364              310             335   CABÍA, dejó de caber
+        375        349              295             335   CABÍA, dejó de caber
+        360        334              288             335   ya se desplazaba antes
+
+   Se devuelven esos 46px donde estaba el gasto —relleno y separación—, no
+   encogiendo el engranaje, que a menos de 42px deja de poder tocarse con el
+   dedo. 360 sigue desplazándose, pero eso ya pasaba antes de este cambio y no
+   lo empeora el engranaje: son cinco nombres que no caben en 360px. */
 @media (max-width: 460px) {
+  .pestanas { gap: 3px; }
   .pestanas button {
-    font-size: 12.5px;
+    /* 12 y no 12,5: el medio punto vale 11px de fila, y a 375 —el iPhone
+       estrecho— eran justo los que faltaban. */
+    font-size: 12px;
     letter-spacing: 0;
-    padding: 12px 6px;
+    padding: 12px 3px;
   }
 }
 
@@ -1124,27 +1173,37 @@
      en el único sitio donde el color ES la información. De ahí el desplegable
      propio, con su `aria-expanded` y su cierre con Escape. */
 
-.tm { position: relative; }
+/* `flex: none` para que el engranaje NO se encoja cuando los nombres de las
+   pestañas aprietan: es lo último que debe ceder sitio, porque encogido deja de
+   poder tocarse con el dedo. Las pestañas ya tienen su propio desplazamiento. */
+.tm { position: relative; flex: none; display: flex; align-items: center; }
 
-/* El disparador se lee como la marca de estado de los demás paneles —misma
-   caja, mismas versalitas—, así que la cabecera no cambia de aire por llevar
-   un control dentro. */
+/* El engranaje. Mismo alto que una pestaña para que la barra no se deforme, y
+   cuadrado: es un icono, no una palabra. */
 .tm-abrir {
-  display: flex; align-items: center; gap: 7px;
-  background: none; border: 0; padding: 2px 0; margin: 0;
-  font: 600 12px/1.2 var(--texto);
-  letter-spacing: .06em; text-transform: uppercase;
-  color: var(--dato); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  width: 42px; min-height: 42px;      /* objetivo táctil por los dos lados */
+  padding: 0; margin: 0;
+  background: none; border: 0; border-radius: 10px;
+  color: var(--apagado); cursor: pointer;
+  transition: color .18s, background .18s;
 }
-.tm-abrir:hover { opacity: .75; }
-.tm-abrir::after {
-  content: ''; flex: none;
-  width: 7px; height: 7px; margin-bottom: 2px;
-  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg) translate(-2px, -2px);
-  transition: transform .15s;
+.tm-abrir:hover { color: var(--dato-suave); }
+.tm-abrir:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--dato); }
+/* Abierto se marca como la pestaña activa: mismo fondo, mismo color. Sin esto
+   no hay forma de saber que el desplegable que tienes delante es suyo. */
+.tm-abrir[aria-expanded="true"] { color: var(--dato); background: var(--dato-tinte); }
+.tm-abrir svg { display: block; transition: transform .25s; }
+
+/* ⚠ Va AQUÍ y no en la media query de la barra, que está antes en el fichero:
+   allí la sobrescribía la regla de arriba por orden de aparición y el engranaje
+   se quedaba en 42px. Comprobado midiéndolo, no leyéndolo.
+   38 de ancho sigue siendo tocable porque el alto no baja de 42, y los 4px que
+   suelta valen una letra de «Validadores». */
+@media (max-width: 460px) {
+  .tm-abrir { width: 38px; }
 }
-.tm-abrir[aria-expanded="true"]::after { transform: rotate(-135deg) translate(-1px, -1px); }
+.tm-abrir[aria-expanded="true"] svg { transform: rotate(60deg); }
 
 .tm-lista {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 30;
@@ -1194,7 +1253,3 @@
 .tm-op[data-tema="ambar"]  { color: #fbbf24; }
 .tm-op[data-tema="papel"]  { color: #ececef; }
 
-/* El panel del tema no tiene cuerpo: es una cabecera y ya. Sin esto arrastraba
-   el `gap` de `.panel` y dejaba un hueco vacío debajo del título. */
-.panel.tema { padding-bottom: 14px; }
-.panel.tema .p-cab { align-items: center; }

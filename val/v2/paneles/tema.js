@@ -65,48 +65,61 @@ export function aplicarGuardado() {
   document.documentElement.dataset.tema = temaGuardado();
 }
 
-/* ─────────────────────────────────────────────── el selector */
+/* ─────────────────────────────────────────────── el selector
 
-export const TITULO = 'Tema';
+   Vive en la BARRA DE PESTAÑAS, a la derecha de «Esfera», y no dentro de una
+   pestaña: el tema se cambia desde cualquier sitio. Antes era un panel al final
+   de Nodo, o sea que para cambiar de tema había que ir primero a Nodo.
+
+   ⚠ SE MONTA UNA SOLA VEZ, y no es una optimización: los paneles regeneran su
+     HTML entero cada 18 segundos, y el engranaje vive fuera de ese ciclo a
+     propósito. Colgándolo del repintado, el desplegable se cerraría solo cada
+     18 segundos en mitad de elegir. Por eso al elegir un tema NO se repinta: se
+     actualizan en su sitio el rótulo del disparador y las marcas.
+
+   Cada nombre va escrito en el color de SU tema: el nombre es la muestra. Por
+   qué no es un «select» nativo, en el CSS. */
+
+const ENGRANAJE = [
+  '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"',
+  '     stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">',
+  '  <circle cx="12" cy="12" r="3.1"/>',
+  '  <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34',
+  '           1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34',
+  '           l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2',
+  '           0 1 1 0-4h.09A1.7 1.7 0 0 0 4.7 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83',
+  '           l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1.03-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0',
+  '           15.1 4.7a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9',
+  '           a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15z"/>',
+  '</svg>',
+].join('\n');
+
+const rotulo = t => `Tema de color: ${t.nombre}. Cambiar`;
 
 /**
- * El panel es SOLO su cabecera: el rótulo «Tema» y, a la derecha, el nombre del
- * que está puesto, que despliega los cinco. Antes era una fila de botones con
- * tres cuadraditos de color cada uno, y ocupaba una tarjeta entera para algo que
- * se toca una vez al mes.
- *
- * Cada nombre va escrito en el color de SU tema, que es lo que sustituye a las
- * muestras: el nombre es la muestra. Por qué no es un `<select>`, en el CSS.
+ * Pinta el engranaje y su desplegable dentro de `caja` y lo deja funcionando.
+ * Se llama UNA VEZ en el arranque. Devuelve false si no hay dónde montarlo.
  */
-export function panelTema() {
+export function montarTema(caja) {
+  if (!caja) return false;
   const actual = temaGuardado();
   const puesto = TEMAS.find(t => t.id === actual) || TEMAS[0];
 
   const opciones = TEMAS.map(t => `
-    <button type="button" class="tm-op" role="menuitemradio"
-            data-tema="${t.id}" aria-checked="${t.id === actual}"
-            title="${t.nombre} · ${t.pista}">${t.nombre}</button>`).join('');
+      <button type="button" class="tm-op" role="menuitemradio"
+              data-tema="${t.id}" aria-checked="${t.id === actual}"
+              title="${t.nombre} · ${t.pista}">${t.nombre}</button>`).join('');
 
-  return `
-    <section class="panel tema" aria-labelledby="ptm-t">
-      <header class="p-cab">
-        <h2 id="ptm-t">${TITULO}</h2>
-        <div class="tm">
-          <button type="button" class="tm-abrir" id="tmAbrir"
-                  aria-expanded="false" aria-haspopup="true"
-                  aria-label="Tema de color: ${puesto.nombre}. Cambiar">${puesto.nombre}</button>
-          <div class="tm-lista" id="tmLista" role="menu" aria-labelledby="tmAbrir" hidden>
-            ${opciones}
-          </div>
-        </div>
-      </header>
-    </section>`;
-}
+  caja.innerHTML = `
+    <button type="button" class="tm-abrir" id="tmAbrir"
+            aria-expanded="false" aria-haspopup="true"
+            aria-label="${rotulo(puesto)}">${ENGRANAJE}</button>
+    <div class="tm-lista" id="tmLista" role="menu" aria-labelledby="tmAbrir" hidden>
+      ${opciones}
+    </div>`;
 
-export function engancharTema(raiz, repintar) {
-  const abrir = raiz.querySelector('#tmAbrir');
-  const lista = raiz.querySelector('#tmLista');
-  if (!abrir || !lista) return;
+  const abrir = caja.querySelector('#tmAbrir');
+  const lista = caja.querySelector('#tmLista');
 
   const cerrar = () => {
     lista.hidden = true;
@@ -114,13 +127,8 @@ export function engancharTema(raiz, repintar) {
     document.removeEventListener('pointerdown', alTocarFuera, true);
     document.removeEventListener('keydown', alTeclear, true);
   };
-  /* ⚠ En captura y en el listener de fuera: el HTML del panel se REGENERA entero
-     cada 18 segundos, así que este nodo puede haber dejado de estar en el
-     documento cuando el evento llega. Sin comprobarlo, el desplegable de un
-     repintado anterior seguía capturando los clics del nuevo. */
   function alTocarFuera(ev) {
-    if (!abrir.isConnected) return cerrar();
-    if (!lista.contains(ev.target) && ev.target !== abrir) cerrar();
+    if (!lista.contains(ev.target) && !abrir.contains(ev.target)) cerrar();
   }
   function alTeclear(ev) {
     if (ev.key === 'Escape') { cerrar(); abrir.focus(); }
@@ -132,16 +140,15 @@ export function engancharTema(raiz, repintar) {
     lista.hidden = false;
     abrir.setAttribute('aria-expanded', 'true');
 
-    /* ⚠ Y AHORA, HACIA DÓNDE. El panel del tema es el último de su columna, así
-       que en un móvil está al final del recorrido: desplegando siempre hacia
-       abajo, los últimos nombres caen fuera de la ventana. Medido a 390×844,
-       «Papel» quedaba justo pegado al borde y con menos alto se salía.
-       Se mide DESPUÉS de mostrarla —oculta no tiene altura— y se voltea solo si
-       de verdad no cabe: hacia arriba por sistema sería peor en escritorio. */
+    /* ⚠ HACIA DÓNDE. Colgando de la barra siempre hay sitio debajo, así que hoy
+       no voltea nunca — pero la medida se queda. Cuando esto colgaba del último
+       panel de Nodo, a 390×844 el último nombre caía fuera de la ventana, y
+       basta con que alguien vuelva a mover el disparador para que reaparezca.
+       Se mide DESPUÉS de mostrarla: oculta no tiene altura. */
     lista.classList.remove('arriba');
-    const caja = lista.getBoundingClientRect();
+    const alto = lista.getBoundingClientRect().height;
     const debajo = window.innerHeight - abrir.getBoundingClientRect().bottom;
-    if (caja.height + 16 > debajo) lista.classList.add('arriba');
+    if (alto + 16 > debajo) lista.classList.add('arriba');
 
     document.addEventListener('pointerdown', alTocarFuera, true);
     document.addEventListener('keydown', alTeclear, true);
@@ -150,11 +157,16 @@ export function engancharTema(raiz, repintar) {
 
   lista.querySelectorAll('.tm-op').forEach(b => {
     b.addEventListener('click', () => {
-      aplicarTema(b.dataset.tema);
+      const id = aplicarTema(b.dataset.tema);
+      // Al sitio, sin regenerar nada: ver el aviso de arriba.
+      const t = TEMAS.find(x => x.id === id) || TEMAS[0];
+      abrir.setAttribute('aria-label', rotulo(t));
+      lista.querySelectorAll('.tm-op').forEach(o =>
+        o.setAttribute('aria-checked', String(o.dataset.tema === id)));
       cerrar();
-      // Repintar para que el nombre del disparador y la marca se pongan al día.
-      // El color en sí ya ha cambiado: lo hace el CSS con el atributo del <html>.
-      repintar();
+      abrir.focus();
     });
   });
+
+  return true;
 }
