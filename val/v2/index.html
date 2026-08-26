@@ -139,13 +139,29 @@
 
 <main class="marco">
   <div id="contenido">
-    <nav class="pestanas" role="tablist" aria-label="Secciones del panel">
-      <button type="button" role="tab" id="t-resumen"     aria-controls="v-resumen"     aria-selected="true">Resumen</button>
-      <button type="button" role="tab" id="t-ganancias"   aria-controls="v-ganancias"   aria-selected="false" tabindex="-1">Ganancias</button>
-      <button type="button" role="tab" id="t-validadores" aria-controls="v-validadores" aria-selected="false" tabindex="-1">Validadores</button>
-      <button type="button" role="tab" id="t-nodo"        aria-controls="v-nodo"        aria-selected="false" tabindex="-1">Nodo</button>
-      <button type="button" role="tab" id="t-esfera"      aria-controls="v-esfera"      aria-selected="false" tabindex="-1">Esfera</button>
-    </nav>
+    <!-- ⚠ El engranaje del tema va DENTRO de la barra pero FUERA del `<nav>`, y
+         las dos cosas importan:
+
+           · El `<nav>` es `role="tablist"` y sus hijos son `role="tab"`. Un
+             botón que no es una pestaña ahí dentro rompe lo que el rol promete
+             a quien navega con lector de pantalla.
+           · El manejador de flechas cuelga de `.pestanas`. Con el engranaje
+             fuera, pulsar → con el foco en él ya no salta de pestaña — sin
+             filtrar el objetivo del evento ni ninguna otra costura.
+
+         Visualmente siguen siendo una sola barra: el fondo, el borde y el
+         redondeo se los pone `.barra`, no `.pestanas`. -->
+    <div class="barra">
+      <nav class="pestanas" role="tablist" aria-label="Secciones del panel">
+        <button type="button" role="tab" id="t-resumen"     aria-controls="v-resumen"     aria-selected="true">Resumen</button>
+        <button type="button" role="tab" id="t-ganancias"   aria-controls="v-ganancias"   aria-selected="false" tabindex="-1">Ganancias</button>
+        <button type="button" role="tab" id="t-validadores" aria-controls="v-validadores" aria-selected="false" tabindex="-1">Validadores</button>
+        <button type="button" role="tab" id="t-nodo"        aria-controls="v-nodo"        aria-selected="false" tabindex="-1">Nodo</button>
+        <button type="button" role="tab" id="t-esfera"      aria-controls="v-esfera"      aria-selected="false" tabindex="-1">Esfera</button>
+      </nav>
+      <!-- Lo rellena `montarTema()` UNA VEZ, no en cada repintado. Ver tema.js -->
+      <div class="tm" id="tmCaja"></div>
+    </div>
 
     <div class="vista" role="tabpanel" id="v-resumen"     aria-labelledby="t-resumen"     tabindex="0"></div>
     <div class="vista" role="tabpanel" id="v-ganancias"   aria-labelledby="t-ganancias"   tabindex="0" hidden></div>
@@ -192,7 +208,7 @@
   import { panelEstadoGlobal } from './paneles/estado-global.js';
   import { panelRegistro } from './paneles/registro.js';
   import { latir } from './paneles/pulso.js';
-  import { panelTema, engancharTema } from './paneles/tema.js';
+  import { montarTema } from './paneles/tema.js';
 
   const q = new URLSearchParams(location.search);
   // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
@@ -250,7 +266,7 @@
     { id: 'resumen',     paneles: [panelResumen] },
     { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelTrayectoria, panelAportaciones, panelPrecio] },
     { id: 'validadores', paneles: [panelValidadores] },
-    { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro, panelTema] },
+    { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
     // `estatica`: su HTML lo escribió el documento y no se regenera nunca. Ver
     // el aviso junto a `#v-esfera` en el marcado.
     { id: 'esfera',      paneles: [], estatica: true },
@@ -313,6 +329,11 @@
 
   window.addEventListener('hashchange', () => activar(desdeHash(), { mover: false }));
 
+  /* El engranaje del tema, UNA VEZ. Vive en la barra y no en una pestaña, así
+     que no lo toca el repintado de cada 18 segundos — que es justo lo que hace
+     falta: si lo regenerara, el desplegable se cerraría solo mientras eliges. */
+  montarTema(document.getElementById('tmCaja'));
+
   /* ───────────────────────────────────────────── paneles */
 
   let ultimos = null;
@@ -370,7 +391,6 @@
     // Tras apuntar o borrar hay que volver a PEDIR: el histórico vive en D1,
     // no en `ultimos`. Por eso `refrescar` y no `pintar`.
     engancharAportaciones(document, () => refrescar());
-    engancharTema(document, () => pintar(ultimos));
     window.__datos = datos;
     // Ganchos de diagnóstico, como `__esfera`: desde la consola se puede forzar
     // un repintado sin esperar 18 segundos, y la prueba del bloque 2 lo usa para
