@@ -116,8 +116,26 @@ export function panelAportaciones(datos) {
           : ''}
       </header>
 
-      <!-- El formulario primero: se abre este panel para apuntar algo, no para
-           leer la lista. La lista es la comprobación de que se apuntó bien. -->
+      <!-- ⚠ PLEGADO por omisión, y no por ahorrar píxeles porque sí: era el
+           panel más alto del v2 —616px a 390, cuando la pantalla útil son 766—
+           y es un formulario que se toca una vez al mes. Plegado deja el total
+           a la vista, que es lo único que se consulta a diario, y se abre para
+           apuntar.
+
+           Es un elemento «details» nativo: se abre sin JS, funciona con teclado
+           y el lector de pantalla ya sabe leerlo. Un plegable hecho a mano
+           habría que enseñárselo a todos ellos.
+
+           SIN COMILLAS INVERSAS aquí dentro: esto vive en una plantilla y una
+           comilla inversa la cierra. Van seis veces en este proyecto, y la
+           séptima ha sido escribiendo ESTE MISMO aviso. Por eso ahora hay una
+           prueba que importa todos los módulos y lo caza sola: sintaxis-test.js
+           en el banco de pruebas. -->
+      <details class="ap-desp">
+        <summary class="ap-abrir">${lista.length
+          ? `${lista.length} ${lista.length === 1 ? 'apuntada' : 'apuntadas'} · añadir o borrar`
+          : 'Apuntar una aportación'}</summary>
+
       <form class="ap-form" id="apForm" autocomplete="off">
         <label class="ap-campo">
           <span>Fecha</span>
@@ -143,6 +161,7 @@ export function panelAportaciones(datos) {
         </p>`
       : `<p class="vacio">Todavía no has apuntado ninguna. Mientras esté vacío, el
          panel da por hecho que todo el saldo viene de validar.</p>`}
+      </details>
     </section>`;
 }
 
