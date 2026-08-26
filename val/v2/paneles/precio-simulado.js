@@ -180,7 +180,13 @@ export function panelPrecioSimulado(datos) {
       <!-- El precio de entrada, editable. Va plegado porque se toca una vez en
            la vida, y NO está escrito en el código a propósito: ver la cabecera
            de este fichero. -->
-      <details class="ps-desp">
+      <!-- ⚠ ABIERTO cuando todavía no hay precio de entrada. Plegado era lo
+           que había, y con la tabla vacía —que es como llega el panel la
+           primera vez— lo único que se veía era una línea discreta de 52px:
+           el dato que falta para completar el panel, escondido detrás de un
+           triángulo. Con precio guardado sí va plegado: entonces es un ajuste
+           que se toca una vez en la vida. -->
+      <details class="ps-desp"${entrada ? '' : ' open'}>
         <summary class="ap-abrir ps-abrir">${entrada
           ? `Entraste a ${escapar(fmtPrecio(entrada))} $ · cambiar`
           : 'Pon tu precio de entrada para ver cuánto falta para volver'}</summary>

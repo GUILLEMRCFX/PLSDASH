@@ -227,7 +227,9 @@ export function panelResumen(datos) {
              porque es el mismo hecho contado de dos maneras. -->
         <div><dt>Validadores</dt><dd${fueraDeServicio ? ' class="alerta"' : ''}>${
           fmt(v.activos)} / ${fmt(v.total)}${
-          Number(v.stake_total) > 0 ? ` · ${fmtCompacto(v.stake_total)} PLS` : ''}</dd></div>
+          /* Espacio duro: a 390 la línea parte en tres columnas y sin él la
+             unidad se quedaba sola en el renglón de abajo. */
+          Number(v.stake_total) > 0 ? ` · ${fmtCompacto(v.stake_total)}&nbsp;PLS` : ''}</dd></div>
         <div><dt>Precio</dt><dd>${hayPrecio ? `${fmtPrecio(precio.precio)} $` : '–'}</dd></div>
       </dl>
 

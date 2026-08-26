@@ -627,8 +627,12 @@
 .a-barra > i { display: block; height: 100%; }
 .a-ganado   { background: var(--dato); }
 .a-aportado { background: var(--acento); }
+/* A 390 los dos rótulos no caben en un renglón y cada uno partía por dentro,
+   dejando la unidad suelta abajo. Con `wrap` parte por donde tiene sentido:
+   el segundo rótulo baja entero. */
 .a-pie {
-  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  display: flex; flex-wrap: wrap; justify-content: space-between;
+  gap: 2px 10px; align-items: baseline;
   font: 400 12px/1.3 var(--texto); color: var(--dato-suave); opacity: .8;
 }
 .a-pie b { font-weight: 400; color: var(--dato); }
@@ -720,6 +724,10 @@
    cuando los nombres no caben: el engranaje queda fuera de ese carril y por eso
    no se lo lleva el desplazamiento — está siempre a mano. */
 .barra {
+  /* Arriba y no estirado: cuando las pestañas envuelven, la barra crece en alto
+     y un engranaje estirado quedaría centrado a media altura, lejos de la fila
+     a la que pertenece. */
+  align-items: flex-start;
   /* ⚠ POSICIONADA Y POR DELANTE, y no es decorativo: el desplegable del tema
      cuelga de aquí y cae SOBRE la vista de abajo. Sin esto quedaba detrás — no
      medio tapado, sino inalcanzable: el titular de Resumen se quedaba con los
@@ -729,7 +737,7 @@
      podía nada contra eso, porque compite dentro de otro contexto.
      Lo cazó la prueba al no poder pulsar un nombre. */
   position: relative; z-index: 40;
-  display: flex; align-items: stretch; gap: 4px;
+  display: flex; gap: 4px;
   padding: 4px;
   border-radius: 13px;
   background: var(--vidrio);
@@ -760,19 +768,28 @@
   overflow: visible;
 }
 
+/* ⚠ LA BARRA ENVUELVE, NO SE DESPLAZA. Y esto es lo tercero que se prueba aquí,
+   así que conviene dejar escrito por qué lo anterior no valía.
+
+     1º  `flex: 1 1 auto` con versalitas y tracking: la quinta pestaña se salía
+         a 390 y había que arrastrar para llegar a ella.
+     2º  Fuera el tracking y menos relleno: cabía por cinco píxeles.
+     3º  Entró el engranaje del tema, que le quita 46px a la fila, y volvió a
+         no caber. Se recortó relleno, separación y medio punto de letra: cabía
+         otra vez, por seis píxeles a 390.
+
+   Los tres eran el mismo apaño con distinta cifra, y los tres se rompieron con
+   el siguiente cambio. Y bastaba con que alguien subiera el tamaño de texto de
+   iOS —que Safari respeta por sitio— para tirarlo sin tocar el código.
+
+   `flex-wrap` quita el problema en vez de estrecharlo: cuando no caben en una
+   línea, bajan a la siguiente. No se corta nada, no hay que arrastrar, y da
+   igual cuántas pestañas haya, cómo se llamen o a qué tamaño se lea el texto.
+   Cuesta una línea de alto en el caso peor, que es lo que costaba arrastrar. */
 .pestanas {
-  display: flex; gap: 4px;
-  /* ⚠ `0 1 auto` y no `1 1 auto`: la fila mide lo que miden sus pestañas y NO
-     se estira. Estirándose, en una pantalla ancha el engranaje se iba al
-     extremo derecho de la barra y quedaba a un palmo de «Esfera» — que es
-     justo donde se pidió que estuviera, al lado. Encoger sí: por eso el `1` del
-     medio y el `min-width: 0`, que es lo que le permite ceder sitio y
-     desplazarse en un móvil estrecho en vez de empujar al engranaje fuera. */
-  min-width: 0; flex: 0 1 auto;
-  overflow-x: auto;
-  scrollbar-width: none;
+  display: flex; flex-wrap: wrap; gap: 4px;
+  min-width: 0; flex: 1 1 auto;
 }
-.pestanas::-webkit-scrollbar { display: none; }
 
 .pestanas button {
   /* ⚠ `flex: 1 1 auto` con `text-transform:uppercase` y `.14em` de tracking:
@@ -1347,7 +1364,10 @@
   transform: rotate(-45deg);
   transition: transform .15s;
 }
-.ap-desp[open] .ap-abrir::before { transform: rotate(45deg); }
+/* Apunta a cualquier plegable abierto, no solo al de aportaciones: el del
+   precio de entrada reutiliza `.ap-abrir` y con el selector atado a `.ap-desp`
+   se quedaba con la flecha a la derecha estando abierto. */
+details[open] > .ap-abrir::before { transform: rotate(45deg); }
 .ap-abrir:hover { color: var(--dato); }
 
 /* ─────────────────────────────────────────── la franja de 30 días

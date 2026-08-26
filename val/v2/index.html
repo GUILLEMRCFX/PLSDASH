@@ -33,8 +33,17 @@
   /* ───────────────────────────────────────────── retícula
      Una sola columna, centrada. La esfera ya no comparte pantalla con nada:
      tiene su propia pestaña y ahí ocupa lo que haya. */
+  /* ⚠ COLUMNA FLEXIBLE Y NO BLOQUE, para que la esfera pueda quedarse con lo
+     que sobre de pantalla MEDIDO, no restado a ojo. Antes `#escena` llevaba un
+     `100dvh - 260px` y ese 260 solo cuadraba en una combinación: medido, el
+     aire de debajo del pie iba de 18px a 138px según envolviera la barra de
+     pestañas o el pie ocupara dos o tres líneas. Con la columna, la escena
+     crece o encoge sola y no hay número que ajustar al añadir la siguiente
+     pestaña. Las otras cuatro vistas no se enteran: van `flex:0 0 auto`, que
+     es lo mismo que hacían de bloque. */
   .marco{
-    display:block;
+    display:flex;flex-direction:column;
+    min-height:100dvh;
     padding:12px;
     padding-top:calc(12px + env(safe-area-inset-top,0px));
     padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
@@ -56,14 +65,28 @@
          `esfera.js` ya apagaba el bucle si el contenedor salía de pantalla; con
          la pestaña oculta el efecto es el mismo, y en el móvil eso es batería.
        · Se remide sola al volver, por el `ResizeObserver` del mismo módulo. */
+  /* La pestaña de la esfera es la única que se estira: dentro de ella, el pie
+     ocupa lo suyo y la escena se queda con el resto. `min-height:0` porque un
+     hijo de flex no baja de su contenido mínimo si no se le dice. */
+  #v-esfera{
+    flex:1 1 auto;min-height:0;
+    display:flex;flex-direction:column;
+  }
+
   #escena{
     position:relative;
     width:100%;
-    /* Lo que queda de pantalla quitando la barra de pestañas (60), el pie que
-       explica qué codifica cada cosa (~76 en tres líneas a 390px), los huecos
-       y los márgenes. Con 150 el pie se salía por abajo y había que desplazar
-       para leer la leyenda de lo que estabas mirando. */
-    height:calc(100dvh - 240px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));
+    /* Sin altura calculada: se queda con lo que sobre dentro de la columna,
+       después de la barra y del pie. El mínimo es para que en una pantalla
+       muy baja siga siendo una esfera y no una raya.
+
+       ⚠ La base es `0` y NO `auto`. Con `auto` la base sale del contenido, y el
+         contenido es un `<canvas>` con `height:100%`: contra una altura sin
+         resolver, el porcentaje cae en el atributo `height` del lienzo —que lo
+         pone `setSize()` a partir del alto anterior—. Se realimenta: medido a
+         360×780 la escena se quedaba en 586px y la página desbordaba 45. Con
+         base `0` el reparto no mira el contenido. */
+    flex:1 1 0;
     min-height:260px;
     max-height:820px;
     /* La esfera se lleva el gesto entero dentro de su caja. */
@@ -94,21 +117,56 @@
   #rotulo.inactivo .r-id{color:var(--acento)}
 
   /* Pie de la pestaña de la esfera: qué codifica lo que se está viendo. Sin
-     esto, un punto más gordo que otro es decoración. */
+     esto, un punto más gordo que otro es decoración.
+
+     ⚠ ERA UN FLEX QUE ENVOLVÍA, y en el móvil quedaba mal: las tres leyendas
+       no caben en una línea a 390, así que cada una bajaba a la suya y las tres
+       se apilaban CONTRA EL BORDE IZQUIERDO, con el lado derecho vacío. Y
+       pegadas abajo, porque la escena se lleva todo el alto disponible.
+
+       Con `grid` van centradas y en columna, cada una en su línea a propósito y
+       no por desbordar. En pantalla ancha vuelven a la fila, que es donde caben
+       de sobra. El aire de abajo lo pone el margen, no la suerte. */
   .esfera-pie{
-    margin:10px 2px 0;
-    display:flex;flex-wrap:wrap;gap:6px 18px;
-    font:400 12px/1.5 var(--texto);color:var(--apagado);
+    flex:none;
+    /* 10 abajo y no 4: es el único aire que separa la última línea del borde,
+       y ahora es una cifra fija —16px hasta el filo, más el `safe-area` del
+       móvil— en vez de la sobra que dejara el cálculo de la escena. */
+    margin:14px 2px 10px;
+    display:grid;justify-items:center;gap:7px;
+    text-align:center;
+    font:400 12.5px/1.45 var(--texto);color:var(--apagado);
+  }
+  @media (min-width:700px){
+    .esfera-pie{
+      grid-auto-flow:column;justify-content:center;gap:0 26px;
+    }
   }
   .esfera-pie b{color:var(--dato-suave);font-weight:600}
 
-  #contenido{min-width:0}
+  /* El envoltorio de verdad de la barra y las vistas: la columna tiene que
+     seguir aquí para que llegue a `#v-esfera`. Poniéndola solo en `.marco` se
+     quedaba a mitad de camino —`#contenido` es su único hijo— y la escena no
+     crecía. */
+  #contenido{
+    min-width:0;
+    flex:1 1 auto;min-height:0;
+    display:flex;flex-direction:column;
+  }
 
   /* Las vistas viven a la vez en el DOM y solo una se enseña. Cambiar de
      pestaña no vuelve a pedir datos ni a construir HTML. */
   .vista{
+    flex:0 0 auto;
     display:grid;
-    grid-template-columns:1fr;
+    /* ⚠ `minmax(0,1fr)` y NO `1fr`. Son distintos: `1fr` es `minmax(auto,1fr)`,
+       y ese `auto` significa «no bajes del ancho mínimo del contenido». Basta
+       con que un hijo tenga un mínimo intrínseco grande —una cifra larga, un
+       título oculto— para que la columna entera se niegue a encoger y la
+       tarjeta se salga de la pantalla. Medido a 320px: el panel se quedaba en
+       313px dentro de un hueco de 296 y la página desbordaba 7px.
+       Con `minmax(0,…)` la columna puede encoger y el contenido se adapta. */
+    grid-template-columns:minmax(0,1fr);
     gap:14px;
     align-content:start;
     min-width:0;
@@ -119,15 +177,24 @@
     .vista{
       /* 340 y no 290: por debajo de eso una tarjeta con etiqueta y cifra en la
          misma línea empieza a partir palabras. */
-      grid-template-columns:repeat(auto-fit,minmax(340px,1fr));
+      grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));
       gap:18px;
       /* Cada panel a su altura: estirar iguala las filas y deja al panel corto
          con un palmo de vidrio vacío debajo de su último dato. */
       align-items:start;
     }
-    /* La esfera nunca se parte en columnas. */
-    #v-esfera{grid-template-columns:1fr}
+    /* La esfera no necesita excepción aquí: desde que es una columna flexible
+       no le llega el `grid-template-columns` de `.vista`. */
   }
+
+  /* ⚠ NO QUITAR. La regla del navegador para `[hidden]` es
+     `[hidden]:not([hidden="until-found"])`: dos atributos, o sea que le gana a
+     una clase pero PIERDE contra un id. En cuanto `#v-esfera` se llevó su
+     propio `display` para la columna, la esfera dejó de esconderse: seguía
+     dibujándose al pie de las otras cuatro pestañas —gastando GPU en algo que
+     nadie estaba mirando— y solo se vio en una captura de Validadores con la
+     esfera debajo. Con `!important` ninguna regla futura vuelve a ganarle. */
+  .vista[hidden]{display:none !important}
 
   #cargando{
     font:400 11px/1 var(--texto);letter-spacing:.16em;text-transform:uppercase;
