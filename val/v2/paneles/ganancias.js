@@ -23,6 +23,7 @@ import {
 } from '/val/compartido/ganancias.js';
 import { ACTIVACION_TS } from '../datos.js';
 import { fmt, fmtEdad, escapar } from './formato.js';
+import { htmlTreintaDias } from './treinta-dias.js';
 
 export const TITULO = 'Ganancias';
 
@@ -91,5 +92,9 @@ export function panelGanancias(datos) {
       </div>
 
       ${procedencia ? `<p class="c-sub">${escapar(procedencia)}</p>` : ''}
+
+      <!-- La forma del mes. Ni la tabla del ritmo —que da medias— ni la sierra
+           del ciclo —que enseña ocho horas— contestan si esto es estable. -->
+      ${htmlTreintaDias(datos)}
     </section>`;
 }

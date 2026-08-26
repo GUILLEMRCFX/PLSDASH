@@ -60,6 +60,33 @@ function esReciente(d, desdeTs) {
   return Number.isFinite(ts) && desdeTs != null && ts > desdeTs;
 }
 
+/* Segundos por slot en PulseChain. Esto SÍ es una constante legítima: es un
+   parámetro del protocolo, no un dato de nadie. */
+const SEGUNDOS_POR_SLOT = 10;
+
+/**
+ * Cada cuánto toca proponer un bloque, en días.
+ *
+ * Es la cuota de la red: con `n` validadores de `red`, te toca esa fracción de
+ * los slots del día. `null` si no se sabe cuántos hay en la red — y entonces no
+ * se enseña, en vez de usar un respaldo escrito a fuego como hace el v1
+ * (`RED_VALIDADORES_RESPALDO = 46905`), que el día que la red crezca convierte
+ * el dato en una estimación silenciosamente vieja.
+ */
+export function diasPorBloque(propios, red) {
+  const n = Number(propios), r = Number(red);
+  if (!(n > 0) || !(r > 0)) return null;
+  return 1 / ((n / r) * (86400 / SEGUNDOS_POR_SLOT));
+}
+
+/** «0,5 días», «3 días». Por debajo de un día se usa una cifra decimal. */
+function fmtDias(d, fmt) {
+  if (d == null) return null;
+  if (d < 1 / 24) return `${fmt(d * 24 * 60, 0)} min`;
+  if (d < 2) return `${fmt(d, 1)} días`;
+  return `${fmt(d, 0)} días`;
+}
+
 export function panelValidadores(datos) {
   const detalle = datos.estado?.validadores?.detalle || [];
   const bloques = datos.ganancia?.por_validador || {};
@@ -101,6 +128,17 @@ export function panelValidadores(datos) {
   // valiendo.
   const v = datos.estado?.validadores || {};
   const stakeUnitario = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : null;
+
+  /* Cuándo toca el próximo bloque y qué parte de lo ganado sale de proponerlos.
+     Los dos venían del v1 y no estaban en el v2. El peso importa porque es LA
+     explicación de que el rendimiento baile: proponer un bloque es suerte, y
+     las atestaciones son el suelo. */
+  const red = Number(datos.estado?.red_validadores_activos) || null;
+  const proximo = fmtDias(diasPorBloque(v.total, red), fmt);
+  const plsBloques = Number(datos.ganancia?.pls_bloques) || 0;
+  const totalGanado = Number(datos.ganancia?.total) || 0;
+  const peso = plsBloques > 0 && Number.isFinite(Number(datos.ganancia?.peso_bloques))
+    ? Number(datos.ganancia.peso_bloques) : null;
 
   const activos = detalle.filter(d => d.estado === 'active_ongoing').length;
   const totalBloques = Object.values(bloques).reduce((a, n) => a + Number(n || 0), 0);
@@ -160,9 +198,15 @@ export function panelValidadores(datos) {
       <div class="vlista">${filas}</div>
 
       <dl class="p-fondo">
-        <div><dt>Bloques</dt><dd>${fmt(totalBloques)}</dd></div>
+        <div><dt>Bloques</dt><dd>${fmt(totalBloques)}${
+          proximo ? ` · el próximo en ~${escapar(proximo)}` : ''}</dd></div>
         <div><dt>Ganado ahora</dt><dd>${fmt(detalle.reduce((a, d) => a + (Number(d.ganado) || 0), 0))}</dd></div>
         <div><dt>Referencia</dt><dd>${ref == null ? '–' : fmt(ref)}</dd></div>
       </dl>
+      ${peso != null ? `
+      <p class="c-sub">${fmt(peso, 1)} % de lo ganado viene de proponer bloques
+        —${fmtCompacto(plsBloques)} de ${fmtCompacto(totalGanado)} PLS—. El resto
+        son atestaciones, que es el rendimiento base y no depende de la suerte.
+        ${red ? `Tus ${v.total} entre los ${fmt(red)} de la red.` : ''}</p>` : ''}
     </section>`;
 }

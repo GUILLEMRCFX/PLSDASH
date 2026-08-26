@@ -41,7 +41,7 @@
 
 import { gananciaAcumulada, aprValidadorHora } from '/val/compartido/ganancias.js';
 import { ACTIVACION_TS, saludGlobal } from '../datos.js';
-import { fmt, fmtPrecio, escapar } from './formato.js';
+import { fmt, fmtPrecio, fmtCompacto, escapar } from './formato.js';
 import { tablaRitmo } from './ritmo.js';
 import { desglosarSaldo } from './aportaciones.js';
 import { htmlPulso, estadoPulso } from './pulso.js';
@@ -222,8 +222,12 @@ export function panelResumen(datos) {
 
       <dl class="p-fondo">
         <div><dt>Rendimiento</dt>${aprTxt}</div>
+        <!-- El capital PUESTO, que venía del v1 y no estaba en el v2: el panel
+             decía cuánto rinde y no cuánto hay rindiendo. Va junto al recuento
+             porque es el mismo hecho contado de dos maneras. -->
         <div><dt>Validadores</dt><dd${fueraDeServicio ? ' class="alerta"' : ''}>${
-          fmt(v.activos)} / ${fmt(v.total)}</dd></div>
+          fmt(v.activos)} / ${fmt(v.total)}${
+          Number(v.stake_total) > 0 ? ` · ${fmtCompacto(v.stake_total)} PLS` : ''}</dd></div>
         <div><dt>Precio</dt><dd>${hayPrecio ? `${fmtPrecio(precio.precio)} $` : '–'}</dd></div>
       </dl>
 

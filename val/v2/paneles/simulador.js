@@ -284,5 +284,9 @@ export function engancharSimulador(raiz, datos) {
     try { localStorage.setItem(CLAVE, String(aporte)); } catch { /* da igual */ }
   };
 
-  mando.addEventListener('input', pintar);
+  /* `() => pintar()` y no `pintar` a secas: un manejador recibe el evento como
+     primer argumento. Hoy `pintar` no acepta ninguno y da igual, pero en el
+     deslizador de precio esa misma línea empezó a fallar el día que le añadí
+     un parámetro opcional — y el fallo era el precio saliendo NaN. */
+  mando.addEventListener('input', () => pintar());
 }
