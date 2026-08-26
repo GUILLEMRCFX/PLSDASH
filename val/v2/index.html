@@ -201,6 +201,7 @@
   import { panelGanancias } from './paneles/ganancias.js';
   import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
   import { panelTrayectoria } from './paneles/trayectoria.js';
+  import { panelSimulador, engancharSimulador } from './paneles/simulador.js';
   import { panelAportaciones, engancharAportaciones } from './paneles/aportaciones.js';
   import { panelPrecio } from './paneles/precio-historico.js';
   import { panelValidadores } from './paneles/validadores.js';
@@ -264,7 +265,7 @@
 
   const PESTANAS = [
     { id: 'resumen',     paneles: [panelResumen] },
-    { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelTrayectoria, panelAportaciones, panelPrecio] },
+    { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelTrayectoria, panelSimulador, panelAportaciones, panelPrecio] },
     { id: 'validadores', paneles: [panelValidadores] },
     { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
     // `estatica`: su HTML lo escribió el documento y no se regenera nunca. Ver
@@ -391,6 +392,7 @@
     // Tras apuntar o borrar hay que volver a PEDIR: el histórico vive en D1,
     // no en `ultimos`. Por eso `refrescar` y no `pintar`.
     engancharAportaciones(document, () => refrescar());
+    engancharSimulador(document, datos);
     window.__datos = datos;
     // Ganchos de diagnóstico, como `__esfera`: desde la consola se puede forzar
     // un repintado sin esperar 18 segundos, y la prueba del bloque 2 lo usa para
