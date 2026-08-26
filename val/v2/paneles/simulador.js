@@ -1,9 +1,16 @@
 /**
- * Panel — Simulador: ¿y si aporto algo cada mes?
+ * La proyección al siguiente validador, y el deslizador que la mueve.
  *
- * La trayectoria de al lado responde «¿cuánto falta al ritmo actual?». Esta
- * responde la otra mitad: «¿y si además pongo dinero?». Un deslizador continuo,
- * y el plazo se recalcula mientras se mueve.
+ * ⚠ ESTO NO ES UN PANEL, y dejó de serlo el 26-ago-2026. Era «Simulador», una
+ *   tarjeta propia justo debajo de «Trayectoria» — y las dos decían LO MISMO.
+ *   Lo demostró su propia prueba de coherencia: con el deslizador a cero, las
+ *   dos daban el mismo objetivo, el mismo plazo y la misma fecha. Dos tarjetas
+ *   seguidas repitiendo una cifra.
+ *
+ *   Ahora aquí viven la CUENTA y el MANDO, y quien los pinta es
+ *   `trayectoria.js`, en una sola tarjeta: la barra de lo reunido arriba y el
+ *   deslizador debajo. El plazo se calcula UNA vez, en `proyectar()`, así que
+ *   ya no pueden divergir ni por redondeo.
  *
  * ## La cuenta, entera
  *
@@ -48,17 +55,68 @@
  */
 
 import { ritmoDiario } from '/val/compartido/ganancias.js';
-import { desglosarSaldo } from './aportaciones.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
-import { tituloObjetivo } from './trayectoria.js';
-
-export const TITULO = 'Simulador';
 
 /** Días por mes, de media. 365,25/12 y no 30. */
 const DIAS_MES = 30.44;
 
 /** El tope del deslizador, en dólares al mes. */
 export const TOPE = 500;
+
+/* ─────────────────────────────────────── la escala del deslizador
+
+   NO es lineal, y el motivo está medido. Con el rango 0–500 repartido a partes
+   iguales, al precio de ahora esto pasaba:
+
+       20 % del dedo → 100 $ → 2,4 meses
+       80 % restante → de 2,4 a 0,6 meses
+
+   O sea que cuatro quintos del recorrido vivían en una zona donde ya compras
+   más de un depósito al mes y el plazo apenas se mueve. Un deslizador cuyo
+   tramo útil son los primeros dos centímetros es un deslizador mal calibrado.
+
+   Con la curva, el plazo baja de forma casi pareja a lo largo del recorrido:
+
+       0 %  →   0 $ → 9,1 meses      60 % →  60 $ → 3,5 meses
+      20 %  →   5 $ → 8,0            70 % → 100 $ → 2,4
+      40 %  →  18 $ → 6,1            80 % → 170 $ → 1,6
+      50 %  →  35 $ → 4,7           100 % → 500 $ → 0,6
+
+   `CURVA` es cuánto se comba: 1 sería lineal y cuanto más alto, más resolución
+   abajo. 200 sale de probar 50, 100, 200 y 400 y quedarse con el que deja los
+   0–100 $ ocupando el 71 % del recorrido — con 400 el tramo alto pega saltos de
+   100 $ entre posiciones contiguas.
+
+   ⚠ El deslizador NO lleva los dólares como valor: lleva la POSICIÓN, de 0 a
+     `PASOS`. Los dólares se calculan. Ponerle los dólares como valor obligaría
+     a un `step` variable, que no existe. */
+const CURVA = 200;
+export const PASOS = 1000;
+
+/**
+ * Redondea a una cifra que se pueda leer: de uno en uno abajo, de 25 en 25
+ * arriba. Sin esto el deslizador enseña «34 $», «37 $», «41 $» — precisión
+ * falsa sobre una proyección, y encima imposible de volver a encontrar.
+ */
+function redondear(v) {
+  if (v < 20) return Math.round(v);
+  if (v < 50) return Math.round(v / 5) * 5;
+  if (v < 200) return Math.round(v / 10) * 10;
+  return Math.round(v / 25) * 25;
+}
+
+/** Posición del deslizador (0..PASOS) → dólares al mes. */
+export function valorDesde(pos) {
+  const t = Math.max(0, Math.min(1, Number(pos) / PASOS));
+  return redondear(TOPE * (Math.pow(CURVA, t) - 1) / (CURVA - 1));
+}
+
+/** Dólares al mes → posición del deslizador. La inversa de `valorDesde`. */
+export function posicionDe(valor) {
+  const v = Math.max(0, Math.min(TOPE, Number(valor) || 0));
+  const t = Math.log((v / TOPE) * (CURVA - 1) + 1) / Math.log(CURVA);
+  return Math.round(t * PASOS);
+}
 
 const CLAVE = 'plsdash:aporte-sim';
 
@@ -103,104 +161,45 @@ export function proyectar({ falta, plsDia, precio, aporteMes }) {
   };
 }
 
-/** Días → «11 meses», «1,4 años», «23 días». Igual que en la trayectoria. */
-function fmtPlazo(dias) {
+/** Días → «11 meses», «1,4 años», «23 días». */
+export function fmtPlazo(dias) {
   if (!Number.isFinite(dias) || dias <= 0) return null;
   if (dias < 60) return `${fmt(dias, 0)} días`;
   if (dias < 730) return `${fmt(dias / 30.44, 0)} meses`;
   return `${fmt(dias / 365.25, 1)} años`;
 }
 
-function vacio(mensaje) {
-  return `
-    <section class="panel" aria-labelledby="psim-t">
-      <header class="p-cab"><h2 id="psim-t">${TITULO}</h2></header>
-      <p class="vacio">${escapar(mensaje)}</p>
-    </section>`;
-}
-
-export function panelSimulador(datos, aporte = aporteGuardado()) {
-  const { estado, serie, snapshots24h, ganancia, precio, ahoraS } = datos;
-  const v = estado?.validadores || {};
-
-  const deposito = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : null;
-  const deWallet = ganancia && ganancia.saldo_wallet != null;
-  const reunido = deWallet ? Number(ganancia.saldo_wallet) : null;
-
-  if (!deposito || reunido == null) {
-    return vacio('Faltan datos para simular: sin depósito o sin saldo de la wallet no hay nada que proyectar.');
-  }
-
-  const falta = Math.max(0, deposito - reunido);
-  const ritmo = ritmoDiario({ serie, snapshots24h, plsDiaKV: v.pls_dia, fmt });
-  const p = Number(precio?.precio);
-  const hayPrecio = precio && precio.disponible !== false && p > 0;
-
-  const r = proyectar({ falta, plsDia: ritmo?.pls_dia, precio: hayPrecio ? p : null, aporteMes: aporte });
-
-  if (r?.yaEsta) {
-    return vacio(`Ya hay saldo para el ${tituloObjetivo(estado).toLowerCase()}. No hay nada que simular.`);
-  }
-  if (!r || r.dias == null) {
-    return vacio('Sin ritmo medible y sin precio: no se puede proyectar ningún plazo.');
-  }
-
-  const plazo = fmtPlazo(r.dias);
-  const fecha = new Date((ahoraS + r.dias * 86400) * 1000)
-    .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-
-  return `
-    <section class="panel" aria-labelledby="psim-t">
-      <header class="p-cab">
-        <h2 id="psim-t">${TITULO}</h2>
-        <span class="p-marca">${escapar(tituloObjetivo(estado))}</span>
-      </header>
-
-      <!-- El deslizador primero: se abre este panel para moverlo, y el resto
-           del panel es la respuesta a dónde lo has dejado. -->
-      <div class="sim-mando">
-        <label class="sim-eti" for="simAporte">Si aporto cada mes</label>
-        <output class="sim-valor" id="simSalida" for="simAporte">${
-          aporte > 0 ? `${fmt(aporte)} $` : 'nada'}</output>
-        <!-- ⚠ La variable --t la fija JS y también aquí, para el primer
-             pintado. WebKit no tiene ::-moz-range-progress, así que el tramo ya
-             recorrido se pinta con un degradado y hay que decirle dónde cortar.
-             Sin el valor inicial el carril arranca vacío aunque el mando no
-             esté a cero, que es lo que pasa al recargar con algo guardado.
-
-             Y SIN COMILLAS INVERSAS: esto vive dentro de una plantilla, así que
-             una comilla inversa en un comentario la cierra. Es la quinta vez
-             que pasa en este proyecto; por eso queda escrito otra vez. -->
-        <input type="range" class="sim-rango" id="simAporte"
-               style="--t:${((aporte / TOPE) * 100).toFixed(1)}%"
-               min="0" max="${TOPE}" step="5" value="${aporte}"
-               aria-label="Aportación mensual en dólares"
-               aria-valuetext="${aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada'}">
-        <div class="sim-topes" aria-hidden="true"><span>0</span><span>${TOPE} $</span></div>
-      </div>
-
-      <div class="cifra" id="simPlazo">
-        <span class="c-num">${escapar(plazo)}</span>
-        <span class="c-eti">${aporte > 0 ? 'Aportando eso' : 'Sin aportar nada'}</span>
-        <span class="c-sub">hacia ${escapar(fecha)} · proyección, no promesa</span>
-      </div>
-
-      <div class="rejilla sim-detalle" id="simDetalle">
-        ${textoDetalle(r, ritmo, aporte)}
-      </div>
-
-      <p class="c-sub">
-        Sobre lo que falta al ritmo medido —${escapar(ritmo?.base || 'sin base')}—
-        más lo que compra la aportación al precio de ahora.
-        ${r.hayPrecio ? '' : '<span class="alerta">Sin precio de PLS: la aportación no se puede convertir y solo cuenta el ritmo.</span>'}
-      </p>
-    </section>`;
-}
-
 /**
- * El bloque que cambia al mover el deslizador. Se saca aparte porque el
- * enganche lo reescribe solo a él, sin tocar el resto del panel.
+ * El deslizador y su rótulo. Lo pinta `trayectoria.js` dentro de su tarjeta.
+ *
+ * Va DESPUÉS de la barra de lo reunido y antes del plazo, que es el orden en
+ * que se lee: cuánto llevas, qué pondrías, cuánto tardarías.
  */
+export function mandoSimulador(aporte) {
+  const pos = posicionDe(aporte);
+  return `
+    <div class="sim-mando">
+      <label class="sim-eti" for="simAporte">Si aporto cada mes</label>
+      <output class="sim-valor" id="simSalida" for="simAporte">${
+        aporte > 0 ? `${fmt(aporte)} $` : 'nada'}</output>
+      <!-- ⚠ La variable --t la fija JS y también aquí, para el primer pintado.
+           WebKit no tiene ::-moz-range-progress, así que el tramo ya recorrido
+           se pinta con un degradado y hay que decirle dónde cortar. Sin el
+           valor inicial el carril arranca vacío aunque el mando no esté a cero,
+           que es lo que pasa al recargar con algo guardado.
+
+           Y SIN COMILLAS INVERSAS: esto vive dentro de una plantilla, así que
+           una comilla inversa en un comentario la cierra. Ya ha pasado cinco
+           veces en este proyecto. -->
+      <input type="range" class="sim-rango" id="simAporte"
+             style="--t:${(pos / PASOS * 100).toFixed(1)}%"
+             min="0" max="${PASOS}" step="1" value="${pos}"
+             aria-label="Aportación mensual en dólares"
+             aria-valuetext="${aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada'}">
+      <div class="sim-topes" aria-hidden="true"><span>0</span><span>${TOPE} $</span></div>
+    </div>`;
+}
+
 export function textoDetalle(r, ritmo, aporte) {
   const partes = [];
 
@@ -266,19 +265,19 @@ export function engancharSimulador(raiz, datos) {
   const hayPrecio = precio && precio.disponible !== false && p > 0;
 
   const pintar = () => {
-    const aporte = Number(mando.value) || 0;
+    const aporte = valorDesde(mando.value);
     const r = proyectar({ falta, plsDia: ritmo?.pls_dia, precio: hayPrecio ? p : null, aporteMes: aporte });
     if (!r || r.dias == null) return;
 
     salida.textContent = aporte > 0 ? `${fmt(aporte)} $` : 'nada';
-    mando.style.setProperty('--t', `${((aporte / TOPE) * 100).toFixed(1)}%`);
+    mando.style.setProperty('--t', `${(Number(mando.value) / PASOS * 100).toFixed(1)}%`);
     mando.setAttribute('aria-valuetext',
       aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada');
 
     const f = new Date((ahoraS + r.dias * 86400) * 1000)
       .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     plazo.querySelector('.c-num').textContent = fmtPlazo(r.dias) || '—';
-    plazo.querySelector('.c-eti').textContent = aporte > 0 ? 'Aportando eso' : 'Sin aportar nada';
+    plazo.querySelector('.c-eti').textContent = aporte > 0 ? 'Aportando eso' : 'Al ritmo actual';
     plazo.querySelector('.c-sub').textContent = `hacia ${f} · proyección, no promesa`;
     detalle.innerHTML = textoDetalle(r, ritmo, aporte);
 

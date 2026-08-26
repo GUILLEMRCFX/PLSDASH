@@ -201,7 +201,7 @@
   import { panelGanancias } from './paneles/ganancias.js';
   import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
   import { panelTrayectoria } from './paneles/trayectoria.js';
-  import { panelSimulador, engancharSimulador } from './paneles/simulador.js';
+  import { engancharSimulador } from './paneles/simulador.js';
   import { panelAportaciones, engancharAportaciones } from './paneles/aportaciones.js';
   import { panelPrecio } from './paneles/precio-historico.js';
   import { panelValidadores } from './paneles/validadores.js';
@@ -264,9 +264,9 @@
      Resumen: era lo primero que hay que responder. Ver `paneles/ritmo.js`. */
 
   const PESTANAS = [
-    { id: 'resumen',     paneles: [panelResumen] },
-    { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelTrayectoria, panelSimulador, panelAportaciones, panelPrecio] },
-    { id: 'validadores', paneles: [panelValidadores] },
+    { id: 'resumen',     paneles: [panelResumen, panelPrecio] },
+    { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelAportaciones] },
+    { id: 'validadores', paneles: [panelValidadores, panelTrayectoria] },
     { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
     // `estatica`: su HTML lo escribió el documento y no se regenera nunca. Ver
     // el aviso junto a `#v-esfera` en el marcado.

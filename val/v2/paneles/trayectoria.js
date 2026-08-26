@@ -29,12 +29,23 @@
  * El depósito no se escribe a fuego: sale de `stake_total / total`, así que si
  * cambia el tamaño del depósito esto sigue valiendo.
  *
- * No hay escenarios de aportación mensual: solo el ritmo actual.
+ * ## ⚠ AQUÍ VIVE TAMBIÉN EL SIMULADOR, desde el 26-ago-2026
+ *
+ * Eran dos tarjetas seguidas —«Trayectoria» y «Simulador»— y decían LO MISMO.
+ * Lo demostró la prueba de coherencia del propio simulador: con el deslizador a
+ * cero daban el mismo objetivo, el mismo plazo y la misma fecha. Repetir una
+ * cifra en dos tarjetas contiguas no es redundancia útil, es ruido.
+ *
+ * Ahora es una sola: la barra de lo reunido, el deslizador debajo y el plazo
+ * que sale de los dos. El plazo se calcula UNA vez, en `proyectar()`, así que
+ * ya no pueden divergir ni por redondeo — que era el riesgo de tenerlo escrito
+ * dos veces.
  */
 
 import { gananciaAcumulada, ritmoDiario } from '/val/compartido/ganancias.js';
 import { ACTIVACION_TS } from '../datos.js';
 import { desglosarSaldo } from './aportaciones.js';
+import { aporteGuardado, proyectar, mandoSimulador, textoDetalle, fmtPlazo } from './simulador.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
 
 /**
@@ -48,15 +59,7 @@ export function tituloObjetivo(estado) {
     : 'Siguiente validador';
 }
 
-/** Días → «11 meses», «1,4 años», «23 días». */
-function fmtPlazo(dias) {
-  if (!Number.isFinite(dias) || dias <= 0) return null;
-  if (dias < 60) return `${fmt(dias, 0)} días`;
-  if (dias < 730) return `${fmt(dias / 30.44, 0)} meses`;
-  return `${fmt(dias / 365.25, 1)} años`;
-}
-
-export function panelTrayectoria(datos) {
+export function panelTrayectoria(datos, aporte = aporteGuardado()) {
   const { estado, serie, snapshots24h, ganancia, precio, ahoraS } = datos;
   const v = estado?.validadores || {};
 
@@ -82,14 +85,23 @@ export function panelTrayectoria(datos) {
   const ritmo = ritmoDiario({
     serie, snapshots24h, plsDiaKV: v.pls_dia, fmt,
   });
-  const dias = ritmo?.pls_dia > 0 ? falta / ritmo.pls_dia : null;
+  const hayPrecio = precio && precio.disponible !== false && precio.precio > 0;
+
+  /* ⚠ UNA sola cuenta para el plazo, la del simulador. Antes esto dividía
+     `falta / ritmo.pls_dia` por su cuenta y el simulador hacía lo mismo en su
+     tarjeta: dos caminos para el mismo número, que es como dos paneles
+     contiguos acaban discrepando por un redondeo. */
+  const r = proyectar({
+    falta, plsDia: ritmo?.pls_dia,
+    precio: hayPrecio ? Number(precio.precio) : null,
+    aporteMes: aporte,
+  });
+  const dias = r?.dias ?? null;
   const plazo = fmtPlazo(dias);
   const fecha = dias != null
     ? new Date((ahoraS + dias * 86400) * 1000)
         .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
     : null;
-
-  const hayPrecio = precio && precio.disponible !== false && precio.precio > 0;
 
   /* ── La barra, partida en dos: lo ganado y lo aportado ──────────────────
      ⚠ NO se descuenta lo aportado del progreso, y esa fue una decisión, no un
@@ -149,14 +161,27 @@ export function panelTrayectoria(datos) {
         </div>
       </div>
 
+      <!-- El deslizador entre la barra y el plazo: cuánto llevas, qué pondrías,
+           cuánto tardarías. Ese es el orden en que se lee. -->
+      ${mandoSimulador(aporte)}
+
       ${plazo ? `
-      <div class="rejilla">
-        <div class="cifra">
-          <span class="c-num">${escapar(plazo)}</span>
-          <span class="c-eti">Al ritmo actual</span>
-          <span class="c-sub">hacia ${escapar(fecha)} · proyección, no promesa</span>
-        </div>
-      </div>` : '<p class="c-sub">Sin ritmo medible para estimar el plazo.</p>'}
+      <div class="cifra" id="simPlazo">
+        <span class="c-num">${escapar(plazo)}</span>
+        <span class="c-eti">${aporte > 0 ? 'Aportando eso' : 'Al ritmo actual'}</span>
+        <span class="c-sub">hacia ${escapar(fecha)} · proyección, no promesa</span>
+      </div>
+
+      <div class="rejilla sim-detalle" id="simDetalle">
+        ${textoDetalle(r, ritmo, aporte)}
+      </div>
+
+      <p class="c-sub">
+        Sobre lo que falta al ritmo medido —${escapar(ritmo?.base || 'sin base')}—
+        más lo que compra la aportación al precio de ahora.
+        ${r.hayPrecio ? '' : '<span class="alerta">Sin precio de PLS: la aportación no se puede convertir y solo cuenta el ritmo.</span>'}
+      </p>
+      ` : '<p class="c-sub">Sin ritmo medible para estimar el plazo.</p>'}
 
       ${deWallet ? '' : '<p class="c-sub alerta">Sin lectura de la wallet: se usa lo generado, que puede no estar disponible.</p>'}
     </section>`;
