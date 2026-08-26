@@ -204,6 +204,7 @@
   import { engancharSimulador } from './paneles/simulador.js';
   import { panelAportaciones, engancharAportaciones } from './paneles/aportaciones.js';
   import { panelPrecio } from './paneles/precio-historico.js';
+  import { panelPrecioSimulado, engancharPrecioSimulado } from './paneles/precio-simulado.js';
   import { panelValidadores } from './paneles/validadores.js';
   import { panelSaludNodo } from './paneles/salud-nodo.js';
   import { panelEstadoGlobal } from './paneles/estado-global.js';
@@ -265,7 +266,7 @@
 
   const PESTANAS = [
     { id: 'resumen',     paneles: [panelResumen, panelPrecio] },
-    { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelAportaciones] },
+    { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelPrecioSimulado, panelAportaciones] },
     { id: 'validadores', paneles: [panelValidadores, panelTrayectoria] },
     { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
     // `estatica`: su HTML lo escribió el documento y no se regenera nunca. Ver
@@ -393,6 +394,7 @@
     // no en `ultimos`. Por eso `refrescar` y no `pintar`.
     engancharAportaciones(document, () => refrescar());
     engancharSimulador(document, datos);
+    engancharPrecioSimulado(document, datos, () => refrescar());
     window.__datos = datos;
     // Ganchos de diagnóstico, como `__esfera`: desde la consola se puede forzar
     // un repintado sin esperar 18 segundos, y la prueba del bloque 2 lo usa para

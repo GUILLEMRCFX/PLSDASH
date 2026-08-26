@@ -52,6 +52,7 @@ export async function cargarTodo() {
     ganancia:     `${API}/ganancia`,
     eventos:      `${API}/eventos?limit=60`,
     aportaciones: `${API}/aportaciones`,
+    ajustes:      `${API}/ajustes`,
     precioSerie:  `${API}/historico?rango=precio`,
     precio:       '/api/precio',
   };
@@ -65,6 +66,10 @@ export async function cargarTodo() {
     // `null` y no `{}`: distingue «aún no ha llegado o ha fallado» de «no has
     // apuntado ninguna». El panel dice cosas distintas en cada caso.
     aportaciones: null,
+    /* Los ajustes que solo sabe el dueño: hoy el precio de entrada. `null` si
+       no llegan, para poder distinguir «no hay conexión» de «no lo has puesto
+       todavía» — que son dos mensajes distintos. */
+    ajustes: null,
     fallos: [],
     // Un 401 en los endpoints del panel no es «está roto»: es «no has metido
     // el PIN». Son dos mensajes muy distintos y confundirlos manda a mirar el
@@ -84,6 +89,7 @@ export async function cargarTodo() {
     if (nombre === 'estado' || nombre === 'ganancia' || nombre === 'precio') salida[nombre] = v;
     else if (nombre === 'eventos') salida.eventos = v.eventos || [];
     else if (nombre === 'aportaciones') salida.aportaciones = v;
+    else if (nombre === 'ajustes') salida.ajustes = v.ajustes || {};
     else salida[nombre] = v.datos || [];
   });
 

@@ -9,7 +9,25 @@
  */
 
 import { saludGlobal, disponibilidad } from '../datos.js';
+import { ritmoDiario } from '/val/compartido/ganancias.js';
 import { fmt, fmtHoras, escapar } from './formato.js';
+
+/**
+ * Lo que cuesta una hora sin servicio, en PLS.
+ *
+ * ⚠ Se valora al ritmo MEDIDO y no a la media desde la activación. El v1 dejó
+ *   escrito por qué, y merece repetirse: con la media desde el arranque la
+ *   pérdida sale infravalorada por un factor de diez, porque los primeros días
+ *   el nodo rendía mucho menos.
+ */
+export function costeHora(datos) {
+  const r = ritmoDiario({
+    serie: datos.serie, snapshots24h: datos.snapshots24h,
+    plsDiaKV: datos.estado?.validadores?.pls_dia, fmt,
+  });
+  const d = Number(r?.pls_dia);
+  return d > 0 ? d / 24 : null;
+}
 
 export const TITULO = 'Estado global';
 
@@ -33,6 +51,8 @@ export function panelEstadoGlobal(datos) {
   }
 
   const disp = disponibilidad(datos.daily);
+  const porHora = costeHora(datos);
+  const vals = Number(e?.validadores?.total) || 0;
 
   // El aviso solo aparece cuando hay algo que avisar. Un panel que siempre
   // lleva una franja de color enseña a ignorarla.
@@ -77,10 +97,22 @@ export function panelEstadoGlobal(datos) {
           <span class="c-num${disp.pct < 99.5 ? ' alerta' : ''}">${fmt(disp.pct, 2)}<span class="u pct">%</span></span>
           <span class="c-eti">Disponibilidad</span>
           <span class="c-sub">${disp.dias} días · ${
-            disp.minutosCaidos > 0 ? `${fmt(disp.minutosCaidos)} min caído` : 'sin caídas'
+            disp.minutosCaidos > 0
+              ? `${fmt(disp.minutosCaidos)} min caído${
+                  porHora ? ` · ≈ −${fmt((disp.minutosCaidos / 60) * porHora)} PLS` : ''}`
+              : 'sin caídas'
           }</span>
         </div>` : ''}
       </div>
+
+      ${porHora ? `
+      <!-- ⚠ El único sitio del panel donde se dice el riesgo de la ARQUITECTURA
+           y no del momento. Los diez validadores cuelgan de una máquina, una
+           conexión y un enchufe: una caída larga los para a los diez a la vez.
+           Venía del v1 y no estaba en el v2. -->
+      <p class="c-sub alerta">Punto único de fallo: los ${fmt(vals)} validadores
+        dependen de una máquina, una conexión y un suministro. Una caída los para
+        a todos a la vez, y cuesta ~${fmt(porHora)} PLS por hora sin servicio.</p>` : ''}
 
       <dl class="p-fondo">
         <div><dt>Epoch</dt><dd>${fmt(n.epoch_actual)}</dd></div>
