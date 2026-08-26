@@ -60,6 +60,61 @@ const DIAS_MES = 30.44;
 /** El tope del deslizador, en dólares al mes. */
 export const TOPE = 500;
 
+/* ─────────────────────────────────────── la escala del deslizador
+
+   NO es lineal, y el motivo está medido. Con el rango 0–500 repartido a partes
+   iguales, al precio de ahora esto pasaba:
+
+       20 % del dedo → 100 $ → 2,4 meses
+       80 % restante → de 2,4 a 0,6 meses
+
+   O sea que cuatro quintos del recorrido vivían en una zona donde ya compras
+   más de un depósito al mes y el plazo apenas se mueve. Un deslizador cuyo
+   tramo útil son los primeros dos centímetros es un deslizador mal calibrado.
+
+   Con la curva, el plazo baja de forma casi pareja a lo largo del recorrido:
+
+       0 %  →   0 $ → 9,1 meses      60 % →  60 $ → 3,5 meses
+      20 %  →   5 $ → 8,0            70 % → 100 $ → 2,4
+      40 %  →  18 $ → 6,1            80 % → 170 $ → 1,6
+      50 %  →  35 $ → 4,7           100 % → 500 $ → 0,6
+
+   `CURVA` es cuánto se comba: 1 sería lineal y cuanto más alto, más resolución
+   abajo. 200 sale de probar 50, 100, 200 y 400 y quedarse con el que deja los
+   0–100 $ ocupando el 71 % del recorrido — con 400 el tramo alto pega saltos de
+   100 $ entre posiciones contiguas.
+
+   ⚠ El deslizador NO lleva los dólares como valor: lleva la POSICIÓN, de 0 a
+     `PASOS`. Los dólares se calculan. Ponerle los dólares como valor obligaría
+     a un `step` variable, que no existe. */
+const CURVA = 200;
+export const PASOS = 1000;
+
+/**
+ * Redondea a una cifra que se pueda leer: de uno en uno abajo, de 25 en 25
+ * arriba. Sin esto el deslizador enseña «34 $», «37 $», «41 $» — precisión
+ * falsa sobre una proyección, y encima imposible de volver a encontrar.
+ */
+function redondear(v) {
+  if (v < 20) return Math.round(v);
+  if (v < 50) return Math.round(v / 5) * 5;
+  if (v < 200) return Math.round(v / 10) * 10;
+  return Math.round(v / 25) * 25;
+}
+
+/** Posición del deslizador (0..PASOS) → dólares al mes. */
+export function valorDesde(pos) {
+  const t = Math.max(0, Math.min(1, Number(pos) / PASOS));
+  return redondear(TOPE * (Math.pow(CURVA, t) - 1) / (CURVA - 1));
+}
+
+/** Dólares al mes → posición del deslizador. La inversa de `valorDesde`. */
+export function posicionDe(valor) {
+  const v = Math.max(0, Math.min(TOPE, Number(valor) || 0));
+  const t = Math.log((v / TOPE) * (CURVA - 1) + 1) / Math.log(CURVA);
+  return Math.round(t * PASOS);
+}
+
 const CLAVE = 'plsdash:aporte-sim';
 
 /** Lo último que se dejó puesto en este dispositivo. */
@@ -172,8 +227,8 @@ export function panelSimulador(datos, aporte = aporteGuardado()) {
              una comilla inversa en un comentario la cierra. Es la quinta vez
              que pasa en este proyecto; por eso queda escrito otra vez. -->
         <input type="range" class="sim-rango" id="simAporte"
-               style="--t:${((aporte / TOPE) * 100).toFixed(1)}%"
-               min="0" max="${TOPE}" step="5" value="${aporte}"
+               style="--t:${(posicionDe(aporte) / PASOS * 100).toFixed(1)}%"
+               min="0" max="${PASOS}" step="1" value="${posicionDe(aporte)}"
                aria-label="Aportación mensual en dólares"
                aria-valuetext="${aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada'}">
         <div class="sim-topes" aria-hidden="true"><span>0</span><span>${TOPE} $</span></div>
@@ -266,12 +321,12 @@ export function engancharSimulador(raiz, datos) {
   const hayPrecio = precio && precio.disponible !== false && p > 0;
 
   const pintar = () => {
-    const aporte = Number(mando.value) || 0;
+    const aporte = valorDesde(mando.value);
     const r = proyectar({ falta, plsDia: ritmo?.pls_dia, precio: hayPrecio ? p : null, aporteMes: aporte });
     if (!r || r.dias == null) return;
 
     salida.textContent = aporte > 0 ? `${fmt(aporte)} $` : 'nada';
-    mando.style.setProperty('--t', `${((aporte / TOPE) * 100).toFixed(1)}%`);
+    mando.style.setProperty('--t', `${(Number(mando.value) / PASOS * 100).toFixed(1)}%`);
     mando.setAttribute('aria-valuetext',
       aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada');
 
