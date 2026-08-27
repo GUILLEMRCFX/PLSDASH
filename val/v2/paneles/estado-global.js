@@ -99,7 +99,7 @@ export function panelEstadoGlobal(datos) {
           <span class="c-sub">${disp.dias} días · ${
             disp.minutosCaidos > 0
               ? `${fmt(disp.minutosCaidos)} min caído${
-                  porHora ? ` · ≈ −${fmt((disp.minutosCaidos / 60) * porHora)} PLS` : ''}`
+                  porHora ? ` · ≈&nbsp;−${fmt((disp.minutosCaidos / 60) * porHora)}&nbsp;PLS` : ''}`
               : 'sin caídas'
           }</span>
         </div>` : ''}

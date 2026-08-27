@@ -156,7 +156,7 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
       <div class="avance" role="presentation">
         <div class="a-barra">${barra}</div>
         <div class="a-pie">
-          <span class="mono">${fmtCompacto(reunido)} de ${fmtCompacto(deposito)} PLS</span>
+          <span class="mono">${fmtCompacto(reunido)} de ${fmtCompacto(deposito)}&nbsp;PLS</span>
           <span>${escapar(pieBarra)}</span>
         </div>
       </div>
