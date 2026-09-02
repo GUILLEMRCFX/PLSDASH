@@ -931,6 +931,9 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   return {
     actualizar,
     destello,
+    /* El nacimiento, para la pantalla de carga. 0 = enjambre disperso,
+       1 = esfera. Lo lee `deformar()`, que comparten todos los materiales. */
+    nacer(v) { uniformes.uNacer.value = Math.max(0, Math.min(1, v)); },
     // Para poder forzarlo desde una prueba sin depender del evento.
     aplicarTema,
     info: () => {
@@ -943,6 +946,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         msGeometria: vor.ms + vorFina.ms,
         nodos: nNodos, dpr: renderer.getPixelRatio(), zoom: +zoom.toFixed(2),
         ancho, alto, visible, respiracion: uniformes.uRespiracion.value,
+        nacer: uniformes.uNacer.value,
         llamadas: renderer.info.render.calls, reducido,
         destello: matNodo.uniforms.uDestT.value,
         /* Los colores tal como los tiene CADA FAMILIA de material ahora mismo,
