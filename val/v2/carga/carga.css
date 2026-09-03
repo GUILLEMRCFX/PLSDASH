@@ -1,0 +1,100 @@
+/**
+ * Lo que comparten las cuatro candidatas.
+ *
+ * Todas viven en la misma caja: una capa a pantalla completa por encima del
+ * panel, con el fondo del tema. Los colores salen de las mismas variables que
+ * el resto —`--dato`, `--acento`, `--fondo`— así que una pantalla de carga
+ * cambia de color con el tema sin una línea más.
+ */
+
+.cg {
+  position: fixed; inset: 0;
+  z-index: 200;
+  display: grid; place-items: center;
+  background: var(--fondo);
+  overflow: hidden;
+  /* Nada de lo que hay aquí se toca ni se lee: es una espera. */
+  pointer-events: none;
+  -webkit-user-select: none; user-select: none;
+}
+
+/* La capa se va con opacidad, no con `display`: `display` corta la animación
+   en seco y lo que se pidió es justo lo contrario. */
+.cg[data-fin] { opacity: 0; transition: opacity .34s ease-out; }
+
+/* El texto de estado, común a las cuatro. Abajo y discreto: la pantalla la
+   cuenta el dibujo, no la letra. */
+.cg-pie {
+  position: absolute; left: 0; right: 0;
+  bottom: calc(30px + env(safe-area-inset-bottom, 0px));
+  text-align: center;
+  font: 500 11px/1 var(--texto);
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--apagado);
+  opacity: 0; transition: opacity .5s ease-out;
+}
+.cg-pie[data-ver] { opacity: 1; }
+
+/* La marca. Es la misma en las cuatro para que se comparen por la animación y
+   no por la tipografía. */
+.cg-marca {
+  position: absolute;
+  top: calc(34px + env(safe-area-inset-top, 0px));
+  left: 0; right: 0;
+  text-align: center;
+  font: 600 12px/1 var(--texto);
+  letter-spacing: .34em; text-transform: uppercase;
+  color: var(--dato);
+  /* Se enciende sola en cuanto la capa está en el DOM: es lo único que se ve
+     durante la compilación de los shaders, así que no puede esperar a JS. */
+  opacity: 0; transition: opacity .42s ease-out;
+}
+
+/* ── contadores de reserva ──────────────────────────────────────────────────
+   Con movimiento reducido no hay coreografía en ninguna de las cuatro: se
+   enseña la marca quieta y se funde. Se define aquí una vez y no en cada
+   candidata, porque el comportamiento tiene que ser idéntico. */
+.cg[data-quieto] .cg-marca { opacity: 1; transition: opacity .3s ease-out; }
+.cg[data-quieto] .cg-pie   { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cg[data-fin] { transition-duration: .2s; }
+}
+
+/* ── el lienzo, común al escáner y a la constelación ────────────────────── */
+.cg-lienzo { position: absolute; inset: 0; display: block; }
+
+/* ── la esfera naciendo ─────────────────────────────────────────────────── */
+.cg-escena { position: absolute; inset: 0; }
+.cg-escena canvas { display: block; width: 100%; height: 100%; }
+/* La entrega: la esfera se aleja mientras se apaga. Es lo contrario de cortar
+   en seco, que es lo que hacía la pantalla vieja al quitarse el `display`. */
+.cg-naciendo[data-entregando] .cg-escena {
+  transform: scale(1.14);
+  transition: transform .52s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ── la compuerta ───────────────────────────────────────────────────────── */
+.cg-ir { width: min(76vmin, 420px); height: min(76vmin, 420px); overflow: visible; }
+/* Opacas y del color del fondo con un velo de dato: tienen que taparse entre
+   ellas, que es de donde sale la lectura de palas solapadas. Con cualquier
+   transparencia se ven los nueve círculos enteros y el efecto se cae. */
+.cg-ir-pala {
+  fill: color-mix(in srgb, var(--dato) 9%, var(--fondo));
+  stroke: color-mix(in srgb, var(--dato) 34%, transparent);
+  stroke-width: 1;
+}
+.cg-ir-borde {
+  fill: none;
+  stroke: color-mix(in srgb, var(--dato) 30%, transparent);
+  stroke-width: 1.4;
+}
+.cg-ir-marca { stroke: color-mix(in srgb, var(--dato) 38%, transparent); stroke-width: 1.1; }
+.cg-ir-marca.larga { stroke: color-mix(in srgb, var(--acento) 55%, transparent); stroke-width: 1.6; }
+.cg-compuerta[data-entregando] .cg-ir {
+  transform: scale(1.5); opacity: 0;
+  transition: transform .42s cubic-bezier(.4, 0, .2, 1), opacity .42s ease-in;
+}
+
+/* ── el escáner ─────────────────────────────────────────────────────────── */
+.cg-escaner[data-entregando] .cg-lienzo { opacity: 0; transition: opacity .3s; }

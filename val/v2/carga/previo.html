@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pantalla de carga · la esfera naciendo</title>
+<link rel="stylesheet" href="../paneles/estilo.css">
+<link rel="stylesheet" href="carga.css">
+<style>
+  /* El banco de pruebas de la pantalla de carga. No lo enlaza nadie: existe
+     para poder reproducirla a voluntad —con o sin retardo de datos, en cualquier
+     tema, con o sin movimiento reducido— sin recargar el panel entero y sin
+     esperar a que los datos tarden de verdad.
+
+     Usa los mismos módulos y los mismos estilos que producción, incluida la
+     mudanza final de la esfera. Una copia no serviría: lo que se afina aquí
+     tiene que ser lo que se ve allí. */
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--fondo);color:var(--dato-suave);
+            font-family:var(--texto);min-height:100%}
+
+  /* El panel de mentira que hay debajo. Existe para poder juzgar LA ENTREGA:
+     una pantalla de carga se juzga por cómo se va, no por cómo empieza. */
+  .falso{padding:12px;max-width:1100px;margin:0 auto;display:grid;
+         grid-template-columns:minmax(0,1fr);gap:14px}
+  @media (min-width:820px){
+    .falso{grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:18px;padding:20px}
+  }
+  .falso .panel{opacity:0;transform:translateY(10px)}
+  .falso.dentro .panel{opacity:1;transform:none;
+    transition:opacity .5s ease-out,transform .5s cubic-bezier(.2,.7,.3,1)}
+  .falso.dentro .panel:nth-child(2){transition-delay:.06s}
+  .falso.dentro .panel:nth-child(3){transition-delay:.12s}
+  .falso.dentro .panel:nth-child(4){transition-delay:.18s}
+
+  /* La botonera. Fija abajo, por encima de todo menos de la carga. */
+  .mando{position:fixed;left:0;right:0;bottom:0;z-index:150;
+         padding:10px calc(10px + env(safe-area-inset-left,0px))
+                 calc(10px + env(safe-area-inset-bottom,0px));
+         background:var(--vidrio-denso);
+         -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+         border-top:1px solid var(--borde)}
+  .mando-fila{display:flex;flex-wrap:wrap;gap:6px;align-items:center;
+              max-width:1100px;margin:0 auto}
+  .mando-fila+.mando-fila{margin-top:7px}
+  .mando button,.mando select{
+    font:600 12px/1 var(--texto);letter-spacing:.06em;
+    padding:9px 11px;min-height:38px;border-radius:9px;cursor:pointer;
+    background:var(--dato-velo);color:var(--dato-suave);
+    border:1px solid var(--borde);}
+  .mando button.grande{flex:1 1 auto;min-width:120px;text-align:center}
+  .mando button[aria-pressed="true"]{background:var(--dato-tinte);color:var(--dato);
+                                     border-color:var(--dato-marco,var(--borde-vivo))}
+  .mando .eti{font:500 11px/1 var(--texto);letter-spacing:.14em;
+              text-transform:uppercase;color:var(--apagado);margin-right:2px}
+  .mando .nota{font:400 11.5px/1.4 var(--texto);color:var(--apagado);
+               max-width:1100px;margin:7px auto 0}
+  .mando .nota b{color:var(--dato-suave);font-weight:600}
+  /* Sitio para que la botonera no tape el último panel. */
+  .colchon{height:170px}
+  #hueco canvas{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+
+<main class="falso" id="falso">
+  <section class="panel">
+    <h2 class="p-tit">Resumen</h2>
+    <p class="c-num" style="font-size:34px;color:var(--dato)">792.082<span class="u">PLS</span></p>
+    <p class="c-eti">Total generado</p>
+    <dl class="p-fondo">
+      <div><dt>Rendimiento</dt><dd>9,49&nbsp;%</dd></div>
+      <div><dt>Validadores</dt><dd>10 / 10</dd></div>
+      <div><dt>Precio</dt><dd>0,0₄1426 $</dd></div>
+    </dl>
+  </section>
+  <section class="panel">
+    <h2 class="p-tit">Precio de PLS</h2>
+    <p class="c-num" style="font-size:34px;color:var(--dato)">0,0₄1426<span class="u">$</span></p>
+    <p class="c-eti">WPLS · precio actual</p>
+    <p class="c-sub">Histórico guardado por el recolector, una lectura por hora.</p>
+  </section>
+  <section class="panel">
+    <h2 class="p-tit">Validadores</h2>
+    <p class="c-sub">Diez activos, 32M PLS cada uno.</p>
+  </section>
+  <section class="panel">
+    <h2 class="p-tit">Registro</h2>
+    <p class="c-sub">Último suceso hace menos de una hora.</p>
+  </section>
+  <section class="panel">
+    <h2 class="p-tit">Esfera, tras la mudanza</h2>
+    <div id="hueco" style="height:260px;position:relative"></div>
+  </section>
+  <div class="colchon"></div>
+</main>
+
+<div class="mando">
+  <div class="mando-fila">
+    <button type="button" class="grande" id="btnVer">Reproducir</button>
+  </div>
+  <div class="mando-fila">
+    <span class="eti">Datos</span>
+    <button type="button" data-espera="0"    aria-pressed="true">Ya están</button>
+    <button type="button" data-espera="1200" aria-pressed="false">1,2 s</button>
+    <button type="button" data-espera="4000" aria-pressed="false">4 s</button>
+    <span class="eti" style="margin-left:8px">Tema</span>
+    <select id="selTema"></select>
+    <button type="button" id="btnReducido" aria-pressed="false">Movimiento reducido</button>
+  </div>
+  <p class="nota" id="nota"></p>
+</div>
+
+<!-- El mismo mapa que `index.html`: los complementos de Three (`LineMaterial` y
+     compañía) importan `'three'` a secas y sin esto no resuelven. -->
+<script type="importmap">
+{ "imports": { "three": "/val/v2/vendor/three.module.js" } }
+</script>
+
+<script type="module">
+import { iniciarCarga, MIN_MS, MIN_MS_REDUCIDO } from './carga.js';
+import * as pantalla from './naciendo.js';
+import { TEMAS, aplicarTema, aplicarGuardado } from '../paneles/tema.js';
+
+aplicarGuardado();
+
+const falso = document.getElementById('falso');
+const nota = document.getElementById('nota');
+const selTema = document.getElementById('selTema');
+const btnRed = document.getElementById('btnReducido');
+const btnVer = document.getElementById('btnVer');
+
+let espera = 0;
+let forzarReducido = false;
+let corriendo = false;
+
+for (const t of TEMAS) {
+  const o = document.createElement('option');
+  o.value = t.id; o.textContent = t.nombre;
+  selTema.appendChild(o);
+}
+selTema.value = document.documentElement.dataset.tema || TEMAS[0].id;
+selTema.addEventListener('change', () => aplicarTema(selTema.value));
+
+for (const b of document.querySelectorAll('[data-espera]')) {
+  b.addEventListener('click', () => {
+    espera = Number(b.dataset.espera);
+    for (const o of document.querySelectorAll('[data-espera]'))
+      o.setAttribute('aria-pressed', String(o === b));
+  });
+}
+btnRed.addEventListener('click', () => {
+  forzarReducido = !forzarReducido;
+  btnRed.setAttribute('aria-pressed', String(forzarReducido));
+});
+btnVer.addEventListener('click', reproducir);
+
+/**
+ * Reproduce la pantalla de principio a fin con el retardo de datos elegido, y
+ * enseña lo que ha durado DE VERDAD: el mínimo garantizado no es una promesa
+ * del comentario, es un número que se puede leer aquí.
+ *
+ * La mudanza al final es la misma que hace `index.html`: la esfera se va al
+ * hueco de abajo en vez de destruirse. Si no se hiciera, este previo mentiría
+ * sobre la parte que más cuesta.
+ */
+async function reproducir() {
+  if (corriendo) return;
+  corriendo = true;
+  btnVer.disabled = true;
+  falso.classList.remove('dentro');
+  document.getElementById('hueco').replaceChildren();
+
+  const t0 = performance.now();
+  const carga = iniciarCarga(document.body, pantalla, {
+    reducido: forzarReducido,
+    alEntregar(e) { e.mudar(document.getElementById('hueco')); },
+  });
+  await new Promise(r => setTimeout(r, espera));
+  const tDatos = performance.now() - t0;
+  falso.classList.add('dentro');
+  await carga.terminar();
+  const total = performance.now() - t0;
+
+  const suelo = forzarReducido ? MIN_MS_REDUCIDO : MIN_MS;
+  nota.innerHTML = `Datos en ${Math.round(tDatos)} ms · pantalla ${Math.round(total)} ms · `
+    + `suelo ${suelo} ms${total + 1 >= suelo ? ' ✓' : ' ✗ SE CORTÓ'}`;
+  corriendo = false;
+  btnVer.disabled = false;
+}
+
+nota.textContent = 'Reproduce la pantalla. El panel de debajo es de mentira y solo '
+  + 'está para poder juzgar la entrega, que es donde se cae una pantalla de carga. '
+  + 'La esfera acaba en el recuadro de abajo: es la mudanza de verdad.';
+</script>
+</body>
+</html>

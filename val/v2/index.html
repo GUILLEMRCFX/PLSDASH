@@ -11,6 +11,9 @@
 <title>PLSDASH · núcleo</title>
 <link rel="icon" href="/favicon.ico">
 <link rel="stylesheet" href="/val/v2/paneles/estilo.css">
+<!-- Antes que nada: la pantalla de carga se pinta en el primer fotograma y
+     no puede esperar a que llegue una hoja de estilo por detrás. -->
+<link rel="stylesheet" href="/val/v2/carga/carga.css">
 <!-- El tema se pone ANTES de pintar: si esperara a los paneles, el panel
      arrancaría en el tema de omisión y saltaría al elegido a los pocos
      cientos de milisegundos. Un parpadeo de color en cada carga. -->
@@ -261,7 +264,8 @@
 </script>
 
 <script type="module">
-  import { crearEsfera } from './escena/esfera.js';
+  import { iniciarCarga } from './carga/carga.js';
+  import * as pantallaCarga from './carga/naciendo.js';
   import { escenaDesde } from './escena/estado-escena.js';
   import { cargarTodo } from './datos.js';
   import { panelResumen, engancharResumen, tictac } from './paneles/resumen.js';
@@ -289,7 +293,20 @@
   // GPU cada vez que cambia el recuento de validadores.
   const rotulo = document.getElementById('rotulo');
 
-  const esfera = crearEsfera(document.getElementById('escena'), {
+  /* ⚠ La esfera NO se crea aquí. La crea la pantalla de carga, a pantalla
+     completa, y al acabar se muda al hueco de esta pestaña con `mudar()`.
+
+     No es un capricho de puesta en escena: si se creara aquí y la pantalla de
+     carga creara la suya, habría DOS contextos de WebGL a la vez y DOS
+     compilaciones de shaders —708 ms medidos cada una por software—. Con la
+     mudanza se compila una sola vez, igual que antes de que la pantalla
+     existiera, y encima la esfera que se ha visto nacer es la misma que se
+     queda.
+
+     Hasta que llega, `esfera` es null: todo lo que la usa pasa por `hayEsfera`
+     o por `?.`, porque el panel se pinta debajo mientras la carga sigue puesta. */
+  let esfera = null;
+  const opcionesEsfera = {
     escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
     alSenalar(n) {
       if (!n) { rotulo.hidden = true; return; }
@@ -304,7 +321,7 @@
         `translate(${Math.round(n.x)}px, ${Math.round(n.y)}px) translate(-50%, -150%)`;
       rotulo.hidden = false;
     },
-  });
+  };
 
   // ⚠ La esfera arranca VACÍA, sin un solo nodo, y se llena cuando llegan los
   //   datos. Antes arrancaba con diez nodos inventados de `datos-falsos.js`,
@@ -314,9 +331,12 @@
   //
   //   El `?n=` para forzar un número de nodos falsos se va con él.
 
-  // Se expone ANTES de nada. Si algo de lo de abajo fallase, `__esfera` sigue
-  // estando en la consola y se puede diagnosticar desde ahí.
-  window.__esfera = esfera;
+  /* El gancho de diagnóstico. Se asigna cuando la esfera EXISTE, que desde que
+     la crea la pantalla de carga ya no es al cargar el módulo sino al
+     entregarla —ver el arranque, más abajo—. Antes se ponía aquí arriba y
+     valía `null` los primeros dos segundos; las pruebas que esperaban a
+     `window.__esfera` se quedaban colgadas mirando un nulo. */
+  window.__esfera = null;
 
   /* ───────────────────────────────────────────── pestañas
 
@@ -436,7 +456,7 @@
     for (const b of bloques) {
       if (Number(b.ts) <= ultimoBloqueTs) continue;
       ultimoBloqueTs = Number(b.ts);
-      if (b.validador != null) esfera.destello(Number(b.validador));
+      if (b.validador != null) esfera?.destello(Number(b.validador));
     }
   }
 
@@ -446,7 +466,12 @@
     // La esfera es el fondo de las cuatro pestañas, así que se actualiza aquí y
     // no dentro de ninguna: sus nodos son los validadores reales, su brillo el
     // avance del ciclo de barrido y su color la frescura del dato.
-    esfera.actualizar(escenaDesde(datos, datos.ahoraS));
+    /* `?.` y no a secas: durante la pantalla de carga el panel ya se está
+       pintando debajo pero la esfera todavía no se ha entregado. Y aunque
+       existiera, no habría que tocarla: mientras nace la conduce la pantalla
+       de carga, y escribirle los nodos reales por encima le pisaría el
+       encendido escalonado. Al entregarla se le pasan los datos de una vez. */
+    esfera?.actualizar(escenaDesde(datos, datos.ahoraS));
     destellarBloquesNuevos(datos);
 
     PESTANAS.forEach((p, i) => {
@@ -493,10 +518,41 @@
   }
 
   activar(activa, { mover: false, animar: false, sellarHash: false });
-  if (!PESTANAS[activa].estatica)
-    vistas[activa].innerHTML = '<div id="cargando">Cargando…</div>';
-  refrescar();
-  setInterval(refrescar, REFRESCO_MS);
+
+  /* El arranque: la pantalla de carga por encima, los datos por debajo, y la
+     esfera mudándose a su pestaña al final.
+
+     El orden de los `await` ES la promesa que se le hizo al panel: `refrescar()`
+     pinta los paneles mientras la carga sigue puesta, y `terminar()` no vuelve
+     hasta que la animación ha hecho su entrada entera, ha cumplido el mínimo y
+     ha hecho su salida entera. Si los datos tardan, la carga se alarga sola.
+
+     Si la esfera no se puede crear —WebGL apagado, contexto perdido— no se
+     puede dejar al panel sin arrancar: se cae al aviso de texto de siempre y el
+     resto del panel funciona igual, solo que sin esfera. Antes de esto un fallo
+     de WebGL se llevaba por delante el módulo entero. */
+  (async () => {
+    let carga = null;
+    try {
+      carga = iniciarCarga(document.body, pantallaCarga, {
+        opcionesEsfera,
+        alEntregar(e) {
+          esfera = e;
+          window.__esfera = e;
+          esfera.mudar(document.getElementById('escena'));
+          // Ahora sí: los nodos reales, de una vez, sobre la esfera ya hecha.
+          if (ultimos) esfera.actualizar(escenaDesde(ultimos, Math.floor(Date.now() / 1000)));
+        },
+      });
+    } catch (e) {
+      console.error('[val/v2] la pantalla de carga no arrancó:', e);
+      if (!PESTANAS[activa].estatica)
+        vistas[activa].innerHTML = '<div id="cargando">Cargando…</div>';
+    }
+    await refrescar();
+    if (carga) { try { await carga.terminar(); } catch (e) { console.error('[val/v2] carga:', e); } }
+    setInterval(refrescar, REFRESCO_MS);
+  })();
 
   // El pulso corre a su propio ritmo. Los datos llegan cada 18 s, pero la
   // cuenta atrás tiene que avanzar segundo a segundo: si solo se moviera con
@@ -521,7 +577,7 @@
        que hace que el brillo suba de forma continua en vez de a escalones —y,
        sobre todo, que la CAÍDA al cobrarse el barrido se vea cuando pasa. Es
        la misma cuenta, con la hora al día: no se inventa nada. */
-    if (ultimos) esfera.actualizar(escenaDesde(ultimos, Math.floor(Date.now() / 1000)));
+    if (ultimos) esfera?.actualizar(escenaDesde(ultimos, Math.floor(Date.now() / 1000)));
   }, 1000);
 </script>
 </body>

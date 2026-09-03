@@ -931,6 +931,37 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   return {
     actualizar,
     destello,
+    /* El nacimiento, para la pantalla de carga. 0 = enjambre disperso,
+       1 = esfera. Lo lee `deformar()`, que comparten todos los materiales. */
+    nacer(v) { uniformes.uNacer.value = Math.max(0, Math.min(1, v)); },
+
+    /**
+     * Cambia de contenedor sin perder el contexto de WebGL.
+     *
+     * Existe por la pantalla de carga: la esfera nace a pantalla completa y al
+     * acabar SE MUDA al hueco de la pestaña Esfera. Es la misma instancia, el
+     * mismo lienzo y el mismo contexto — la que has visto ensamblarse es
+     * literalmente la que se queda.
+     *
+     * Y no es solo poética: crear una segunda esfera para la pestaña
+     * significaría un segundo contexto de WebGL y una segunda compilación de
+     * shaders, que es la parte cara (708 ms medidos por software). Mudando el
+     * lienzo se compila una sola vez.
+     *
+     * Mover un `<canvas>` de sitio en el DOM conserva su contexto; lo que hay
+     * que rehacer son los dos observadores, que apuntaban al contenedor viejo,
+     * y la medida, porque el hueco nuevo tiene otro tamaño.
+     */
+    mudar(nuevo) {
+      if (!nuevo || nuevo === contenedor) return;
+      observador.unobserve(contenedor);
+      alVer.unobserve(contenedor);
+      nuevo.appendChild(renderer.domElement);
+      contenedor = nuevo;
+      observador.observe(contenedor);
+      alVer.observe(contenedor);
+      medir();
+    },
     // Para poder forzarlo desde una prueba sin depender del evento.
     aplicarTema,
     info: () => {
@@ -943,6 +974,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         msGeometria: vor.ms + vorFina.ms,
         nodos: nNodos, dpr: renderer.getPixelRatio(), zoom: +zoom.toFixed(2),
         ancho, alto, visible, respiracion: uniformes.uRespiracion.value,
+        nacer: uniformes.uNacer.value,
         llamadas: renderer.info.render.calls, reducido,
         destello: matNodo.uniforms.uDestT.value,
         /* Los colores tal como los tiene CADA FAMILIA de material ahora mismo,
