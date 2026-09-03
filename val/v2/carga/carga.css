@@ -45,7 +45,9 @@
   font: 600 12px/1 var(--texto);
   letter-spacing: .34em; text-transform: uppercase;
   color: var(--dato);
-  opacity: 0;
+  /* Se enciende sola en cuanto la capa está en el DOM: es lo único que se ve
+     durante la compilación de los shaders, así que no puede esperar a JS. */
+  opacity: 0; transition: opacity .42s ease-out;
 }
 
 /* ── contadores de reserva ──────────────────────────────────────────────────

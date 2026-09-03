@@ -3,14 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Pantallas de carga · candidatas</title>
+<title>Pantalla de carga · la esfera naciendo</title>
 <link rel="stylesheet" href="../paneles/estilo.css">
 <link rel="stylesheet" href="carga.css">
 <style>
-  /* Esta página NO se fusiona con el panel: es la mesa donde se comparan las
-     candidatas. Vive aquí y no en una rama aparte para que use exactamente los
-     mismos estilos y los mismos módulos que usaría en producción — comparar una
-     copia no sirve de nada. */
+  /* El banco de pruebas de la pantalla de carga. No lo enlaza nadie: existe
+     para poder reproducirla a voluntad —con o sin retardo de datos, en cualquier
+     tema, con o sin movimiento reducido— sin recargar el panel entero y sin
+     esperar a que los datos tarden de verdad.
+
+     Usa los mismos módulos y los mismos estilos que producción, incluida la
+     mudanza final de la esfera. Una copia no serviría: lo que se afina aquí
+     tiene que ser lo que se ve allí. */
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--fondo);color:var(--dato-suave);
             font-family:var(--texto);min-height:100%}
@@ -54,6 +58,7 @@
   .mando .nota b{color:var(--dato-suave);font-weight:600}
   /* Sitio para que la botonera no tape el último panel. */
   .colchon{height:170px}
+  #hueco canvas{display:block;width:100%;height:100%}
 </style>
 </head>
 <body>
@@ -83,11 +88,17 @@
     <h2 class="p-tit">Registro</h2>
     <p class="c-sub">Último suceso hace menos de una hora.</p>
   </section>
+  <section class="panel">
+    <h2 class="p-tit">Esfera, tras la mudanza</h2>
+    <div id="hueco" style="height:260px;position:relative"></div>
+  </section>
   <div class="colchon"></div>
 </main>
 
 <div class="mando">
-  <div class="mando-fila" id="filaCandidatas"><span class="eti">Candidata</span></div>
+  <div class="mando-fila">
+    <button type="button" class="grande" id="btnVer">Reproducir</button>
+  </div>
   <div class="mando-fila">
     <span class="eti">Datos</span>
     <button type="button" data-espera="0"    aria-pressed="true">Ya están</button>
@@ -107,16 +118,17 @@
 </script>
 
 <script type="module">
-import { iniciarCarga, CANDIDATAS, MIN_MS, MIN_MS_REDUCIDO } from './carga.js';
+import { iniciarCarga, MIN_MS, MIN_MS_REDUCIDO } from './carga.js';
+import * as pantalla from './naciendo.js';
 import { TEMAS, aplicarTema, aplicarGuardado } from '../paneles/tema.js';
 
 aplicarGuardado();
 
 const falso = document.getElementById('falso');
 const nota = document.getElementById('nota');
-const filaC = document.getElementById('filaCandidatas');
 const selTema = document.getElementById('selTema');
 const btnRed = document.getElementById('btnReducido');
+const btnVer = document.getElementById('btnVer');
 
 let espera = 0;
 let forzarReducido = false;
@@ -130,14 +142,6 @@ for (const t of TEMAS) {
 selTema.value = document.documentElement.dataset.tema || TEMAS[0].id;
 selTema.addEventListener('change', () => aplicarTema(selTema.value));
 
-for (const [clave, c] of Object.entries(CANDIDATAS)) {
-  const b = document.createElement('button');
-  b.type = 'button'; b.className = 'grande'; b.textContent = c.titulo;
-  b.dataset.candidata = clave;
-  b.addEventListener('click', () => reproducir(clave));
-  filaC.appendChild(b);
-}
-
 for (const b of document.querySelectorAll('[data-espera]')) {
   b.addEventListener('click', () => {
     espera = Number(b.dataset.espera);
@@ -149,26 +153,29 @@ btnRed.addEventListener('click', () => {
   forzarReducido = !forzarReducido;
   btnRed.setAttribute('aria-pressed', String(forzarReducido));
 });
+btnVer.addEventListener('click', reproducir);
 
 /**
- * Reproduce una candidata de principio a fin, con el retardo de datos elegido.
- * Mide lo que ha durado de verdad y lo enseña: el mínimo garantizado no es una
- * promesa del comentario, es un número que se puede leer aquí.
+ * Reproduce la pantalla de principio a fin con el retardo de datos elegido, y
+ * enseña lo que ha durado DE VERDAD: el mínimo garantizado no es una promesa
+ * del comentario, es un número que se puede leer aquí.
+ *
+ * La mudanza al final es la misma que hace `index.html`: la esfera se va al
+ * hueco de abajo en vez de destruirse. Si no se hiciera, este previo mentiría
+ * sobre la parte que más cuesta.
  */
-async function reproducir(clave) {
+async function reproducir() {
   if (corriendo) return;
   corriendo = true;
+  btnVer.disabled = true;
   falso.classList.remove('dentro');
-  for (const b of filaC.querySelectorAll('button'))
-    b.setAttribute('aria-pressed', String(b.dataset.candidata === clave));
-
-  const c = CANDIDATAS[clave];
-  nota.innerHTML = `<b>${c.titulo}</b> — ${c.resumen}`;
-  const pieza = await c.cargar();
+  document.getElementById('hueco').replaceChildren();
 
   const t0 = performance.now();
-  const carga = iniciarCarga(document.body, pieza, { reducido: forzarReducido });
-  // Así es como se usa en el panel: se piden los datos y se espera al mínimo.
+  const carga = iniciarCarga(document.body, pantalla, {
+    reducido: forzarReducido,
+    alEntregar(e) { e.mudar(document.getElementById('hueco')); },
+  });
   await new Promise(r => setTimeout(r, espera));
   const tDatos = performance.now() - t0;
   falso.classList.add('dentro');
@@ -176,14 +183,15 @@ async function reproducir(clave) {
   const total = performance.now() - t0;
 
   const suelo = forzarReducido ? MIN_MS_REDUCIDO : MIN_MS;
-  nota.innerHTML = `<b>${c.titulo}</b> — ${c.resumen}<br>`
-    + `Datos en ${Math.round(tDatos)} ms · pantalla ${Math.round(total)} ms · `
+  nota.innerHTML = `Datos en ${Math.round(tDatos)} ms · pantalla ${Math.round(total)} ms · `
     + `suelo ${suelo} ms${total + 1 >= suelo ? ' ✓' : ' ✗ SE CORTÓ'}`;
   corriendo = false;
+  btnVer.disabled = false;
 }
 
-nota.textContent = 'Elige una candidata. El panel de debajo es de mentira y solo '
-  + 'está para poder juzgar la entrega, que es donde se cae una pantalla de carga.';
+nota.textContent = 'Reproduce la pantalla. El panel de debajo es de mentira y solo '
+  + 'está para poder juzgar la entrega, que es donde se cae una pantalla de carga. '
+  + 'La esfera acaba en el recuadro de abajo: es la mudanza de verdad.';
 </script>
 </body>
 </html>
