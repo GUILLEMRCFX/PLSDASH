@@ -157,8 +157,14 @@
     backdrop-filter:blur(22px) saturate(150%);-webkit-backdrop-filter:blur(22px) saturate(150%);
     box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 26px 54px -28px rgba(0,0,0,.85)}
   .panel-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
-  .tabs{display:flex;gap:4px;background:var(--bg-2);padding:4px;border-radius:12px;border:1px solid var(--line)}
-  .tab{font-family:var(--body);font-weight:600;font-size:13px;color:var(--dim);background:none;border:none;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.16s}
+  /* ⚠ ENVUELVE. Con tres pestañas cabían de sobra; con la cuarta —Inversiones—
+     la fila se sale por la derecha a 390 y la última queda cortada contra el
+     borde. Se arregla dejándola envolver en vez de apretando el relleno: así la
+     quinta pestaña que se añada tampoco romperá nada. `min-width:0` para que
+     pueda encoger dentro de la cabecera. */
+  .tabs{display:flex;flex-wrap:wrap;gap:4px;background:var(--bg-2);padding:4px;
+    border-radius:12px;border:1px solid var(--line);min-width:0;max-width:100%}
+  .tab{font-family:var(--body);font-weight:600;font-size:13px;color:var(--dim);background:none;border:none;padding:8px 15px;border-radius:9px;cursor:pointer;transition:.16s;white-space:nowrap}
   .tab.on{background:var(--surface-2);color:var(--text);box-shadow:0 1px 0 rgba(255,255,255,.04) inset}
   .head-tools{display:flex;align-items:center;gap:8px}
   .tool{display:inline-flex;align-items:center;gap:7px;font-family:var(--body);font-weight:500;font-size:12.5px;color:var(--dim);background:var(--bg-2);border:1px solid var(--line);padding:8px 12px;border-radius:10px;cursor:pointer;transition:.16s;white-space:nowrap;flex-shrink:0}
@@ -247,7 +253,10 @@
      de tokens y el pie de "añadir token": no aplican al calendario. */
   body[data-view="history"] .thead,
   body[data-view="history"] .head-tools,
-  body[data-view="history"] .foot{display:none}
+  body[data-view="history"] .foot,
+  body[data-view="invest"] .thead,
+  body[data-view="invest"] .head-tools,
+  body[data-view="invest"] .foot{display:none}
 
   /* ---------- HISTORIAL / CALENDARIO ---------- */
   .hist-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -298,6 +307,88 @@
   .htx-i span{font-family:var(--body);font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
   .htx-v{font-family:var(--mono);font-size:13.5px;font-weight:600;color:var(--mint);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
   .hist-note{padding:14px 22px;text-align:center;font-size:11px;color:var(--faint);font-family:var(--mono);border-top:1px solid var(--line)}
+
+  /* ---------- INVERSIONES ----------
+     La jerarquía la manda la distinción entre invertir y mover: lo que ENTRA
+     de fuera va en el degradado de la marca y con cifra grande; lo que solo se
+     mueve va en gris y en una línea. Si las dos cosas se pintaran igual, la
+     pestaña no diría nada que no dijera ya Historial. */
+  .iv-sembrando{display:flex;align-items:center;gap:10px;padding:12px 22px;
+    border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .iv-sembrando .spinner{width:15px;height:15px;flex-shrink:0}
+  .iv-tit{font-family:var(--display);font-size:12px;font-weight:600;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 10px}
+  .iv-nota{font-size:11.5px;line-height:1.5;color:var(--faint);margin:10px 0 0}
+
+  .iv-semanas{padding:18px 22px;border-bottom:1px solid var(--line)}
+  .iv-semanas ul{list-style:none;margin:0;padding:0;display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+  .iv-semanas li{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding:9px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+  .iv-sem-f{font-size:11.5px;color:var(--faint)}
+  .iv-sem-u{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--mint);
+    font-variant-numeric:tabular-nums}
+
+  .iv-dias{padding:18px 22px;display:grid;gap:12px}
+  .iv-dia{padding:14px 16px;border-radius:14px;background:var(--surface);
+    border:1px solid var(--line)}
+  .iv-fecha{margin:0 0 10px;font-family:var(--display);font-size:12px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+
+  /* El nodo de entrada: lo único de esta vista que lleva el degradado de la
+     marca, porque es lo único que es dinero nuevo. */
+  .iv-nodo{display:flex;flex-wrap:wrap;gap:10px}
+  .iv-ent{display:flex;align-items:center;gap:9px;padding:9px 13px;border-radius:12px;
+    background:rgba(155,93,229,.10);border:1px solid rgba(155,93,229,.34)}
+  .iv-ent b{font-family:var(--mono);font-size:14.5px;font-weight:600;color:var(--text);
+    font-variant-numeric:tabular-nums}
+  .iv-ent-usd{font-family:var(--mono);font-size:14.5px;font-weight:700;color:var(--mint);
+    font-variant-numeric:tabular-nums}
+  .iv-ent-nota{font-size:11px;color:var(--faint)}
+  .iv-quieto{margin:9px 0 0;font-size:12px;color:var(--faint)}
+
+  .iv-flechas{list-style:none;margin:11px 0 0;padding:0 0 0 13px;display:grid;gap:7px;
+    border-left:1px solid var(--line-2)}
+  .iv-fl{display:flex;align-items:center;gap:9px;min-width:0}
+  .iv-pct{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--violet);
+    min-width:44px;font-variant-numeric:tabular-nums}
+  /* La flecha se dibuja con CSS y no con un carácter: un «→» de la fuente
+     cambia de grosor y de altura con cada familia, y aquí hay tres. */
+  .iv-flecha{flex:none;width:22px;height:1px;background:var(--line-2);position:relative}
+  .iv-flecha::after{content:'';position:absolute;right:0;top:-2.5px;
+    border-left:5px solid var(--line-2);border-top:3px solid transparent;
+    border-bottom:3px solid transparent}
+  .iv-dest{font-family:var(--mono);font-size:13.5px;color:var(--text);
+    font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  .iv-movs{list-style:none;margin:11px 0 0;padding:0;display:grid;gap:7px}
+  .iv-mov{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    font-family:var(--mono);font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+  .iv-logo{border-radius:50%;display:inline-grid;place-items:center;flex:none;
+    font-family:var(--body);font-weight:700;color:#fff;overflow:hidden;position:relative;
+    box-shadow:0 0 0 1px rgba(255,255,255,.06)}
+  .iv-logo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
+  .iv-desc{margin:0;padding:14px 22px 20px;border-top:1px solid var(--line)}
+  .iv-desc>summary{cursor:pointer;font-size:12.5px;color:var(--dim);padding:6px 0;
+    min-height:34px;display:flex;align-items:center}
+  .iv-desc>summary:hover{color:var(--text)}
+  .iv-desc-lista{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
+  .iv-desc-lista li{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
+    padding:9px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+  .iv-desc-m{font-size:12px;color:var(--faint);flex:1 1 200px;min-width:0}
+  .iv-desc-c{display:flex;flex-wrap:wrap;gap:6px}
+  .iv-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:8px;
+    background:var(--bg-2);border:1px solid var(--line);font-family:var(--mono);
+    font-size:11.5px;color:var(--dim)}
+  .iv-chip.sale{color:var(--faint)}
+
+  @media (max-width:640px){
+    .iv-semanas,.iv-dias,.iv-desc{padding-left:16px;padding-right:16px}
+    .iv-semanas ul{grid-template-columns:repeat(auto-fill,minmax(126px,1fr))}
+    .iv-ent{flex:1 1 100%}
+  }
 
   /* ---------- TIMEFRAME + GRÁFICO ---------- */
   .chartbtn{margin-left:auto;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:none;border:1px solid transparent;color:var(--faint);cursor:pointer;flex-shrink:0;transition:.15s}
@@ -556,6 +647,7 @@
         <button class="tab on" onclick="setView('combined',this)">Combinado</button>
         <button class="tab" onclick="setView('wallet',this)">Por wallet</button>
         <button class="tab" onclick="setView('history',this)">Historial</button>
+        <button class="tab" onclick="setView('invest',this)">Inversiones</button>
       </div>
       <div class="head-tools">
         <button class="tool" id="sortTool" onclick="cycleSort()">
@@ -1270,6 +1362,7 @@ function render(){
   // --- estado vacío ---
   if(!state.wallets.length){
     if(state.view==='history'){loadHistory();updateHeader();renderWalletBar();return;}
+    if(state.view==='invest'){renderInvest();updateHeader();renderWalletBar();return;}
     renderEmpty();
     updateHeader();
     renderWalletBar();
@@ -1281,6 +1374,19 @@ function render(){
     if(tokensCombined.length)renderStats();
     renderWalletBar();
     loadHistory();   // refetch sólo si cambió la firma (wallets/filtro)
+    return;
+  }
+  /* --- vista Inversiones: qué entró de fuera y en qué se convirtió ---
+     Tiene que salir ANTES del dibujo de la cartera, igual que Historial: los
+     precios de los tokens llegan más tarde que esta vista y `render()` se
+     vuelve a llamar cuando llegan. Sin esta salida, el esqueleto de la tabla
+     de la cartera pisaba las tarjetas ya pintadas. Medido: la vista aparecía y
+     se borraba sola un segundo después. */
+  if(state.view==='invest'){
+    updateHeader();
+    if(tokensCombined.length)renderStats();
+    renderWalletBar();
+    loadInvest();    // solo vuelve a pedir si cambiaron las wallets
     return;
   }
   // --- aún cargando (sin datos) ---
@@ -1806,6 +1912,7 @@ function setView(v,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   el.classList.add('on');
   if(v==='history')loadHistory();
+  else if(v==='invest')loadInvest();
   else render();
 }
 function cycleSort(){
@@ -2150,6 +2257,190 @@ function histSetMin(v){
 function histSelectDay(key){
   historyState.selectedDay=historyState.selectedDay===key?null:key;
   renderHistory();
+}
+
+/* ============================================================
+   VISTA INVERSIONES — qué entró de fuera y en qué se convirtió
+   ============================================================
+
+   La pregunta que responde esta vista y no responde ninguna otra: CUÁNTO
+   DINERO DE FUERA has metido, y en qué se fue.
+
+   La distinción que lo ordena todo es INVERSIÓN contra MOVIMIENTO. Un swap de
+   PLS por HEX no es invertir: es mover lo que ya tenías. Invertir es cuando
+   entra dinero de fuera. La clasificación la hace `/api/inversiones` mirando
+   cada TRANSACCIÓN entera —qué salió y qué entró— y aquí solo se dibuja.
+
+   Y por eso esta vista NO sustituye a Historial. Historial es un calendario de
+   lo que ha llegado a la cartera valorado al precio de HOY, con su aviso de que
+   eso es una aproximacion. Esta no aproxima nada: las entradas en stablecoin
+   valen su propio importe, y en destino solo se enseña el numero de monedas y
+   el logo, sin valor. Son dos preguntas distintas y cada una tiene su pestaña.
+*/
+const investState={
+  loading:false,
+  error:false,
+  datos:null,
+  loadedSig:null,
+  reintento:null,      // temporizador de la siembra
+};
+
+function investSig(){
+  return state.wallets.map(w=>lc(w.address)).sort().join(',');
+}
+
+async function loadInvest(){
+  if(!state.wallets.length){investState.datos=null;investState.loadedSig=null;renderInvest();return;}
+  const sig=investSig();
+  if(investState.loading)return;
+  // Ya cargado y sin siembra pendiente: solo dibujar.
+  if(sig===investState.loadedSig&&investState.datos&&!investState.datos.sembrando){renderInvest();return;}
+  investState.loading=true;investState.error=false;
+  renderInvest();
+  try{
+    // El desfase horario va en la petición: el día y la semana se cuentan en TU
+    // hora, no en UTC. Un ingreso a las 00:30 caería en el día anterior.
+    const tz=new Date().getTimezoneOffset();
+    const r=await fetch(`/api/inversiones?w=${encodeURIComponent(sig)}&tz=${tz}`);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    if(!j.ok)throw new Error(j.error||'respuesta sin ok');
+    investState.datos=j;investState.loadedSig=sig;
+  }catch(e){console.error(e);investState.error=true;}
+  finally{
+    investState.loading=false;
+    renderInvest();
+    /* La siembra va por tandas: mientras quede historia por traer, se vuelve a
+       pedir. Se espera un poco entre tandas para no encadenar llamadas al
+       explorador, y solo si la pestaña sigue abierta. */
+    clearTimeout(investState.reintento);
+    if(investState.datos&&investState.datos.sembrando&&state.view==='invest'){
+      investState.reintento=setTimeout(()=>{investState.loadedSig=null;loadInvest();},1500);
+    }
+  }
+}
+
+// Logo de un token, con el gradiente de respaldo de siempre.
+function invLogo(t,px){
+  const grad=gradientFor(t.dir==='native'?'native-pls':(t.dir||t.sim));
+  const img=t.logo?`<img src="${escapeHtml(t.logo)}" alt="" loading="lazy" onerror="this.remove()">`:'';
+  return `<span class="iv-logo" style="background:${grad};width:${px}px;height:${px}px;font-size:${Math.round(px*0.44)}px">${img}${escapeHtml((t.sim||'?')[0].toUpperCase())}</span>`;
+}
+
+/* Todo redondeado: `fmtAmount` ya lleva los sufijos K/M/B y ningún decimal
+   largo. En los dólares de una entrada no se enseñan céntimos porque una
+   entrada en stablecoin es un ingreso, no un precio.
+
+   ⚠ `en-US` y no `es-ES`, aunque las fechas de aquí al lado sí vayan en
+     español. Es la convención que ya sigue todo el fichero —`fmtUsd`,
+     `fmtAmount`— y mezclarlas se veía: en la misma tarjeta salía «4,000 PLSX»
+     con coma y «$1200» sin separador, porque el español no agrupa los números
+     de cuatro cifras. Números a la inglesa, fechas en español. */
+const invUsd=n=>'$'+Math.round(n).toLocaleString('en-US');
+const invFecha=f=>{
+  const [y,m,d]=f.split('-').map(Number);
+  return new Date(y,m-1,d).toLocaleDateString('es-ES',{weekday:'short',day:'numeric',month:'short'});
+};
+
+/* La tarjeta de un día. Tres formas, y cada día enseña la que le toca:
+
+     entrada + reparto   el caso limpio: nodo de entrada, flechas con su
+                         porcentaje y en destino solo logo y monedas
+     solo entrada        «Entraron 500 USDC» y «sin mover todavía»
+     solo movimientos    una línea por swap, sin nodo de entrada */
+function invDia(d){
+  const entradas=d.entradas||[],movs=d.movimientos||[];
+  let cuerpo='';
+
+  if(entradas.length&&d.reparto){
+    // Caso limpio: el dibujo.
+    const nodo=entradas.map(e=>`<span class="iv-ent">${invLogo(e,26)}<b>${escapeHtml(fmtAmount(e.cant))} ${escapeHtml(e.sim)}</b>${e.moneda==='usd'?`<span class="iv-ent-usd">${escapeHtml(invUsd(e.usd))}</span>`:'<span class="iv-ent-nota">no cuenta en dólares</span>'}</span>`).join('');
+    const flechas=d.reparto.map(r=>`<li class="iv-fl">
+        <span class="iv-pct">${Math.round(r.pct)}%</span>
+        <span class="iv-flecha" aria-hidden="true"></span>
+        ${invLogo(r,22)}
+        <span class="iv-dest">${escapeHtml(fmtAmount(r.cant))} ${escapeHtml(r.sim)}</span>
+      </li>`).join('');
+    cuerpo=`<div class="iv-nodo">${nodo}</div><ul class="iv-flechas">${flechas}</ul>`;
+    // Swaps del día que no salieron del stablecoin: van como líneas sueltas.
+    const sueltos=movs.filter(m=>!(m.gastoUsd>0));
+    if(sueltos.length)cuerpo+=`<ul class="iv-movs">${sueltos.map(invMov).join('')}</ul>`;
+  }else if(entradas.length){
+    cuerpo=`<div class="iv-nodo">${entradas.map(e=>`<span class="iv-ent">${invLogo(e,26)}<b>Entraron ${escapeHtml(fmtAmount(e.cant))} ${escapeHtml(e.sim)}</b>${e.moneda==='usd'?`<span class="iv-ent-usd">${escapeHtml(invUsd(e.usd))}</span>`:'<span class="iv-ent-nota">no cuenta en el resumen en dólares</span>'}</span>`).join('')}</div>
+      <p class="iv-quieto">sin mover todavía</p>`;
+  }else{
+    cuerpo=`<ul class="iv-movs">${movs.map(invMov).join('')}</ul>`;
+  }
+  return `<article class="iv-dia"><h4 class="iv-fecha">${escapeHtml(invFecha(d.fecha))}</h4>${cuerpo}</article>`;
+}
+
+// Una línea de movimiento: sale esto, entra aquello. Sin valor en dólares.
+function invMov(m){
+  return `<li class="iv-mov">
+    ${invLogo(m.sale,20)}<span>${escapeHtml(fmtAmount(m.sale.cant))} ${escapeHtml(m.sale.sim)}</span>
+    <span class="iv-flecha" aria-hidden="true"></span>
+    ${invLogo(m.entra,20)}<span>${escapeHtml(fmtAmount(m.entra.cant))} ${escapeHtml(m.entra.sim)}</span>
+  </li>`;
+}
+
+const INV_MOTIVOS={
+  'traspaso':'Traspaso entre tus propias wallets',
+  'nft':'Un NFT, que no tiene cantidad que sumar',
+  'salida hacia fuera':'Salió de la wallet sin recibir nada a cambio',
+  'token que no es ni stablecoin ni PLS':'Llegó un token sin que saliera nada: airdrop, regalo o envío de un tercero',
+  'varios tokens de golpe':'Llegaron varios tokens en la misma transacción',
+  'varios tokens en la misma operación':'Varios tokens a la vez: liquidez o un enrutado que no se lee como un cambio',
+};
+
+function renderInvest(){
+  const rows=$('rows');
+  if(!state.wallets.length){
+    rows.innerHTML=`<div class="state-block"><h3>Añade una wallet</h3><p>Las inversiones se sacan de las wallets que tengas puestas.</p></div>`;
+    return;
+  }
+  if(investState.loading&&!investState.datos){
+    rows.innerHTML=`<div class="state-block"><div class="spinner"></div><p>Leyendo el historial desde el explorer…</p></div>`;
+    return;
+  }
+  if(investState.error){
+    rows.innerHTML=`<div class="state-block error"><h3>No se pudo cargar</h3><p>El explorer de PulseChain no respondió.</p><button class="btn btn-ghost" onclick="loadInvest()">Reintentar</button></div>`;
+    return;
+  }
+  const d=investState.datos;
+  if(!d)return;
+
+  let html='';
+  if(d.sembrando){
+    html+=`<div class="iv-sembrando"><div class="spinner"></div><span>Trayendo el historial por tandas. Lo que ya está se ve; el resto va apareciendo.</span></div>`;
+  }
+
+  // Resúmenes semanales. Solo entradas reales de stablecoin: un swap no es
+  // dinero que entra, y una entrada en PLS no se convierte a dólares.
+  if(d.semanas.length){
+    html+=`<div class="iv-semanas"><h3 class="iv-tit">Dólares que entraron, por semana</h3><ul>`
+      +d.semanas.slice(0,12).map(w=>`<li><span class="iv-sem-f">${escapeHtml(invFecha(w.desde))}</span><span class="iv-sem-u">${escapeHtml(invUsd(w.usd))}</span></li>`).join('')
+      +`</ul><p class="iv-nota">Solo entradas en stablecoin. Los swaps no cuentan: mover lo que ya tenías no es invertir.</p></div>`;
+  }
+
+  if(!d.dias.length&&!d.descuadres.length){
+    rows.innerHTML=html+`<div class="state-block"><h3>Sin movimientos</h3><p>No hay entradas ni swaps en el periodo que se mira.</p></div>`;
+    return;
+  }
+
+  html+=`<div class="iv-dias">${d.dias.map(invDia).join('')}</div>`;
+
+  if(d.descuadres.length){
+    html+=`<details class="iv-desc"><summary>${d.descuadres.length} movimiento${d.descuadres.length===1?'':'s'} que no cuadra${d.descuadres.length===1?'':'n'}</summary>
+      <p class="iv-nota">Ni entradas de dinero ni cambios de una cosa por otra. Buena parte de los airdrops que llegan solos son estafa: no los toques.</p>
+      <ul class="iv-desc-lista">`
+      +d.descuadres.slice(0,60).map(x=>{
+        const piezas=[...x.sale.map(p=>['sale',p]),...x.entra.map(p=>['entra',p])];
+        const chips=piezas.map(([lado,p])=>`<span class="iv-chip ${lado}">${invLogo(p,18)}${escapeHtml(fmtAmount(p.cant))} ${escapeHtml(p.sim)}</span>`).join('');
+        return `<li><span class="iv-desc-m">${escapeHtml(INV_MOTIVOS[x.motivo]||x.motivo)}</span><span class="iv-desc-c">${chips}</span></li>`;
+      }).join('')
+      +`</ul></details>`;
+  }
+  rows.innerHTML=html;
 }
 
 /* ============================================================
