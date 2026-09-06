@@ -815,6 +815,163 @@
   transition: color .18s, background .18s;
 }
 .pestanas button:hover { color: var(--dato-suave); }
+
+/* ═══════════════════════════════════════════ la barra, abajo en el móvil
+
+   En el móvil la barra deja de estar arriba y pasa a ser una PÍLDORA FLOTANTE
+   abajo: con el teléfono en una mano, el pulgar llega al borde inferior y no
+   al superior. En escritorio se queda donde estaba — una píldora flotante
+   abajo en una pantalla ancha no se alcanza mejor con nada y le come sitio al
+   contenido.
+
+   Es el MISMO marcado en los dos sitios. Duplicar la barra habría significado
+   dos `role="tablist"`, dos juegos de ids y dos sitios donde arreglar cada
+   cosa; aquí solo cambia dónde se coloca.
+
+   ## Los iconos
+
+   Van SIEMPRE en el marcado, también en escritorio, pero arriba están ocultos:
+   una fila de pestañas con texto no los necesita y con ellos queda cargada.
+   Se esconden con `display:none`, no con `visibility`, para que no ocupen.
+
+   ## El desenfoque
+
+   ⚠ COSTE: NO SE HA PODIDO MEDIR EN LA MÁQUINA DE PRUEBAS, y conviene que
+     conste. Se intentó por tres caminos —deltas de `requestAnimationFrame`
+     saturando con hasta 160 copias, lo mismo repartiéndolas para que cada una
+     desenfoque su propio trozo de fondo, y la traza de DevTools sumando
+     rasterizado y dibujo— y los tres dieron cero o negativo. El motivo es que
+     `backdrop-filter` lo resuelve el COMPOSITOR y en headless el `rAF` va
+     contra un vsync simulado que no espera a que termine: los 16,7 ms que
+     salían eran el intervalo de vsync, no una medida.
+
+     Lo que SÍ se comprobó es que el desenfoque se aplica de verdad: la
+     varianza de luminancia dentro de la píldora cae de 1277,7 a 193,4 al
+     activarlo. Y el precedente: el panel ya lleva en producción
+     `blur(16px) saturate(1.25)` sobre 366×52 más una tarjeta de 376×375, y eso
+     sí se midió por debajo de 1 ms por fotograma. Aquí el área es 0,09-0,21
+     Mpx a DPR 3, o sea menos. Es precedente, no confirmación. */
+
+@media (max-width: 819px) {
+  .barra {
+    position: fixed;
+    left: 12px; right: 12px;
+    /* ⚠ SUELO PARA LA BARRA DE INICIO. `env(safe-area-inset-bottom)` a veces
+       llega a 0 en la app instalada —el mismo comportamiento que obligó a poner
+       `max()` arriba en la portada—, y con 0 la píldora se sienta encima de la
+       raya del iPhone. 12px es el margen de diseño; los 22 de la app instalada
+       son el seguro, elegidos para despejar la banda del indicador sin comerse
+       media pantalla cuando el teléfono no lo tiene. */
+    bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+    z-index: 60;
+    justify-content: center;
+    align-items: stretch;
+    padding: 6px;
+    border-radius: 20px;
+    /* Translúcida de verdad: el contenido se ve pasar por detrás. */
+    background: color-mix(in srgb, var(--fondo) 62%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    border: 1px solid var(--borde-vivo);
+    box-shadow: 0 12px 34px -10px rgba(0, 0, 0, .75);
+    /* El muelle: rebasa y vuelve. Una curva lineal aquí se lee como una
+       persiana; el rebase es lo que la hace parecer física. */
+    transition: left .34s cubic-bezier(.34, 1.56, .64, 1),
+                right .34s cubic-bezier(.34, 1.56, .64, 1),
+                padding .34s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  @media (display-mode: standalone) {
+    .barra { bottom: max(env(safe-area-inset-bottom, 0px), 22px); }
+  }
+
+  .pestanas {
+    flex-wrap: nowrap;              /* abajo NO envuelve: es una fila y ya está */
+    justify-content: space-around;
+    gap: 0;
+  }
+
+  .pestanas button {
+    /* ⚠ `min-width: 0` NO ES DECORATIVO. Un elemento flexible no baja de su
+       ancho de contenido mínimo salvo que se le diga, y el contenido mínimo
+       aquí incluye la etiqueta — que al contraerse pliega el ALTO pero sigue
+       midiendo lo mismo de ancho. Sin esto, la píldora se estrechaba a 218px
+       y los iconos de Nodo y Esfera se quedaban FUERA de ella, a la derecha,
+       con el engranaje encima del de Validadores. Visto en captura. */
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 7px 2px 6px;
+    /* ⚠ 48 y no 42. El objetivo táctil tiene que aguantar aunque los iconos
+       encojan al contraerse: el botón mantiene su altura mínima siempre, y lo
+       que encoge es el dibujo de dentro. */
+    min-height: 48px;
+    /* 9,5 y no 10,5. Medido a 390: a 10,5 la etiqueta «Validadores» ocupa 59px
+       dentro de un botón de 58 —se sale— y entre dos etiquetas contiguas quedan
+       5px, que a ojo es que se tocan. A 9,5 son 53px de etiqueta y 10 de aire.
+       Medido, no estimado. */
+    font-size: 9.5px;
+    border-radius: 14px;
+    white-space: nowrap;
+  }
+
+  .pt-ico { display: block; line-height: 0; }
+  .pt-ico svg {
+    width: 22px; height: 22px; display: block;
+    transition: width .3s cubic-bezier(.34, 1.56, .64, 1),
+                height .3s cubic-bezier(.34, 1.56, .64, 1);
+  }
+
+  .pt-eti {
+    display: block;
+    /* Se pliega en LAS DOS DIRECCIONES. El alto es lo que se ve; el ancho es lo
+       que deja que la píldora se estreche de verdad. Se probó animar el ancho
+       de la propia barra y no se puede: de `max-content` a un número no hay
+       transición. */
+    max-height: 14px; max-width: 7em; overflow: hidden;
+    transition: max-height .3s cubic-bezier(.34, 1.56, .64, 1),
+                max-width .3s cubic-bezier(.34, 1.56, .64, 1),
+                opacity .2s ease-out, margin-top .3s ease-out;
+  }
+
+  /* El engranaje, sexto hueco de la píldora: si se quedara arriba, la barra de
+     arriba sería una fila entera para un solo botón. */
+  .barra .tm { display: flex; align-items: stretch; }
+  .tm-abrir { border-radius: 14px; min-height: 48px; min-width: 46px; }
+
+  /* ── contraída ─────────────────────────────────────────────────────────── */
+  :root[data-nav="contraida"] .barra {
+    /* Se estrecha quedando centrada: el margen lateral crece por los dos lados
+       por igual, así que la píldora encoge hacia el centro sin moverse de él. */
+    left: 22%; right: 22%;
+    padding: 4px;
+  }
+  :root[data-nav="contraida"] .pestanas button { padding: 7px 2px; }
+  :root[data-nav="contraida"] .pt-ico svg { width: 19px; height: 19px; }
+  :root[data-nav="contraida"] .pt-eti {
+    max-height: 0; max-width: 0; opacity: 0; margin-top: -3px;
+  }
+
+  /* ⚠ La reserva de sitio para que la barra no tape el último panel NO está
+     aquí: está en el bloque de `.marco` de `index.html`. Estuvo aquí y no
+     servía de nada — `index.html` enlaza esta hoja y DESPUÉS abre su propio
+     `<style>`, así que a igual especificidad gana el suyo y el relleno se
+     quedaba en los 12px de siempre. Medido: el último panel acababa 62px por
+     debajo del borde superior de la barra, o sea tapado. */
+}
+
+/* Arriba, en escritorio: los iconos sobran. */
+@media (min-width: 820px) {
+  .pt-ico { display: none; }
+}
+
+/* Sin movimiento: la barra no se contrae nunca. Lo decide `nav.js`, que no
+   pone el atributo; esto es el cinturón por si alguien lo pone a mano. */
+@media (prefers-reduced-motion: reduce) {
+  .barra, .pt-ico svg, .pt-eti { transition: none !important; }
+  :root[data-nav="contraida"] .barra { left: 12px; right: 12px; padding: 6px; }
+  :root[data-nav="contraida"] .pt-eti { max-height: 14px; max-width: 7em; opacity: 1; margin-top: 0; }
+  :root[data-nav="contraida"] .pt-ico svg { width: 22px; height: 22px; }
+}
+
 .pestanas button[aria-selected="true"] {
   color: var(--dato);
   background: var(--dato-tinte);
@@ -1048,32 +1205,14 @@
      Lo que sobraba era el tracking, que estaba puesto para unas versalitas que
      ya no hay. Con 0 y el relleno a 6px caben las cinco con 30px de sobra, y a
      12px de cuerpo. Medido, no estimado. */
-/* ⚠ EL TRAMO ESTRECHO, Y POR QUÉ ESTOS NÚMEROS Y NO OTROS.
-
-   Las cinco pestañas suman 335px de texto y relleno. El engranaje del tema le
-   quita a la fila 46px de hueco (42 de botón y 4 de separación), y eso rompía
-   dos anchos que antes cabían:
-
-       ancho   hueco antes   hueco con engranaje   suman
-        430        404              350             335   cabía y cabe
-        390        364              310             335   CABÍA, dejó de caber
-        375        349              295             335   CABÍA, dejó de caber
-        360        334              288             335   ya se desplazaba antes
-
-   Se devuelven esos 46px donde estaba el gasto —relleno y separación—, no
-   encogiendo el engranaje, que a menos de 42px deja de poder tocarse con el
-   dedo. 360 sigue desplazándose, pero eso ya pasaba antes de este cambio y no
-   lo empeora el engranaje: son cinco nombres que no caben en 360px. */
-@media (max-width: 460px) {
-  .pestanas { gap: 3px; }
-  .pestanas button {
-    /* 12 y no 12,5: el medio punto vale 11px de fila, y a 375 —el iPhone
-       estrecho— eran justo los que faltaban. */
-    font-size: 12px;
-    letter-spacing: 0;
-    padding: 12px 3px;
-  }
-}
+/* ⚠ AQUÍ HABÍA UN BLOQUE PARA 460px QUE YA NO APLICA, y se retira en vez de
+   dejarlo estorbando. Apretaba el tipo a 12px y el relleno a 3px para que los
+   CINCO NOMBRES cupieran en una fila de arriba a 375. Desde que en móvil la
+   barra es una píldora de abajo con icono y etiqueta en columna, ese problema
+   no existe — y el bloque sí: iba después del de la píldora, con la misma
+   especificidad, así que le ganaba y dejaba la etiqueta en 12px cuando la
+   píldora pide 9,5. Medido: las etiquetas se SOLAPABAN 3px entre «Ganancias» y
+   «Validadores». */
 
 
 /* ─────────────────────────────────────────────── auxiliares */
