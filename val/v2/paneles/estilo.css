@@ -898,7 +898,15 @@
        y los iconos de Nodo y Esfera se quedaban FUERA de ella, a la derecha,
        con el engranaje encima del de Validadores. Visto en captura. */
     flex: 1 1 0; min-width: 0;
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    /* ⚠ `justify-content: center` NO ES DE ADORNO. El botón tiene `min-height`
+       de 48 para el dedo, y el contenido —icono más etiqueta— mide 35 en
+       expandida y 19 en contraída. Sin centrar, todo ese sobrante cae DEBAJO y
+       el icono se va arriba: medido, 7px por encima y 19 por debajo, con el
+       centro del icono a 25px cuando el de la píldora está a 31. Y el
+       engranaje, que es otro elemento, sí quedaba centrado (15/15) — que es
+       justo lo que hacía que se notara tanto al ponerlos en fila. */
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px;
     padding: 7px 2px 6px;
     /* ⚠ 48 y no 42. El objetivo táctil tiene que aguantar aunque los iconos
        encojan al contraerse: el botón mantiene su altura mínima siempre, y lo
@@ -933,9 +941,30 @@
   }
 
   /* El engranaje, sexto hueco de la píldora: si se quedara arriba, la barra de
-     arriba sería una fila entera para un solo botón. */
+     arriba sería una fila entera para un solo botón.
+
+     ⚠ Y CON SU ETIQUETA, como los otros cinco. Sin ella era un botón de otra
+       forma en la misma fila: su icono se centraba en los 48px (centro a 31)
+       mientras los de las pestañas quedaban a 25, porque esos llevan la
+       etiqueta debajo. Seis pulgadas de diferencia se ven, y se veían. Con la
+       etiqueta los seis huecos son idénticos y se alinean solos en los dos
+       estados, sin un solo número que ajustar. */
   .barra .tm { display: flex; align-items: stretch; }
-  .tm-abrir { border-radius: 14px; min-height: 48px; min-width: 46px; }
+  .tm-abrir {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px;
+    border-radius: 14px; min-height: 48px; min-width: 52px;
+    padding: 7px 4px 6px;
+    /* El mismo cuerpo que las pestañas. El engranaje NO cuelga de `.pestanas`,
+       así que su etiqueta no heredaba los 9,5px y salía más alta: eso empujaba
+       su icono 2px por encima del de los demás. */
+    font: 500 9.5px/1 var(--texto);
+  }
+  .tm-abrir svg { width: 22px; height: 22px; display: block;
+    transition: width .3s cubic-bezier(.34, 1.56, .64, 1),
+                height .3s cubic-bezier(.34, 1.56, .64, 1); }
+  :root[data-nav="contraida"] .tm-abrir { padding: 7px 4px; }
+  :root[data-nav="contraida"] .tm-abrir svg { width: 19px; height: 19px; }
 
   /* ── contraída ─────────────────────────────────────────────────────────── */
   :root[data-nav="contraida"] .barra {
@@ -958,9 +987,11 @@
      debajo del borde superior de la barra, o sea tapado. */
 }
 
-/* Arriba, en escritorio: los iconos sobran. */
+/* Arriba, en escritorio: los iconos sobran, y la etiqueta del engranaje
+   también — allí es un botón redondo con su dibujo y ya está. */
 @media (min-width: 820px) {
   .pt-ico { display: none; }
+  .tm-abrir .pt-eti { display: none; }
 }
 
 /* Sin movimiento: la barra no se contrae nunca. Lo decide `nav.js`, que no
@@ -970,6 +1001,7 @@
   :root[data-nav="contraida"] .barra { left: 12px; right: 12px; padding: 6px; }
   :root[data-nav="contraida"] .pt-eti { max-height: 14px; max-width: 7em; opacity: 1; margin-top: 0; }
   :root[data-nav="contraida"] .pt-ico svg { width: 22px; height: 22px; }
+  :root[data-nav="contraida"] .tm-abrir svg { width: 22px; height: 22px; }
 }
 
 .pestanas button[aria-selected="true"] {
