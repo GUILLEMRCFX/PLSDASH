@@ -498,7 +498,7 @@
     // no en `ultimos`. Por eso `refrescar` y no `pintar`.
     engancharAportaciones(document, () => refrescar());
     engancharSimulador(document, datos);
-    engancharPrecioSimulado(document, datos, () => refrescar());
+    engancharPrecioSimulado(document, datos);
     window.__datos = datos;
     // Ganchos de diagnóstico, como `__esfera`: desde la consola se puede forzar
     // un repintado sin esperar 18 segundos, y la prueba del bloque 2 lo usa para

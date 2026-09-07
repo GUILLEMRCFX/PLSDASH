@@ -5,23 +5,23 @@
  * tardo?»; esta contesta «¿cuánto vale esto, y a qué precio dejo de perder?».
  *
  * Un deslizador de PRECIO, y debajo: qué vale el stake, qué vale lo ganado, qué
- * valdría un año a ese precio, y cuánto falta para volver al precio de entrada.
+ * valdría un año a ese precio, y cuánto falta para volver al precio del
+ * sacrificio.
  *
- * ## ⚠ EL PRECIO DE ENTRADA NO ESTÁ ESCRITO AQUÍ
+ * ## El precio del sacrificio es una constante, y es deliberado
  *
- * El v1 lo lleva así:
+ * Antes se guardaba en D1 vía `/api/val/ajustes`, con su plegable, su campo y su
+ * botón de guardar dentro del panel. Se ha quitado entero —endpoint incluido—
+ * porque el dato no cambia: el sacrificio de PulseChain ocurrió una vez, a un
+ * precio que ya pasó. Un ajuste editable para un número que no se va a volver a
+ * editar es un formulario que ocupa sitio, una tabla que mantener y un endpoint
+ * más que puede fallar, a cambio de nada.
  *
- *     const PRECIO_SACRIFICIO = 0.0001;   // en el código
- *
- * Y es peor vicio que el `V11 = 32_000_000` que ya se quitó, porque el depósito
- * al menos es un parámetro público del protocolo. Esto no: es a qué precio
- * entró UNA persona, y esa persona es la única que lo sabe. Escribirlo en un
- * fichero que hay que desplegar para cambiarlo es ponerle una fecha de
- * caducidad a un dato que no debería tenerla.
- *
- * Aquí se guarda en D1 vía `/api/val/ajustes`, se edita desde el propio panel y
- * viaja entre dispositivos. Mientras no se ponga, el panel enseña el valor y
- * calla sobre el breakeven — en vez de compararlo contra un número inventado.
+ * Que quede claro por qué esto NO es el vicio del `V11 = 32_000_000` que sí se
+ * quitó: aquel era un parámetro VIVO —el depósito puede cambiar y el número
+ * mentiría en silencio— y aquí se calcula. Éste es un hecho cerrado del pasado.
+ * Escribir a fuego lo que ya no puede cambiar no tiene ningún riesgo; escribir a
+ * fuego lo que cambia, sí.
  *
  * ## La escala del deslizador
  *
@@ -44,6 +44,16 @@ import { ACTIVACION_TS } from '../datos.js';
 import { fmt, fmtPrecio, escapar } from './formato.js';
 
 export const TITULO = 'Si PLS valiera otra cosa';
+
+/**
+ * El precio del sacrificio, en dólares. Fijo y no editable: ver la cabecera.
+ *
+ * ⚠ El v1 lleva `PRECIO_SACRIFICIO = 0.0001`, un cero más. El número de aquí es
+ *   el que estaba guardado en producción y el que se pidió, así que manda éste;
+ *   se anota la discrepancia por si algún día alguien compara los dos paneles y
+ *   se pregunta cuál miente.
+ */
+export const SACRIFICIO = 0.001;
 
 /* El rango del deslizador, en dólares. Cubre de 1e-6 a 1e-2: cuatro órdenes de
    magnitud alrededor de donde ha vivido PLS, con sitio arriba y abajo. */
@@ -73,11 +83,11 @@ export function posicionDe(precio) {
 /**
  * Las cuatro cifras, sin DOM para poder probarlas con números a mano.
  *
- * @param entrada El precio al que se entró, o null si no se ha puesto. Cuando
- *   es null, `vsEntrada` sale null y el panel calla en vez de comparar contra
- *   un número inventado.
+ * @param entrada El precio de referencia. Por omisión el del sacrificio, que es
+ *   lo único contra lo que se compara ya. Sigue siendo un parámetro para poder
+ *   probar la cuenta con números a mano sin depender de la constante.
  */
-export function valorar({ precio, stakePls, ganadoPls, plsDia, entrada }) {
+export function valorar({ precio, stakePls, ganadoPls, plsDia, entrada = SACRIFICIO }) {
   const p = Number(precio);
   if (!Number.isFinite(p) || p <= 0) return null;
 
@@ -133,22 +143,26 @@ export function panelPrecioSimulado(datos) {
 
   const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
   const ritmo = ritmoDiario({ serie, snapshots24h, plsDiaKV: v.pls_dia, fmt });
-  const entrada = Number(datos.ajustes?.precio_entrada?.valor) || null;
 
   const r = valorar({
     precio: real, stakePls: v.stake_total, ganadoPls: acum ? acum.total : null,
-    plsDia: ritmo?.pls_dia, entrada,
+    plsDia: ritmo?.pls_dia,
   });
 
   const pos = posicionDe(real);
-  const marca = posicionDe(entrada || real);
 
   return `
     <section class="panel" aria-labelledby="pps-t">
       <header class="p-cab">
         <h2 id="pps-t">${TITULO}</h2>
-        <button type="button" class="p-marca ps-volver" id="psAhora"
-                title="Volver al precio de ahora">ahora</button>
+        <!-- Los dos precios que importan, como atajos. No son ajustes: son los
+             dos sitios del carril a los que uno quiere volver. -->
+        <div class="ps-atajos">
+          <button type="button" class="p-marca ps-ir" id="psAhora"
+                  title="Llevar el deslizador al precio de ahora">ahora</button>
+          <button type="button" class="p-marca ps-ir" id="psSacrificio"
+                  title="Llevar el deslizador al precio del sacrificio: ${escapar(fmtPrecio(SACRIFICIO))} $">sacrificio</button>
+        </div>
       </header>
 
       <div class="ps-valor" id="psPrecio">${escapar(fmtPrecio(real))}<span class="u">$</span></div>
@@ -159,12 +173,11 @@ export function panelPrecioSimulado(datos) {
                min="0" max="${PASOS}" step="1" value="${pos}"
                aria-label="Precio de PLS simulado"
                aria-valuetext="${escapar(fmtPrecio(real))} dólares">
-        ${entrada ? `
-        <!-- La marca de por dónde entraste, en la misma escala que el mando:
-             así no se descuadra si algún día cambia el rango. -->
-        <span class="ps-marca" style="left:${(marca / PASOS * 100).toFixed(1)}%"
-              title="Tu precio de entrada: ${escapar(fmtPrecio(entrada))} $"
-              aria-hidden="true"></span>` : ''}
+        <!-- Las DOS marcas, en la misma escala logarítmica que el mando: así no
+             se descuadran si algún día cambia el rango. La de «ahora» se mueve
+             con el precio en cada repintado; la del sacrificio no se mueve
+             nunca. Antes solo se veía una y no había forma de situar la otra. -->
+        ${marcas(real)}
         <!-- Los extremos en potencias de diez y no con el formateador de
              precios, que para 1e-6 daba «0,0₅1000» y para 1e-2 «0,010000»: dos
              formatos distintos en los dos extremos de la misma escala, y
@@ -176,35 +189,23 @@ export function panelPrecioSimulado(datos) {
       </div>
 
       <div class="rejilla" id="psCifras">${cifras(r)}</div>
-
-      <!-- El precio de entrada, editable. Va plegado porque se toca una vez en
-           la vida, y NO está escrito en el código a propósito: ver la cabecera
-           de este fichero. -->
-      <!-- ⚠ ABIERTO cuando todavía no hay precio de entrada. Plegado era lo
-           que había, y con la tabla vacía —que es como llega el panel la
-           primera vez— lo único que se veía era una línea discreta de 52px:
-           el dato que falta para completar el panel, escondido detrás de un
-           triángulo. Con precio guardado sí va plegado: entonces es un ajuste
-           que se toca una vez en la vida. -->
-      <details class="ps-desp"${entrada ? '' : ' open'}>
-        <summary class="ap-abrir ps-abrir">${entrada
-          ? `Entraste a ${escapar(fmtPrecio(entrada))} $ · cambiar`
-          : 'Pon tu precio de entrada para ver cuánto falta para volver'}</summary>
-        <form class="ps-form" id="psForm" autocomplete="off">
-          <label class="ap-campo">
-            <span>Precio de entrada, en dólares</span>
-            <input type="number" name="entrada" step="any" min="0" max="0.99"
-                   inputmode="decimal" placeholder="por ejemplo 0,00012"
-                   value="${entrada || ''}" required>
-          </label>
-          <button type="submit" class="ap-guardar ps-guardar">Guardar</button>
-        </form>
-        <p class="ap-aviso" id="psAviso" role="status" aria-live="polite"></p>
-        <p class="c-sub">Es a qué precio compraste o entró tu sacrificio. Solo lo
-          sabes tú, así que no está escrito en ninguna parte del código: se guarda
-          con tus datos y vale para todos tus dispositivos.</p>
-      </details>
     </section>`;
+}
+
+/**
+ * Las dos rayitas del carril. Se saca aparte porque la de «ahora» hay que
+ * recolocarla cuando llega un precio nuevo, sin tocar el resto del panel.
+ *
+ * El `left` va en la escala del mando, no en la del precio: es la misma cuenta
+ * que `posicionDe`, así que las marcas y el pulgar caen en el mismo sitio por
+ * construcción y no por coincidencia.
+ */
+export function marcas(real) {
+  const uno = (clase, p, texto) =>
+    `<span class="ps-marca ${clase}" style="--p:${(posicionDe(p) / PASOS).toFixed(4)}"
+           title="${escapar(texto)}: ${escapar(fmtPrecio(p))} $" aria-hidden="true"></span>`;
+  return (real != null && real > 0 ? uno('ps-marca-ahora', real, 'Precio de ahora') : '')
+    + uno('ps-marca-sac', SACRIFICIO, 'Precio del sacrificio');
 }
 
 /** El bloque de cifras. Se reescribe solo al mover el deslizador. */
@@ -218,25 +219,30 @@ export function cifras(r) {
 
   if (r.vsEntrada != null) {
     const baja = r.vsEntrada < 0;
+    /* El subtítulo NOMBRA la referencia. Antes decía «para volver» a secas
+       porque el precio de entrada lo había escrito el propio usuario y lo tenía
+       en la cabeza; ahora es una constante, así que la cifra tiene que decir
+       contra qué se compara o se convierte en un porcentaje sin origen. */
+    const ref = `${escapar(fmtPrecio(r.entrada))} $`;
     partes.push(fila(
       'Frente a tu entrada',
       `<span class="${baja ? 'ps-baja' : 'ps-sube'}">${
         r.vsEntrada > 0 ? '+' : ''}${fmt(r.vsEntrada, 1)}<span class="u pct">%</span></span>`,
       r.paraVolver
-        ? `necesita ×${escapar(fmt(r.paraVolver, r.paraVolver < 10 ? 1 : 0))} para volver`
-        : 'por encima del precio al que entraste'));
+        ? `necesita ×${escapar(fmt(r.paraVolver, r.paraVolver < 10 ? 1 : 0))} para volver a ${ref}`
+        : `por encima del sacrificio, ${ref}`));
   }
   return partes.join('');
 }
 
 /**
- * El deslizador y el formulario del precio de entrada.
+ * El deslizador y los dos atajos.
  *
  * ⚠ Recalcula EN EL SITIO, como el del validador y por el mismo motivo: el
  *   panel se regenera cada 18 segundos y un repintado en mitad de un arrastre
  *   devolvería el mando a donde estaba el HTML.
  */
-export function engancharPrecioSimulado(raiz, datos, refrescar) {
+export function engancharPrecioSimulado(raiz, datos) {
   const mando = raiz.querySelector('#psRango');
   if (!mando) return;
 
@@ -245,7 +251,6 @@ export function engancharPrecioSimulado(raiz, datos, refrescar) {
   const real = Number(precio?.precio) || null;
   const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
   const ritmo = ritmoDiario({ serie, snapshots24h, plsDiaKV: v.pls_dia, fmt });
-  const entrada = Number(datos.ajustes?.precio_entrada?.valor) || null;
 
   const salida = raiz.querySelector('#psPrecio');
   const caja = raiz.querySelector('#psCifras');
@@ -257,7 +262,7 @@ export function engancharPrecioSimulado(raiz, datos, refrescar) {
     const p = exacto != null ? exacto : precioDesde(mando.value);
     const r = valorar({
       precio: p, stakePls: v.stake_total, ganadoPls: acum ? acum.total : null,
-      plsDia: ritmo?.pls_dia, entrada,
+      plsDia: ritmo?.pls_dia,
     });
     salida.innerHTML = `${fmtPrecio(p)}<span class="u">$</span>`;
     mando.setAttribute('aria-valuetext', `${fmtPrecio(p)} dólares`);
@@ -274,47 +279,17 @@ export function engancharPrecioSimulado(raiz, datos, refrescar) {
      Solo apareció al darle a `pintar` un parámetro opcional. */
   mando.addEventListener('input', () => pintar());
 
-  const volver = raiz.querySelector('#psAhora');
-  if (volver && real != null) {
-    volver.addEventListener('click', () => {
-      mando.value = String(posicionDe(real));
-      pintar(real);
+  /* Los dos atajos. Los dos llevan el precio EXACTO por `pintar(p)` y no el que
+     salga de la posición: la escala tiene 4000 pasos, así que redondear al paso
+     más cercano desplaza el precio un 0,2 % y el panel se marcaría «simulado»
+     nada más pulsar «ahora», que es justo lo contrario de lo que hace el botón. */
+  const irA = (boton, p) => {
+    if (!boton || !(p > 0)) return;
+    boton.addEventListener('click', () => {
+      mando.value = String(posicionDe(p));
+      pintar(p);
     });
-  }
-
-  const form = raiz.querySelector('#psForm');
-  const aviso = raiz.querySelector('#psAviso');
-  if (form) {
-    form.addEventListener('submit', async ev => {
-      ev.preventDefault();
-      const val = Number(new FormData(form).get('entrada'));
-      if (!(val > 0 && val < 1)) {
-        aviso.textContent = 'Tiene que ser un precio en dólares mayor que cero.';
-        aviso.classList.add('mal');
-        return;
-      }
-      const boton = form.querySelector('.ps-guardar');
-      boton.disabled = true;
-      aviso.classList.remove('mal');
-      aviso.textContent = 'Guardando…';
-      try {
-        const res = await fetch('/api/val/ajustes', {
-          method: 'PUT',
-          credentials: 'same-origin',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ precio_entrada: val }),
-        });
-        const d = await res.json();
-        if (!res.ok) throw new Error(d?.error || `HTTP ${res.status}`);
-        aviso.textContent = 'Guardado.';
-        // Vuelve a PEDIR: el ajuste vive en D1, no en `datos`.
-        refrescar();
-      } catch (e) {
-        aviso.textContent = `No se pudo guardar: ${e.message}`;
-        aviso.classList.add('mal');
-      } finally {
-        boton.disabled = false;
-      }
-    });
-  }
+  };
+  irA(raiz.querySelector('#psAhora'), real);
+  irA(raiz.querySelector('#psSacrificio'), SACRIFICIO);
 }

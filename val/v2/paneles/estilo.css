@@ -1597,38 +1597,73 @@ details[open] > .ap-abrir::before { transform: rotate(45deg); }
 }
 
 .ps-mando { position: relative; margin-bottom: 6px; }
-/* La marca del precio de entrada, colocada en la MISMA escala logarítmica que
-   el mando: así no se descuadra si algún día cambia el rango. */
+
+/* Las dos marcas del carril: dónde cae el precio de ahora y dónde el del
+   sacrificio. Van en la MISMA escala logarítmica que el mando, así que no se
+   descuadran si algún día cambia el rango.
+
+   ⚠ EL `left` NO ES EL PORCENTAJE A SECAS, y esto sí importa. Un `input[range]`
+     no mueve el tirador de 0 % a 100 % del ancho: lo mueve entre los centros de
+     las posiciones extremas, o sea con medio tirador de margen a cada lado. Con
+     `left: 75 %` la rayita queda hasta 10px separada del tirador que dice
+     marcar, y en un panel cuyo asunto es «dónde cae este precio» una marca
+     desplazada es peor que no tenerla. La cuenta reproduce la del navegador:
+     medio tirador, más la fracción del ancho que queda. */
+/* ⚠ DEBAJO DEL CARRIL, no encima, y esto no es estética. Las marcas vivían
+   sobre la barra (`top: 2px; height: 16px`) y ahí el TIRADOR LAS TAPA: mide
+   20px de ancho y ocupa de 3 a 23px de alto, o sea justo donde caía la rayita.
+   Con una sola marca no se notaba porque era la del precio de entrada y el
+   tirador estaba en otro sitio; con dos, la de «ahora» desaparecía debajo del
+   tirador siempre —el tirador arranca precisamente en el precio de ahora— y se
+   volvía a ver una sola marca, que es el fallo que había que arreglar.
+   Comprobado en la captura a 390 antes de darlo por bueno.
+
+   El tirador acaba a los 23px, así que las marcas empiezan a los 24. */
 .ps-marca {
-  position: absolute; top: 2px;
-  width: 2px; height: 16px;
+  position: absolute; top: 24px;
+  left: calc(10px + (100% - 20px) * var(--p, 0));
+  width: 2px; height: 9px;
   margin-left: -1px;
-  background: var(--bien);
   border-radius: 1px;
   pointer-events: none;
 }
-.ps-rango { margin: 0; }
+/* Cada una del color de su botón, que es lo que las hace legibles sin rótulo:
+   dos rayitas iguales en un carril no dicen cuál es cuál. */
+.ps-marca-ahora { background: var(--dato); }
+.ps-marca-sac   { background: var(--bien); }
 
-.ps-volver {
-  background: none; border: 0; padding: 2px 4px; margin: 0;
+.ps-rango { margin: 0; }
+/* Sitio para las rayitas, que ahora van debajo del carril. */
+.ps-mando .sim-topes { margin-top: 10px; }
+
+/* Los dos atajos de la cabecera. */
+.ps-atajos { display: flex; align-items: baseline; gap: 4px; flex: 0 0 auto; }
+.ps-ir {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: none; border: 0; padding: 4px 6px; margin: 0;
+  min-height: 32px;
   cursor: pointer;
-  /* Hereda de `.p-marca` el tipo y las versalitas: se lee como la marca de los
-     demás paneles, que es lo que ocupa ese sitio en todos. */
+  /* El tipo y las versalitas los hereda de `.p-marca`: se lee como la marca de
+     los demás paneles, que es lo que ocupa ese sitio en todos. */
 }
-.ps-volver:hover { opacity: 1; text-decoration: underline; }
+/* El área de toque llega a 44px SIN crecer 44px de alto. Son dos botones
+   pegados en la cabecera de un panel: a 32px se acierta, pero el de al lado
+   está a 4px y el dedo no distingue. Estirar la caja de verdad empujaría el
+   título —la cabecera alinea por línea base— así que se estira solo el blanco
+   de toque, que es lo que importa. */
+.ps-ir::after {
+  content: ''; position: absolute; left: 0; right: 0;
+  top: 50%; height: 44px; transform: translateY(-50%);
+}
+.ps-ir:hover { opacity: 1; text-decoration: underline; }
+/* El punto de color que empareja cada botón con su rayita del carril. */
+.ps-ir::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; flex: 0 0 auto;
+}
+#psAhora { color: var(--dato); }
+#psSacrificio { color: var(--bien); }
 
 .ps-sube { color: var(--bien); }
 .ps-baja { color: var(--acento); }
-
-.ps-desp { margin-top: 12px; }
-.ps-form {
-  display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: end;
-  margin: 8px 0 4px;
-}
-
-/* ⚠ El plegable y el botón del precio de entrada COMPARTEN el estilo de los de
-   aportaciones —de ahí que lleven las dos clases— pero tienen la suya propia.
-   Sin ella había dos `.ap-abrir` y dos `.ap-guardar` en la misma pestaña, y
-   cualquier selector caía en el que tocara primero: el del precio va antes en
-   el DOM y encima vive dentro de un plegable cerrado, o sea invisible. */
-.ps-abrir, .ps-guardar { /* el aspecto lo heredan de `.ap-*` */ }
