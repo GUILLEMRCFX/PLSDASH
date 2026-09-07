@@ -69,14 +69,39 @@ const TIMEOUT_MS = 9000;
    abre alguien con una wallet de hace años. */
 const DIAS_ATRAS = 540;
 
-/* Páginas por fuente y por tanda. Tres fuentes por dirección —tokens,
-   transacciones e internas— así que el peor caso de una tanda son 9 peticiones
-   al explorador por wallet. En marcha normal, con el cursor al día, es 3. */
-const PAGINAS_POR_TANDA = 3;
+/* Páginas por FLUJO y por tanda. Cinco flujos por wallet (ver `FLUJOS`), así
+   que el peor caso de una tanda son 10 peticiones al explorador por wallet. */
+const PAGINAS_POR_TANDA = 2;
 
-/* Cuántas wallets se atienden en una llamada. Más de cuatro y el peor caso se
-   va a 36 subpeticiones, que es donde el plan gratuito empieza a apretar. */
-const MAX_WALLETS = 4;
+/* Cuántas wallets se atienden en una llamada. Tres, para que el peor caso se
+   quede en 30 subpeticiones. */
+const MAX_WALLETS = 3;
+
+/**
+ * Los flujos que se leen, cada uno con su cursor propio.
+ *
+ * ⚠ VAN CON `filter`, Y ESTO ES LO QUE ANTES FALTABA. La portada lleva desde
+ *   siempre paginando este mismo endpoint con `?filter=to` y funciona; esta
+ *   Function no mandaba filtro ninguno y devolvía cero. Era la única diferencia
+ *   visible entre el código que va y el que no iba, así que se copia la forma
+ *   que está probada en producción.
+ *
+ *   Pero copiarla tal cual NO valdría: `filter=to` es solo lo que ENTRA, y para
+ *   distinguir una compra de un swap hace falta ver también lo que SALE. Por eso
+ *   son dos llamadas por fuente en vez de una, y por eso cada sentido lleva su
+ *   propio cursor: uno puede llegar al final y el otro no.
+ *
+ *   Las internas solo en `to`: son el PLS que devuelve un contrato. Una wallet
+ *   normal no origina transacciones internas, así que pedir `from` sería gastar
+ *   una petición para no traer nada.
+ */
+const FLUJOS = [
+  { id: 'tk_to',   ruta: 'token-transfers',        filtro: 'to',   cesta: 'tokens' },
+  { id: 'tk_from', ruta: 'token-transfers',        filtro: 'from', cesta: 'tokens' },
+  { id: 'tx_to',   ruta: 'transactions',           filtro: 'to',   cesta: 'nativas' },
+  { id: 'tx_from', ruta: 'transactions',           filtro: 'from', cesta: 'nativas' },
+  { id: 'itx_to',  ruta: 'internal-transactions',  filtro: 'to',   cesta: 'internas' },
+];
 
 const TAM_LOTE = 100;          // filas por escritura en D1
 const TTL_BORDE = 120;         // segundos de caché en el borde
@@ -159,14 +184,27 @@ async function pedir(ruta, params) {
 }
 
 /**
- * Pagina una ruta hasta agotar la tanda, cruzar el suelo de fecha o quedarse
- * sin páginas. Devuelve lo traído y si quedaba más por traer.
+ * Pagina un flujo desde donde se quedó la tanda anterior.
+ *
+ * ⚠ EL CURSOR ES LA PIEZA, no un detalle. Antes esta función arrancaba SIEMPRE
+ *   en la primera página, así que cada tanda releía las tres mismas y la siembra
+ *   no avanzaba nunca. Medido con una wallet activa de diez páginas: tandas 1 a
+ *   5 pidiendo `[0,1,2]` y lo más viejo alcanzado, tres días. La ventana nominal
+ *   eran 540 días y la real, tres. Y el comentario de arriba decía que el cursor
+ *   guardaba la posición, que es peor que no decir nada: quien lo leyera daba por
+ *   hecho que funcionaba.
+ *
+ * `desde` es el `next_page_params` guardado, o `null` para empezar. Devuelve
+ * `cursor` con el siguiente, o `null` cuando el flujo se ha terminado —porque no
+ * hay más páginas o porque se ha cruzado el suelo de fecha—.
  */
-async function paginar(ruta, sueloTs, maxPaginas) {
+async function paginar(ruta, sueloTs, maxPaginas, desde = null) {
   const items = [];
-  let params = null, quedaMas = false;
+  let params = desde;
+  let paginas = 0;
   for (let i = 0; i < maxPaginas; i++) {
     const j = await pedir(ruta, params);
+    paginas++;
     const lote = Array.isArray(j.items) ? j.items : [];
     let cruzado = false;
     for (const it of lote) {
@@ -175,12 +213,11 @@ async function paginar(ruta, sueloTs, maxPaginas) {
       if (ts < sueloTs) { cruzado = true; continue; }
       items.push(it);
     }
-    if (cruzado) return { items, quedaMas: false };   // el suelo manda
-    if (!j.next_page_params) return { items, quedaMas: false };
+    if (cruzado) return { items, cursor: null, paginas };        // el suelo manda
+    if (!j.next_page_params) return { items, cursor: null, paginas };
     params = j.next_page_params;
-    quedaMas = true;                                  // hay más y se cortó aquí
   }
-  return { items, quedaMas };
+  return { items, cursor: params, paginas };                     // se cortó aquí
 }
 
 // ───────────────────────────────────────── de transferencias a transacciones
@@ -352,26 +389,55 @@ async function guardar(db, wallet, filas) {
  * Una tanda para una dirección: pide, clasifica, guarda y mueve el cursor.
  * Devuelve si le queda historia por sembrar.
  */
+const claveCursor = (wallet, flujo) => `inv_cur_${wallet}_${flujo}`;
+
+/** El cursor guardado de un flujo: `null` si nunca empezó, 'fin' si terminó. */
+async function leerCursor(db, wallet, flujo) {
+  const v = await leerMeta(db, claveCursor(wallet, flujo));
+  if (v == null) return { inicio: null, fin: false };
+  if (v === 'fin') return { inicio: null, fin: true };
+  try { return { inicio: JSON.parse(v), fin: false }; }
+  catch { return { inicio: null, fin: false }; }
+}
+
+/**
+ * Una tanda para una dirección: pide lo que toca de cada flujo, clasifica,
+ * guarda y ADELANTA EL CURSOR de cada uno.
+ *
+ * Un flujo terminado no se vuelve a recorrer entero: se relee solo su primera
+ * página, que es donde aparece lo nuevo. Los que aún no han llegado al fondo
+ * siguen bajando por donde se quedaron.
+ *
+ * Devuelve el parte de lo que ha hecho: es lo que se enseña cuando la pantalla
+ * sale vacía, para no tener que adivinar si falló la red o es que no hay nada.
+ */
 async function tanda(db, wallet, propias, sueloTs) {
-  const clave = 'inv_sembrada_' + wallet;
-  const yaEsta = (await leerMeta(db, clave)) === '1';
-  // Con la siembra hecha basta una página por fuente para recoger lo nuevo;
-  // sin hacer, se tira de la tanda entera.
-  const paginas = yaEsta ? 1 : PAGINAS_POR_TANDA;
+  const cestas = { tokens: [], nativas: [], internas: [] };
+  const parte = [];
+  let sembrando = false;
 
-  const [tk, nv, itx] = await Promise.all([
-    paginar(`/addresses/${wallet}/token-transfers`, sueloTs, paginas),
-    paginar(`/addresses/${wallet}/transactions`, sueloTs, paginas),
-    paginar(`/addresses/${wallet}/internal-transactions`, sueloTs, paginas),
-  ]);
+  const trabajos = FLUJOS.map(async f => {
+    const { inicio, fin } = await leerCursor(db, wallet, f.id);
+    // Terminado: una página para recoger novedades, sin tocar el cursor.
+    const paginas = fin ? 1 : PAGINAS_POR_TANDA;
+    const r = await paginar(`/addresses/${wallet}/${f.ruta}?filter=${f.filtro}`,
+      sueloTs, paginas, fin ? null : inicio);
+    cestas[f.cesta].push(...r.items);
+    if (!fin) {
+      await escribirMeta(db, claveCursor(wallet, f.id),
+        r.cursor ? JSON.stringify(r.cursor) : 'fin');
+      if (r.cursor) sembrando = true;
+    }
+    parte.push({ flujo: f.id, paginas: r.paginas, traidos: r.items.length,
+                 estado: fin ? 'al dia' : (r.cursor ? 'bajando' : 'fondo') });
+  });
+  await Promise.all(trabajos);
 
-  const filas = agrupar(wallet, { tokens: tk.items, nativas: nv.items, internas: itx.items })
-    .map(t => clasificar(t, propias));
+  const filas = agrupar(wallet, cestas).map(t => clasificar(t, propias));
   if (filas.length) await guardar(db, wallet, filas);
 
-  const quedaMas = tk.quedaMas || nv.quedaMas || itx.quedaMas;
-  if (!quedaMas && !yaEsta) await escribirMeta(db, clave, '1');
-  return quedaMas;
+  parte.sort((a, b) => (a.flujo < b.flujo ? -1 : 1));
+  return { sembrando, parte, clasificadas: filas.length };
 }
 
 // ───────────────────────────────────────────────────── armar la respuesta
@@ -496,11 +562,18 @@ export async function onRequestGet({ request, env }) {
 
   let sembrando = false;
   const fallos = [];
+  /* El parte de lo que ha hecho cada wallet: cuántas páginas ha pedido de cada
+     flujo, cuántos elementos han venido y por dónde va el cursor. No es adorno:
+     cuando la pantalla sale vacía es la única forma de distinguir «el explorador
+     no contesta» de «no tienes actividad», que hasta ahora se veían igual. */
+  const diag = [];
   try {
     await asegurarTablas(db);
     for (const w of wallets) {
       try {
-        if (await tanda(db, w, propias, sueloTs)) sembrando = true;
+        const r = await tanda(db, w, propias, sueloTs);
+        if (r.sembrando) sembrando = true;
+        diag.push({ wallet: w, ...r });
       } catch (e) {
         // Que una wallet falle no puede dejar sin historial a las otras: se
         // anota y se sigue con lo que haya guardado de antes.
@@ -532,6 +605,7 @@ export async function onRequestGet({ request, env }) {
     // vuelve a llamar. No es un error, es una siembra a medias.
     sembrando,
     fallos,
+    diag,
     ...salida,
   }, { segundos: sembrando ? 0 : TTL_BORDE });
 }
