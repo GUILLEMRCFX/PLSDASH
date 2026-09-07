@@ -113,7 +113,7 @@ export function montarTema(caja) {
   caja.innerHTML = `
     <button type="button" class="tm-abrir" id="tmAbrir"
             aria-expanded="false" aria-haspopup="true"
-            aria-label="${rotulo(puesto)}">${ENGRANAJE}</button>
+            aria-label="${rotulo(puesto)}">${ENGRANAJE}<span class="pt-eti">Tema</span></button>
     <div class="tm-lista" id="tmLista" role="menu" aria-labelledby="tmAbrir" hidden>
       ${opciones}
     </div>`;

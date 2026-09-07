@@ -533,6 +533,37 @@
      PARA — no cuando se levanta el dedo. Ver nav.js. */
   engancharNav();
 
+  /* ── la hoja vieja en la caché ────────────────────────────────────────────
+     Pasó, y se pudo reproducir: en el iPhone, Safari y la app instalada tienen
+     CACHÉS SEPARADAS. En la app entró la hoja nueva y en Safari se quedó la de
+     antes, así que se veía el marcado nuevo —con iconos— maquetado con reglas
+     viejas: la barra arriba, los iconos enormes y las etiquetas encima unas de
+     otras. Reproducido sirviendo el `index.html` de hoy con la hoja anterior.
+
+     `_headers` ya manda `no-cache` para `/val/v2/*`, y aun así ocurrió. Como no
+     se puede depender de que todas las capas lo respeten, esto lo comprueba: si
+     el marcado es el nuevo y la hoja no lo es, se vuelve a pedir saltándose la
+     caché. Se cura solo en una recarga en vez de quedarse así hasta que alguien
+     borre los datos del sitio.
+
+     La sonda es `position: fixed` en la barra por debajo de 820px, que es
+     EXACTAMENTE lo que faltaba en la captura. No detecta cualquier desfase —solo
+     este— y eso es lo que hay: una sonda concreta que se sabe que funciona vale
+     más que una genérica que no se ha visto fallar nunca. */
+  (function vigilarHoja() {
+    const barra = document.querySelector('.barra');
+    if (!barra || !window.matchMedia('(max-width: 819px)').matches) return;
+    if (getComputedStyle(barra).position === 'fixed') return;      // al día
+    const enlace = document.querySelector('link[href*="paneles/estilo.css"]');
+    if (!enlace || enlace.dataset.repescada) return;                // una vez y no más
+    console.warn('[val/v2] hoja de estilo desfasada en la caché; se vuelve a pedir');
+    const nuevo = enlace.cloneNode();
+    nuevo.dataset.repescada = '1';
+    nuevo.href = enlace.href.split('?')[0] + '?v=' + Date.now();
+    nuevo.addEventListener('load', () => enlace.remove());
+    enlace.after(nuevo);
+  })();
+
   activar(activa, { mover: false, animar: false, sellarHash: false });
 
   /* El arranque: la pantalla de carga por encima, los datos por debajo, y la
