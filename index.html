@@ -142,6 +142,26 @@
   .wchip .lbl-btn{background:none;border:none;cursor:pointer;color:var(--faint);padding:0;display:grid;place-items:center}
   .wchip .lbl-btn:hover{color:var(--violet)}
   .wchip .lbl-btn svg{width:12px;height:12px}
+
+  /* El interruptor de «cuenta en los totales». Es un `role="switch"` de verdad
+     y no una casilla disfrazada: se lee con teclado y con lector de pantalla, y
+     el estado va en `aria-checked`, no solo en el color. */
+  .wchip .w-sw{width:30px;height:18px;border-radius:9px;background:var(--violet);
+    border:1px solid transparent;padding:0;position:relative;flex-shrink:0;transition:.16s}
+  .wchip .w-sw .w-sw-p{position:absolute;top:2px;left:14px;width:12px;height:12px;
+    border-radius:50%;background:#fff;transition:left .16s}
+  .wchip .w-sw[aria-checked="false"]{background:var(--bg-2);border-color:var(--line-2)}
+  .wchip .w-sw[aria-checked="false"] .w-sw-p{left:2px;background:var(--faint)}
+  .wchip .w-sw:hover{filter:brightness(1.15)}
+  /* Área de toque de 44px sin que el interruptor mida 44px: la chapita se haría
+     el doble de alta y la barra de wallets ocuparía dos filas. */
+  .wchip .w-sw::after{content:'';position:absolute;left:50%;top:50%;
+    width:44px;height:44px;transform:translate(-50%,-50%)}
+  /* Apagada: se ve, se distingue y se puede volver a encender. Atenuada, no
+     escondida — una wallet invisible es una wallet que se olvida encendida. */
+  .wchip.apagada{opacity:.55}
+  .wchip.apagada:hover{opacity:.8}
+  .wchip.apagada .wch-i span{color:var(--faint)}
   .add-wallet-chip{display:inline-flex;align-items:center;gap:7px;background:var(--bg-2);border:1px dashed var(--line-2);border-radius:12px;padding:9px 14px;font-family:var(--body);font-weight:500;font-size:12.5px;color:var(--dim);cursor:pointer;transition:.16s}
   .add-wallet-chip:hover{color:var(--text);border-color:var(--violet)}
   .add-wallet-chip svg{width:14px;height:14px}
@@ -1216,11 +1236,15 @@ async function lookupToken(addr){
    REFRESH PRINCIPAL — balances + precios → render
    ============================================================ */
 async function refresh(){
-  if(isFetching||!state.wallets.length)return;
+  if(isFetching||!walletsQueCuentan().length)return;
   isFetching=true;
   try{
-    // 1) Balances de todas las wallets en paralelo.
-    const perWallet=await Promise.all(state.wallets.map(async w=>({
+    /* 1) Balances en paralelo, SOLO de las que cuentan. El filtro va aquí y en
+          ningún sitio más: todo lo de abajo —el número grande, la tabla, el
+          reparto, el mejor activo, la vista por wallet— sale de
+          `tokensCombined`, así que filtrando en el origen obedecen todos sin
+          tocarlos. Filtrar al pintar dejaría el total y la lista discrepando. */
+    const perWallet=await Promise.all(walletsQueCuentan().map(async w=>({
       address:lc(w.address),
       tokens:await discoverWalletTokens(lc(w.address))
     })));
@@ -1405,6 +1429,20 @@ function render(){
     renderWalletBar();
     return;
   }
+  /* --- todas apagadas ---
+     Hay wallets, pero ninguna suma. Sin esto la portada enseñaría 0,00 $ y una
+     tabla vacía, que se lee como «se ha roto» y no como «las has apagado tú».
+     La barra de wallets se sigue pintando: es donde está el interruptor para
+     deshacerlo. */
+  if(!walletsQueCuentan().length){
+    $('rows').innerHTML=`<div class="state-block">
+      <h3>Ninguna wallet suma ahora mismo</h3>
+      <p>Tienes ${state.wallets.length} wallet${state.wallets.length===1?'':'s'} guardada${state.wallets.length===1?'':'s'}, pero está${state.wallets.length===1?'':'n'} sin sumar. Vuelve a encender alguna con el interruptor de su chapita para ver la cartera.</p>
+    </div>`;
+    updateHeader();
+    renderWalletBar();
+    return;
+  }
   // --- vista Historial: calendario de transacciones ---
   if(state.view==='history'){
     updateHeader();
@@ -1446,7 +1484,9 @@ function render(){
     let html='';
     // Contra el mismo total que el héroe: ver la nota de `updateHeader()`.
     const total=tokensParaLista().reduce((s,t)=>s+t.value,0);
-    for(const w of state.wallets){
+    // Las apagadas tampoco salen aquí: no tienen tokens en `list` —no se han
+    // pedido siquiera— así que su grupo saldría vacío y con el total a cero.
+    for(const w of walletsQueCuentan()){
       const addr=lc(w.address);
       const wtokens=list.filter(t=>t.perWallet[addr]>0).map(t=>{
         const amt=t.perWallet[addr];
@@ -1507,7 +1547,13 @@ function updateHeader(){
   const up=diff>=0;
   const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} hoy</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
-  meta.innerHTML=`${pill}<span class="chip">${state.wallets.length} wallet${state.wallets.length>1?'s':''}</span><span class="dot-sep"></span><span class="chip">${tokensParaLista().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
+  /* La cuenta de wallets es la de las que SUMAN, y si hay alguna apagada se
+     dice. Un número grande más bajo de lo esperado sin ninguna explicación a la
+     vista es lo que hace dudar del panel entero. */
+  const n=walletsQueCuentan().length, fuera=state.wallets.length-n;
+  const cuantas=`<span class="chip">${n} wallet${n===1?'':'s'}${
+    fuera?` <span style="color:var(--faint)">(${fuera} sin sumar)</span>`:''}</span>`;
+  meta.innerHTML=`${pill}${cuantas}<span class="dot-sep"></span><span class="chip">${tokensParaLista().length} tokens</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
 }
 
 function renderStats(){
@@ -1864,8 +1910,14 @@ function renderWalletBar(){
   const bar=$('walletBar');
   let html=state.wallets.map((w,i)=>{
     const addr=lc(w.address);
-    return `<div class="wchip"><div class="wch-d" style="background:${gradientFor(addr)}">${escapeHtml((w.label||'W')[0].toUpperCase())}</div>
-      <div class="wch-i"><b>${escapeHtml(w.label||'Wallet '+(i+1))}</b><span>${shortAddr(addr)}</span></div>
+    const on=cuentaW(w);
+    const nombre=w.label||'Wallet '+(i+1);
+    return `<div class="wchip${on?'':' apagada'}"><div class="wch-d" style="background:${gradientFor(addr)}">${escapeHtml((w.label||'W')[0].toUpperCase())}</div>
+      <div class="wch-i"><b>${escapeHtml(nombre)}</b><span>${shortAddr(addr)}${on?'':' · no suma'}</span></div>
+      <button class="lbl-btn w-sw" role="switch" aria-checked="${on}"
+        title="${on?'Dejar de sumar esta wallet en los totales':'Volver a sumar esta wallet en los totales'}"
+        aria-label="${escapeHtml(nombre)}: ${on?'suma en los totales':'no suma en los totales'}"
+        onclick="toggleWallet('${addr}')"><span class="w-sw-p"></span></button>
       <button class="lbl-btn" title="Renombrar" aria-label="Renombrar wallet" onclick="renameWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17v3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
       <button class="x" title="Eliminar" aria-label="Eliminar wallet" onclick="removeWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     </div>`;
@@ -1901,11 +1953,48 @@ function renderError(msg){
 /* ============================================================
    ACCIONES — wallets / tokens / visibilidad
    ============================================================ */
+/* ────────────────────────────────────────────────────────────────────────
+   DOS COSAS DISTINTAS: «ES MÍA» Y «CUENTA EN LO QUE VEO»
+
+   Añadir una wallet es declarar que es tuya, y eso no se deshace con un
+   interruptor: se deshace borrándola. Lo que el interruptor apaga es si SUMA
+   —en el número grande, en la tabla, en el historial y en inversiones—, que es
+   otra pregunta. La wallet de los validadores es tuya y quieres verla; lo que
+   no quieres es que sus 32M PLS inflen la cartera.
+
+   ⚠ Y ESTO NO ES UNA SUTILEZA DE VOCABULARIO. En `/api/inversiones`, el
+     conjunto de wallets tuyas es lo que convierte un envío de una a otra en
+     «traspaso entre tus propias wallets» en vez de «salió de la wallet sin
+     recibir nada». Si apagar una la sacara también del `w=`, cada traspaso a la
+     wallet de validadores pasaría a verse como dinero que se va — un descuadre
+     nuevo por cada movimiento interno, y todos falsos. Por eso `w` lleva
+     SIEMPRE todas y `ver` solo las que cuentan.
+
+   Por omisión cuenta: `cuenta !== false`, y no `=== true`. Las carteras ya
+   guardadas no llevan el campo, y con `=== true` se apagarían todas de golpe
+   en cuanto se despliegue esto. */
+const cuentaW=w=>w.cuenta!==false;
+const walletsQueCuentan=()=>state.wallets.filter(cuentaW);
+
+function toggleWallet(addr){
+  const w=state.wallets.find(x=>lc(x.address)===lc(addr));
+  if(!w)return;
+  w.cuenta=!cuentaW(w);
+  savePortfolio();
+  /* Se vacía y se vuelve a pedir: los balances agregados dependen de qué
+     wallets entran, así que no vale con repintar. */
+  tokensCombined=[];
+  historyState.loadedSig=null;
+  investState.loadedSig=null;
+  render();
+  refresh();
+}
+
 function addWallet(address,label){
   const addr=lc(address);
   if(!isAddr(addr))return {ok:false,msg:'Esa dirección no parece válida (debe ser 0x + 40 caracteres).'};
   if(state.wallets.some(w=>lc(w.address)===addr))return {ok:false,msg:'Esa wallet ya está en tu portfolio.'};
-  state.wallets.push({address:addr,label:(label||'').trim()});
+  state.wallets.push({address:addr,label:(label||'').trim(),cuenta:true});
   savePortfolio();
   tokensCombined=[];
   render();
@@ -2065,13 +2154,15 @@ async function bsFetchPages(path,maxPages){
 
 async function loadHistory(){
   if(!state.wallets.length){historyState.transfers=[];historyState.loadedSig=null;renderHistory();return;}
-  const sig=JSON.stringify({w:state.wallets.map(w=>lc(w.address)),f:historyState.wallet});
+  const sig=JSON.stringify({w:walletsQueCuentan().map(w=>lc(w.address)),f:historyState.wallet});
   if(historyState.loading)return;
   if(sig===historyState.loadedSig){renderHistory();return;}  // ya cargado: sólo dibujar
   historyState.loading=true;historyState.error=false;
   renderHistory();                                            // muestra spinner
   try{
-    const targets=historyState.wallet==='all'?state.wallets.map(w=>lc(w.address)):[historyState.wallet];
+    // «Todas» son las que suman: el desplegable sigue pudiendo apuntar a una
+    // concreta, y ahí manda lo que se ha elegido a mano.
+    const targets=historyState.wallet==='all'?walletsQueCuentan().map(w=>lc(w.address)):[historyState.wallet];
     const raw=[]; // receipts crudos: {ts,date,key,priceAddr,symbol,name,logo,amount}
     let anyOk=false;
     for(const addr of targets){
@@ -2322,27 +2413,36 @@ const investState={
   reintento:null,      // temporizador de la siembra
 };
 
+/* Dos listas, y no es duplicación: `w` son TODAS —lo que la Function usa para
+   saber qué es tuyo, y sin ellas un traspaso a una wallet apagada se leería
+   como dinero que se va— y `ver` son las que suman, o sea lo que se dibuja.
+   Ver el porqué largo junto a `cuentaW`. */
 function investSig(){
-  return state.wallets.map(w=>lc(w.address)).sort().join(',');
+  return {
+    w:state.wallets.map(w=>lc(w.address)).sort().join(','),
+    ver:walletsQueCuentan().map(w=>lc(w.address)).sort().join(','),
+  };
 }
 
 async function loadInvest(){
   if(!state.wallets.length){investState.datos=null;investState.loadedSig=null;renderInvest();return;}
   const sig=investSig();
+  const firma=sig.w+'|'+sig.ver;
   if(investState.loading)return;
   // Ya cargado y sin siembra pendiente: solo dibujar.
-  if(sig===investState.loadedSig&&investState.datos&&!investState.datos.sembrando){renderInvest();return;}
+  if(firma===investState.loadedSig&&investState.datos&&!investState.datos.sembrando){renderInvest();return;}
   investState.loading=true;investState.error=false;
   renderInvest();
   try{
     // El desfase horario va en la petición: el día y la semana se cuentan en TU
     // hora, no en UTC. Un ingreso a las 00:30 caería en el día anterior.
     const tz=new Date().getTimezoneOffset();
-    const r=await fetch(`/api/inversiones?w=${encodeURIComponent(sig)}&tz=${tz}`);
+    const r=await fetch(`/api/inversiones?w=${encodeURIComponent(sig.w)}`
+      +`&ver=${encodeURIComponent(sig.ver)}&tz=${tz}`);
     if(!r.ok)throw new Error('HTTP '+r.status);
     const j=await r.json();
     if(!j.ok)throw new Error(j.error||'respuesta sin ok');
-    investState.datos=j;investState.loadedSig=sig;
+    investState.datos=j;investState.loadedSig=firma;
   }catch(e){console.error(e);investState.error=true;}
   finally{
     investState.loading=false;
@@ -2585,7 +2685,11 @@ function serialize(){
 }
 function applyData(d){
   if(!d)return;
-  state.wallets=Array.isArray(d.wallets)?d.wallets.filter(w=>isAddr(w.address)).map(w=>({address:lc(w.address),label:(w.label||'').toString().slice(0,24)})):[];
+  /* ⚠ `cuenta` se lee como «distinto de false», no como «igual a true». Las
+     carteras guardadas antes de que existiera el interruptor no llevan el
+     campo, y con `=== true` se apagarían TODAS de golpe al desplegar esto: el
+     usuario abriría la portada con 0,00 $ y sin haber tocado nada. */
+  state.wallets=Array.isArray(d.wallets)?d.wallets.filter(w=>isAddr(w.address)).map(w=>({address:lc(w.address),label:(w.label||'').toString().slice(0,24),cuenta:w.cuenta!==false})):[];
   state.customTokens=Array.isArray(d.customTokens)?d.customTokens.filter(isAddr).map(lc):[];
   if(d.sort)state.sort=d.sort;
   /* `d.hideDust` ya NO se lee, y no se migra a propósito. Valía `false` en

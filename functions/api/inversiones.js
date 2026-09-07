@@ -556,6 +556,24 @@ export async function onRequestGet({ request, env }) {
   const brutas = (url.searchParams.get('w') || '').split(',').map(lc).filter(Boolean);
   const wallets = [...new Set(brutas.filter(esDireccion))].slice(0, MAX_WALLETS);
 
+  /* ⚠ `w` Y `ver` SON DOS COSAS DISTINTAS, y confundirlas rompe la
+     clasificación en silencio.
+
+     `w` es de quién son las wallets. Es lo que forma `propias`, y `propias` es
+     lo único que convierte un envío de una wallet tuya a otra en «traspaso
+     entre tus propias wallets» en vez de «salió de la wallet sin recibir nada».
+     O sea que tiene que llevar TODAS, cuenten o no en la vista.
+
+     `ver` es qué se dibuja. Filtra la lectura de la tabla y nada más: ni la
+     siembra, ni los cursores, ni la clasificación.
+
+     Si la portada mandara solo las que cuentan, apagar una wallet convertiría
+     cada movimiento interno hacia ella en un descuadre nuevo — y todos falsos.
+     Sin `ver` se ven todas, que es como se comportaba antes. */
+  const pedidas = (url.searchParams.get('ver') || '').split(',').map(lc).filter(Boolean);
+  const verSet = new Set(pedidas.filter(a => wallets.includes(a)));
+  const aVer = verSet.size ? wallets.filter(w => verSet.has(w)) : wallets;
+
   if (!wallets.length) {
     return responder({ ok: false, error: 'sin wallets válidas' }, { status: 400, segundos: 0 });
   }
@@ -591,10 +609,11 @@ export async function onRequestGet({ request, env }) {
     return responder({ ok: false, error: String(e.message || e) }, { status: 502, segundos: 0 });
   }
 
-  const marcas = wallets.map(() => '?').join(',');
+  // Se siembran todas, se leen solo las que se quieren ver.
+  const marcas = aVer.map(() => '?').join(',');
   const { results } = await db.prepare(
     `SELECT * FROM inversiones WHERE wallet IN (${marcas}) AND ts >= ? ORDER BY ts DESC`
-  ).bind(...wallets, sueloTs).all();
+  ).bind(...aVer, sueloTs).all();
 
   /* `getTimezoneOffset()` da minutos y con el signo al revés de lo que uno
      espera: en España en verano son -120. Se acota a ±16 h, que cubre todos los
@@ -606,6 +625,8 @@ export async function onRequestGet({ request, env }) {
   return responder({
     ok: true,
     wallets,
+    // Cuáles se están dibujando, que puede ser un subconjunto de `wallets`.
+    ver: aVer,
     desde: sueloTs,
     tz: tzMin,
     // Mientras esto sea true falta historia por traer: la portada lo dice y
