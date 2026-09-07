@@ -414,6 +414,12 @@
     background:var(--bg-2);border:1px solid var(--line);font-family:var(--mono);
     font-size:11.5px;color:var(--dim)}
   .iv-chip.sale{color:var(--faint)}
+  /* El grupo de envíos repetidos va delante y algo más marcado: es lo único de
+     esta lista que dice qué es, y no solo qué no es. */
+  .iv-desc-lista li.iv-grupo{background:var(--bg-2);border-color:var(--line-2)}
+  .iv-grupo .iv-desc-m{color:var(--dim)}
+  .iv-grupo-sub{display:block;margin-top:3px;font-size:11px;color:var(--faint);line-height:1.45}
+  .iv-grupo-sub code{font-family:var(--mono);font-size:10.5px}
 
   @media (max-width:640px){
     .iv-semanas,.iv-dias,.iv-desc{padding-left:16px;padding-right:16px}
@@ -2414,6 +2420,63 @@ function invMov(m){
   </li>`;
 }
 
+/* ────────────────────────────────────────────────────────────────────────
+   LOS ENVÍOS QUE SE REPITEN — probablemente depósitos de validador
+
+   Con validadores puestos, «lo que no cuadra» se llena de la misma línea trece
+   veces: «salió de la wallet sin recibir nada», siempre la misma cantidad de
+   PLS. Es correcto —no es una compra ni un swap— pero enterrado entre trece
+   copias no se ve, y encima empuja fuera de la lista todo lo demás.
+
+   ⚠ SIN NINGÚN NÚMERO ESCRITO A FUEGO, y es deliberado. Lo evidente sería
+     buscar 32.000.000 PLS, que es lo que cuesta un validador hoy. Pero ese es
+     exactamente el `V11 = 32_000_000` del v1 que este proyecto ya quitó una vez:
+     el día que cambie el depósito, el número miente y nadie se entera. Y aquí
+     no hay excusa para tenerlo, porque la portada no sabe nada de validadores.
+
+     Lo que se busca es la FORMA, que es mejor pista que la cifra: varios envíos
+     de PLS nativo, todos por la misma cantidad, todos al mismo destino, sin
+     recibir nada a cambio. Tres iguales ya no son casualidad, y si algún día el
+     depósito cambia de tamaño esto lo sigue cazando solo.
+
+   Por eso la etiqueta dice «probablemente» y enseña el destino: es una
+   deducción a partir de la forma, no una lectura del contrato de depósito.
+   Confirmando esa dirección una vez, deja de ser una sospecha. */
+const INV_MIN_GRUPO=3;
+
+function invAgrupar(descuadres){
+  const grupos=new Map(), sueltos=[];
+  for(const x of descuadres){
+    // Un envío limpio hacia fuera: una sola pieza, PLS nativo, nada de vuelta.
+    const p=x.sale.length===1&&!x.entra.length&&x.sale[0].dir==='native'?x.sale[0]:null;
+    if(!p||!p.hacia||!(p.cant>0)){sueltos.push(x);continue;}
+    /* La clave lleva la cantidad a seis cifras significativas: dos depósitos
+       idénticos pueden diferir en el último bit del reparto decimal, y comparar
+       flotantes en crudo partiría el grupo sin motivo. */
+    const k=p.hacia+'@'+p.cant.toPrecision(6);
+    if(!grupos.has(k))grupos.set(k,{hacia:p.hacia,cant:p.cant,sim:p.sim,logo:p.logo,dir:p.dir,items:[]});
+    grupos.get(k).items.push(x);
+  }
+  const juntos=[];
+  for(const g of grupos.values()){
+    // Menos de tres no es un patrón: vuelven a la lista de uno en uno.
+    if(g.items.length<INV_MIN_GRUPO){sueltos.push(...g.items);continue;}
+    g.ts=Math.max(...g.items.map(x=>x.ts));
+    juntos.push(g);
+  }
+  juntos.sort((a,b)=>b.ts-a.ts);
+  sueltos.sort((a,b)=>b.ts-a.ts);
+  return {juntos,sueltos};
+}
+
+function invGrupo(g){
+  return `<li class="iv-grupo">
+    <span class="iv-desc-m">Probablemente depósitos de validador
+      <span class="iv-grupo-sub">${g.items.length} envíos idénticos al mismo destino, <code>${escapeHtml(shortAddr(g.hacia))}</code> · se deduce de la forma, no está confirmado contra el contrato</span></span>
+    <span class="iv-desc-c"><span class="iv-chip sale">${invLogo(g,18)}${g.items.length} × ${escapeHtml(fmtAmount(g.cant))} ${escapeHtml(g.sim)}</span></span>
+  </li>`;
+}
+
 const INV_MOTIVOS={
   'traspaso':'Traspaso entre tus propias wallets',
   'nft':'Un NFT, que no tiene cantidad que sumar',
@@ -2490,15 +2553,25 @@ function renderInvest(){
   html+=`<div class="iv-dias">${d.dias.map(invDia).join('')}</div>`;
 
   if(d.descuadres.length){
+    const {juntos,sueltos}=invAgrupar(d.descuadres);
+    /* El tope se aplica a lo que QUEDA suelto, no al total: agrupar trece
+       depósitos en una línea no debe gastar trece plazas. Y era un tope de 60
+       con 59 descuadres en producción, o sea a una operación de empezar a
+       esconder cosas en silencio. Ahora hay margen y, si se pasa, se dice. */
+    const TOPE=150;
+    const ver=sueltos.slice(0,TOPE);
     html+=`<details class="iv-desc"><summary>${d.descuadres.length} movimiento${d.descuadres.length===1?'':'s'} que no cuadra${d.descuadres.length===1?'':'n'}</summary>
       <p class="iv-nota">Ni entradas de dinero ni cambios de una cosa por otra. Buena parte de los airdrops que llegan solos son estafa: no los toques.</p>
       <ul class="iv-desc-lista">`
-      +d.descuadres.slice(0,60).map(x=>{
+      +juntos.map(invGrupo).join('')
+      +ver.map(x=>{
         const piezas=[...x.sale.map(p=>['sale',p]),...x.entra.map(p=>['entra',p])];
         const chips=piezas.map(([lado,p])=>`<span class="iv-chip ${lado}">${invLogo(p,18)}${escapeHtml(fmtAmount(p.cant))} ${escapeHtml(p.sim)}</span>`).join('');
         return `<li><span class="iv-desc-m">${escapeHtml(INV_MOTIVOS[x.motivo]||x.motivo)}</span><span class="iv-desc-c">${chips}</span></li>`;
       }).join('')
-      +`</ul></details>`;
+      +`</ul>`
+      +(sueltos.length>TOPE?`<p class="iv-nota">Se enseñan los ${TOPE} más recientes de ${sueltos.length}.</p>`:'')
+      +`</details>`;
   }
   rows.innerHTML=html;
 }

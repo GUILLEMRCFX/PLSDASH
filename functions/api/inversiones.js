@@ -461,7 +461,14 @@ function lunesDe(ts, tzMin) {
   return d.toISOString().slice(0, 10);
 }
 
-const pieza = p => ({ sim: p.sim, logo: p.logo || null, cant: p.cant, dir: p.dir });
+/* ⚠ `desde` y `hacia` VIAJAN, y no son adorno. Sin ellos la portada solo ve
+   «salió PLS de la wallet» trece veces seguidas y no puede notar que las trece
+   fueron al MISMO sitio, que es lo único que distingue un depósito de validador
+   de trece envíos sueltos. Ya estaban en la tabla —`agrupar()` los mete en cada
+   pieza y `guardar()` serializa la pieza entera—, así que esto no obliga a
+   resembrar nada: es dejar de tirarlos al construir la respuesta. */
+const pieza = p => ({ sim: p.sim, logo: p.logo || null, cant: p.cant, dir: p.dir,
+                      desde: p.desde || null, hacia: p.hacia || null });
 
 /**
  * De las filas guardadas al objeto que dibuja la portada: días, con sus tres
