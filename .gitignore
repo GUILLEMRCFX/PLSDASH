@@ -4,3 +4,8 @@
 # Python
 __pycache__/
 *.pyc
+
+# Artefactos de las pruebas: capturas y registros, no el código de las pruebas
+pruebas/*.png
+pruebas/*.log
+pruebas/capturas/

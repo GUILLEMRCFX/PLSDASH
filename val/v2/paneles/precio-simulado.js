@@ -48,12 +48,16 @@ export const TITULO = 'Si PLS valiera otra cosa';
 /**
  * El precio del sacrificio, en dólares. Fijo y no editable: ver la cabecera.
  *
- * ⚠ El v1 lleva `PRECIO_SACRIFICIO = 0.0001`, un cero más. El número de aquí es
- *   el que estaba guardado en producción y el que se pidió, así que manda éste;
- *   se anota la discrepancia por si algún día alguien compara los dos paneles y
- *   se pregunta cuál miente.
+ * 0,0001, el mismo que lleva el v1, y cerrado.
+ *
+ * ⚠ Y AQUÍ ESTÁ EL MEJOR ARGUMENTO PARA QUE SEA UNA CONSTANTE. En la tabla de
+ *   ajustes había guardado un 0,001 — un cero de menos, tecleado a mano en su
+ *   día— y con él el panel daba −98,6 % y ×70 donde el v1 daba −85,7 % y ×7,0.
+ *   Un factor de diez en la cifra de cabecera, sin que nada avisara, porque un
+ *   campo de texto acepta lo que le pongas. Comprobado contra el gráfico de
+ *   WPLS/DAI: 0,0001 es donde estuvo, con el precio de ahora en 0,0₄1092.
  */
-export const SACRIFICIO = 0.001;
+export const SACRIFICIO = 0.0001;
 
 /* El rango del deslizador, en dólares. Cubre de 1e-6 a 1e-2: cuatro órdenes de
    magnitud alrededor de donde ha vivido PLS, con sitio arriba y abajo. */
