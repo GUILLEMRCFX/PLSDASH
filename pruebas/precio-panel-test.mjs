@@ -12,7 +12,8 @@ import {
   SACRIFICIO, MIN, MAX, PASOS,
   precioDesde, posicionDe, valorar, cifras, marcas, panelPrecioSimulado,
 } from '/val/v2/paneles/precio-simulado.js';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, extname } from 'node:path';
 
 let fallos = 0, pruebas = 0;
 const ok = (que, real, esperado) => {
@@ -31,6 +32,29 @@ const okQue = (que, cond, detalle = '') => {
 const RAIZ = new URL('..', import.meta.url).pathname;
 const texto = h => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
+/** Ficheros del cliente, fuera de `precio-simulado.js`, que declaren su propia
+ *  copia del precio del sacrificio. Debería no haber ninguno. */
+function buscarConstante(raiz) {
+  const salida = [];
+  const mirar = dir => {
+    for (const n of readdirSync(dir)) {
+      if (n === 'vendor' || n === 'node_modules') continue;
+      const r = join(dir, n);
+      if (statSync(r).isDirectory()) { mirar(r); continue; }
+      if (!['.js', '.html'].includes(extname(r))) continue;
+      if (r.endsWith('precio-simulado.js')) continue;
+      const src = readFileSync(r, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ')
+        .replace(/^\s*\/\/.*$/gm, ' ');
+      if (/(PRECIO_)?SACRIFICIO\s*=/.test(src)) salida.push(relative(raiz, r));
+    }
+  };
+  mirar(join(raiz, 'val'));
+  mirar(join(raiz, 'index.html').replace(/\/index\.html$/, '')); // la raíz, solo sus ficheros
+  return [...new Set(salida)];
+}
+
 /* El precio real de PLS con el que se ha ido comprobando todo. Es el mismo con
    el que se compararon el v1 y el v2, así que las cifras de abajo se pueden
    contrastar contra lo que enseña el panel viejo. */
@@ -44,10 +68,19 @@ console.log('\n=== 1. EL PRECIO DEL SACRIFICIO ===');
    lo que le pongas. Ahora es constante y aquí se fija. */
 ok('vale 0,0001', SACRIFICIO, 0.0001);
 {
-  const v1 = readFileSync(RAIZ + 'val/index.html', 'utf8');
-  const m = v1.match(/PRECIO_SACRIFICIO\s*=\s*([\d.eE-]+)/);
-  okQue('y es EL MISMO que el del v1, que sigue vivo',
-    m && Number(m[1]) === SACRIFICIO, m ? m[1] : 'no encontrado en val/index.html');
+  /* ⚠ AQUÍ HABÍA UNA COMPROBACIÓN CRUZADA CONTRA EL V1, y se retira a
+     sabiendas. Leía el `PRECIO_SACRIFICIO = 0.0001` de `val/index.html` y
+     exigía que coincidiera con la constante de aquí: existía porque el mismo
+     número vivía en dos paneles y ya se habían separado una vez —0,001 contra
+     0,0001, un factor de diez en la cifra de cabecera—.
+     
+     El v1 se retiró el 8-sep-2026, así que ya no hay dos sitios que puedan
+     divergir. Lo que queda es asegurarse de que no vuelve a haberlos: si algún
+     día reaparece un segundo panel con su propia copia del número, esto lo
+     dice antes de que las dos cifras se separen otra vez. */
+  const otro = buscarConstante(RAIZ);
+  okQue('el número vive en UN solo sitio', otro.length === 0,
+    'también aparece en: ' + otro.join(', '));
 }
 {
   const fuente = readFileSync(RAIZ + 'val/v2/paneles/precio-simulado.js', 'utf8')

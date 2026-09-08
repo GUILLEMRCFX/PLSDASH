@@ -194,6 +194,35 @@ const ESTADO = {
     await p.close();
   }
 
+  console.log('\n=== 9. `/val/` SIGUE LLEVANDO AL PANEL ===');
+  {
+    /* ⚠ El v1 vivía aquí. Ahora es una redirección, y tiene que seguir
+       funcionando: es a donde lleva el Vault de la portada y lo que hay en los
+       marcadores. Dejarlo en 404 rompería el único camino hasta el panel. */
+    const { p } = await abrir({ sesion: true });
+    /* Se llega desde la portada, que es como se llega de verdad: el Vault
+       navega a `/val/`. Y así el «atrás» de abajo comprueba lo que importa. */
+    await p.goto(BASE + '/', { waitUntil: 'load' });
+    await p.goto(BASE + '/val/', { waitUntil: 'load' });
+    okQue('acaba en /val/v2/',
+      await hasta(() => p.evaluate(() => location.pathname === '/val/v2/'), 15000), p.url());
+    okQue('y el panel arranca', await hasta(() => p.$('.panel'), 25000));
+    /* ⚠ La redirección NO deja entrada en el historial. Con `location.href` en
+       vez de `replace`, atrás volvería a `/val/`, que redirige otra vez: te
+       quedas encerrado en el panel sin poder salir con el botón de atrás. */
+    await p.goBack().catch(() => {});
+    okQue('atrás vuelve a la portada, no rebota',
+      await hasta(() => p.evaluate(() => location.pathname === '/'), 10000), p.url());
+    await p.close();
+  }
+  {
+    const { p } = await abrir({ sesion: false });
+    await p.goto(BASE + '/val/', { waitUntil: 'load' });
+    okQue('y sin sesión lleva a la puerta, no a un 404',
+      await hasta(() => p.$('.pu'), 20000), p.url());
+    await p.close();
+  }
+
   await b.close();
   terminar();
 })();

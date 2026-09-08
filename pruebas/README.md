@@ -47,6 +47,7 @@ a página lo que devuelve el explorador.
 | `sintaxis-test.mjs` | que todo parsee, que el CSS cuadre de llaves | no |
 | `precio-panel-test.mjs` | «Si PLS valiera otra cosa»: escala, sacrificio, marcas | no |
 | `inversiones-test.mjs` | `/api/inversiones`: clasificar, `ver`, cursores | no |
+| `rutas-test.mjs` | qué endpoints se piden de verdad, reconstruyendo las URL | no |
 | `puerta-test.js` | el PIN del v2 y el cierre de sesión | sí |
 | `wallets-test.js` | el interruptor «cuenta en los totales» | sí |
 | `invest-vista-test.js` | la vista Inversiones y los depósitos agrupados | sí |

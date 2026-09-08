@@ -17,6 +17,7 @@ SIN_NAVEGADOR=(
   "pruebas/sintaxis-test.mjs"
   "pruebas/precio-panel-test.mjs"
   "pruebas/inversiones-test.mjs"
+  "pruebas/rutas-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"
