@@ -43,14 +43,26 @@ ALTER TABLE daily DROP COLUMN apr_medio;
 -- ⚠ NO SE BORRA. Aquí había un `DROP TABLE validador_diario`, y era un error.
 --
 --   La auditoría la dio por muerta porque `/api/val/validadores` «no lo llamaba
---   nadie». Sí lo llama: el panel v1, con `api('/validadores')`. La URL se
---   compone al vuelo desde `const API = '/api/val'`, así que el literal
---   «api/val/validadores» no aparece en ningún fichero y el grep no lo vio.
+--   nadie». Sí lo llamaba: el panel v1, con `api('/validadores')`. La URL se
+--   componía al vuelo desde `const API = '/api/val'`, así que el literal
+--   «api/val/validadores» no aparecía en ningún fichero y el grep no lo vio.
 --
---   De esta tabla sale la línea «tu media: X %» bajo la casilla de Efectividad
---   del v1. Y borrarla sería IRREVERSIBLE: es el único histórico por validador
---   y por día que existe —`snapshots` solo guarda agregados del grupo y KV solo
---   el instante actual—, así que los 165 días-validador no se recuperarían.
+--   ⚠ ACTUALIZADO EL 8-SEP-2026, y la conclusión de abajo CAMBIA. El v1 se ha
+--     retirado, y con él la llamada y el endpoint. La tabla ya no la lee nadie.
 --
---   Si algún día se retira la casilla de Efectividad del v1, se retiran a la vez
---   la llamada, el endpoint y la tabla. Los tres o ninguno.
+--     Aquí decía «los tres o ninguno»: si se retira la casilla de Efectividad,
+--     se retiran la llamada, el endpoint y la tabla. Se han retirado los dos
+--     primeros y la tabla SE QUEDA, a propósito. El motivo por el que aquella
+--     regla estaba mal es el que ya avisaba la línea de arriba: borrar la tabla
+--     es IRREVERSIBLE. Es el único histórico por validador y por día que existe
+--     —`snapshots` solo guarda agregados del grupo y KV solo el instante
+--     actual—, así que esos días-validador no se recuperarían nunca.
+--
+--     Cambiar código muerto por dato perdido es un mal trato. El endpoint se
+--     restaura desde git en un minuto; el histórico, no. Y `push.py` la sigue
+--     llenando sin coste, así que el día que la efectividad por validador vuelva
+--     a hacer falta, el dato estará ahí en vez de empezar de cero.
+--
+--   ⚠ Y OJO CON LA PRÓXIMA AUDITORÍA: esta tabla ya no tiene lector, así que
+--     saldrá como muerta en cualquier análisis automático. No lo está. Es un
+--     archivo, y se conserva a sabiendas.

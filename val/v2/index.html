@@ -14,6 +14,10 @@
 <!-- Antes que nada: la pantalla de carga se pinta en el primer fotograma y
      no puede esperar a que llegue una hoja de estilo por detrás. -->
 <link rel="stylesheet" href="/val/v2/carga/carga.css">
+<!-- La puerta del PIN. Va aquí y no dentro de la hoja de paneles porque es lo
+     primero que ve quien llega sin sesión: tiene que poder pintarse sin
+     depender de 1.500 líneas de estilos de tarjetas. -->
+<link rel="stylesheet" href="/val/v2/puerta.css">
 <!-- El tema se pone ANTES de pintar: si esperara a los paneles, el panel
      arrancaría en el tema de omisión y saltaría al elegido a los pocos
      cientos de milisegundos. Un parpadeo de color en cada carga. -->
@@ -294,6 +298,7 @@
   import { panelRegistro } from './paneles/registro.js';
   import { latir } from './paneles/pulso.js';
   import { montarTema } from './paneles/tema.js';
+  import { montarPuerta, cerrarSesion } from './puerta.js';
 
   const q = new URLSearchParams(location.search);
   // `?escalon=` fuerza un escalón de calidad, para comparar en una misma
@@ -433,7 +438,16 @@
   /* El engranaje del tema, UNA VEZ. Vive en la barra y no en una pestaña, así
      que no lo toca el repintado de cada 18 segundos — que es justo lo que hace
      falta: si lo regenerara, el desplegable se cerraría solo mientras eliges. */
-  montarTema(document.getElementById('tmCaja'));
+  montarTema(document.getElementById('tmCaja'), {
+    /* Cerrar sesión de verdad: solo se navega si el servidor CONFIRMA que ha
+       borrado la cookie. Si no, `montarTema` deja el botón diciéndolo. Ver la
+       nota larga en `puerta.js`. */
+    async alSalir() {
+      const ok = await cerrarSesion();
+      if (ok) window.location.href = '/';
+      return ok;
+    },
+  });
 
   /* ───────────────────────────────────────────── paneles */
 
@@ -516,7 +530,13 @@
 
   async function refrescar() {
     try {
-      pintar(await cargarTodo());
+      const datos = await cargarTodo();
+      /* La sesión dura 30 días y puede caducar CON EL PANEL ABIERTO. Antes eso
+         dejaba el panel puesto diciendo «SIN SESIÓN» en una esquina y todos los
+         números congelados en el último dato bueno — que es la peor mezcla
+         posible: parece que va y no va. Ahora vuelve la puerta. */
+      if (datos.sesion === false) { volverALaPuerta(); return; }
+      pintar(datos);
     } catch (e) {
       // `cargarTodo` ya absorbe los fallos por endpoint; llegar aquí es un
       // fallo del propio módulo, y callarlo dejaría la pantalla de carga fija.
@@ -578,7 +598,36 @@
      puede dejar al panel sin arrancar: se cae al aviso de texto de siempre y el
      resto del panel funciona igual, solo que sin esfera. Antes de esto un fallo
      de WebGL se llevaba por delante el módulo entero. */
-  (async () => {
+  /* ⚠ LA PRIMERA PETICIÓN ES TAMBIÉN LA COMPROBACIÓN DE SESIÓN, y por eso el
+     arranque cambió de forma. `cargarTodo()` ya devuelve `sesion: false` cuando
+     los endpoints contestan 401, así que no hace falta ni un endpoint nuevo ni
+     una petición de más: se pide lo de siempre y se mira lo que ya venía.
+
+     La pantalla de carga arranca A LA VEZ, sin esperar. Es deliberado: con
+     sesión —el caso de casi todas las visitas, la cookie dura 30 días— las dos
+     cosas corren en paralelo igual que antes y el arranque no cuesta ni un
+     milisegundo más. Sin sesión, la carga se aborta en cuanto se sabe y en su
+     sitio aparece la puerta.
+
+     Esperar a la respuesta ANTES de montar la carga habría sido más simple de
+     leer, pero le suma la ida y vuelta a cada arranque con sesión para ahorrar
+     un destello a uno de cada treinta días. */
+  let arrancado = false;
+  let latido = null;                      // el `setInterval` del refresco
+
+  /** La sesión ha caducado con el panel abierto: se para todo y se pide el PIN. */
+  function volverALaPuerta() {
+    clearInterval(latido);
+    latido = null;
+    arrancado = false;
+    abrirPuerta();
+  }
+
+  async function arrancar() {
+    if (arrancado) return;
+    arrancado = true;
+
+    const primeros = cargarTodo();          // sin await: que corra ya
     let carga = null;
     try {
       carga = iniciarCarga(document.body, pantallaCarga, {
@@ -596,10 +645,41 @@
       if (!PESTANAS[activa].estatica)
         vistas[activa].innerHTML = '<div id="cargando">Cargando…</div>';
     }
-    await refrescar();
+
+    let datos = null;
+    try { datos = await primeros; }
+    catch (e) { console.error('[val/v2] no se pudieron cargar los datos:', e); }
+
+    if (datos && datos.sesion === false) {
+      // Sin sesión no hay panel que enseñar ni esfera que entregar.
+      carga?.abortar();
+      arrancado = false;                    // para poder volver tras el PIN
+      abrirPuerta();
+      return;
+    }
+
+    if (datos) pintar(datos); else await refrescar();
     if (carga) { try { await carga.terminar(); } catch (e) { console.error('[val/v2] carga:', e); } }
-    setInterval(refrescar, REFRESCO_MS);
-  })();
+    clearInterval(latido);                // por si se vuelve a arrancar
+    latido = setInterval(refrescar, REFRESCO_MS);
+  }
+
+  function abrirPuerta() {
+    /* El panel se esconde del árbol de accesibilidad mientras la puerta está
+       puesta. Taparlo con una capa opaca basta para el ojo, pero no para un
+       lector de pantalla ni para el tabulador: sin esto se puede recorrer con
+       el teclado un panel vacío que está detrás del PIN. */
+    const marco = document.querySelector('.marco');
+    if (marco) marco.inert = true;
+    montarPuerta(document.body, {
+      alEntrar() {
+        if (marco) marco.inert = false;
+        return arrancar();
+      },
+    });
+  }
+
+  arrancar();
 
   // El pulso corre a su propio ritmo. Los datos llegan cada 18 s, pero la
   // cuenta atrás tiene que avanzar segundo a segundo: si solo se moviera con

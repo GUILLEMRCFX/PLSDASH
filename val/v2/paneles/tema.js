@@ -99,8 +99,14 @@ const rotulo = t => `Tema de color: ${t.nombre}. Cambiar`;
 /**
  * Pinta el engranaje y su desplegable dentro de `caja` y lo deja funcionando.
  * Se llama UNA VEZ en el arranque. Devuelve false si no hay dónde montarlo.
+ *
+ * `alSalir` es opcional. Si se pasa, el menú lleva además «Cerrar sesión» al
+ * final, separado por una línea. Va aquí porque el engranaje es el único sitio
+ * de la barra que no es una pestaña, y la alternativa era un botón suelto que
+ * en móvil no cabe. La función que se pasa es la que sabe cerrar sesión de
+ * verdad; este módulo solo dibuja el botón y espera su respuesta.
  */
-export function montarTema(caja) {
+export function montarTema(caja, { alSalir } = {}) {
   if (!caja) return false;
   const actual = temaGuardado();
   const puesto = TEMAS.find(t => t.id === actual) || TEMAS[0];
@@ -115,7 +121,9 @@ export function montarTema(caja) {
             aria-expanded="false" aria-haspopup="true"
             aria-label="${rotulo(puesto)}">${ENGRANAJE}<span class="pt-eti">Tema</span></button>
     <div class="tm-lista" id="tmLista" role="menu" aria-labelledby="tmAbrir" hidden>
-      ${opciones}
+      ${opciones}${alSalir ? `
+      <button type="button" class="tm-op tm-salir" role="menuitem" id="tmSalir"
+              title="Cerrar sesión en este dispositivo">Cerrar sesión</button>` : ''}
     </div>`;
 
   const abrir = caja.querySelector('#tmAbrir');
@@ -155,13 +163,34 @@ export function montarTema(caja) {
     lista.querySelector('.tm-op[aria-checked="true"]')?.focus();
   });
 
-  lista.querySelectorAll('.tm-op').forEach(b => {
+  const salir = caja.querySelector('#tmSalir');
+  if (salir) {
+    salir.addEventListener('click', async () => {
+      /* ⚠ SE ESPERA LA RESPUESTA Y SE MIRA. El v1 hacía `try { fetch } catch {}`
+         y navegaba pasase lo que pasase: si la petición fallaba, veías que
+         salías y la cookie seguía puesta. El fallo era invisible porque el
+         síntoma es que todo parece ir bien. */
+      if (salir.dataset.ocupado) return;
+      salir.dataset.ocupado = '1';
+      salir.textContent = 'Cerrando…';
+      const ok = await alSalir();
+      if (ok) return;                      // quien llama se encarga de navegar
+      delete salir.dataset.ocupado;
+      salir.textContent = 'No se pudo cerrar · reintentar';
+    });
+  }
+
+  lista.querySelectorAll('.tm-op[data-tema]').forEach(b => {
     b.addEventListener('click', () => {
       const id = aplicarTema(b.dataset.tema);
       // Al sitio, sin regenerar nada: ver el aviso de arriba.
       const t = TEMAS.find(x => x.id === id) || TEMAS[0];
       abrir.setAttribute('aria-label', rotulo(t));
-      lista.querySelectorAll('.tm-op').forEach(o =>
+      /* `[data-tema]` y no `.tm-op` a secas: «Cerrar sesión» comparte la clase
+         para heredar el aspecto, pero es un `menuitem` y no un
+         `menuitemradio` — ponerle `aria-checked` lo convertiría en una opción
+         marcable que no lo es. */
+      lista.querySelectorAll('.tm-op[data-tema]').forEach(o =>
         o.setAttribute('aria-checked', String(o.dataset.tema === id)));
       cerrar();
       abrir.focus();

@@ -1,0 +1,124 @@
+/**
+ * La puerta del PIN.
+ *
+ * Hoja propia y no dentro de `paneles/estilo.css` por una razón concreta: esto
+ * es lo primero que ve quien llega sin sesión, y tiene que poder pintarse sin
+ * que haga falta la hoja de los paneles —1.500 líneas para un teclado—. Los
+ * COLORES sí salen del tema, que es lo que hace que la puerta y el panel sean
+ * la misma aplicación y no dos pantallas pegadas.
+ *
+ * Las variables las define `paneles/estilo.css`, que va antes en el documento.
+ * Si por lo que fuera no llegara, los `var(…, respaldo)` dejan una puerta
+ * legible en vez de texto negro sobre negro.
+ */
+
+.pu {
+  position: fixed; inset: 0;
+  z-index: 300;                    /* por encima de la pantalla de carga */
+  display: grid; place-items: center;
+  padding: 24px;
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  background: var(--fondo, #000);
+  color: var(--dato-suave, #cfd6dd);
+  font-family: var(--texto, 'Inter', system-ui, sans-serif);
+  -webkit-user-select: none; user-select: none;
+}
+
+.pu-caja { width: 100%; max-width: 296px; text-align: center; }
+/* Recibe el foco al montar para meter al teclado dentro de la puerta, pero no
+   es un control: sin esto pinta su propio aro y parece que algo está activo. */
+.pu-caja:focus { outline: none; }
+
+.pu-marca {
+  width: 56px; height: 56px; border-radius: 15px;
+  overflow: hidden; margin: 0 auto 18px;
+  /* El halo es del color del tema: es lo único de la marca que cambia con él,
+     y basta para que la puerta se lea como parte del panel elegido. */
+  box-shadow: 0 0 30px color-mix(in srgb, var(--dato, #2ad4f0) 34%, transparent),
+              0 0 0 1px var(--borde, rgba(255, 255, 255, .08));
+}
+.pu-marca img { width: 100%; height: 100%; display: block; }
+
+.pu-tit {
+  margin: 0 0 4px;
+  font: 600 18px/1.25 var(--texto, 'Inter', system-ui, sans-serif);
+  color: var(--dato-suave, #cfd6dd);
+  letter-spacing: -.01em;
+}
+.pu-sub {
+  margin: 0 0 14px;
+  font: 400 12.5px/1.4 var(--texto, 'Inter', system-ui, sans-serif);
+  color: var(--apagado, #7d8b96);
+}
+
+/* Altura reservada SIEMPRE, aunque no haya mensaje: si el hueco apareciera al
+   fallar, el teclado entero daría un salto justo cuando estás mirando. */
+.pu-error {
+  margin: 0 0 10px;
+  min-height: 1.35em;
+  font: 400 12px/1.35 var(--texto, 'Inter', system-ui, sans-serif);
+  color: var(--acento, #ff8a3d);
+}
+
+.pu-puntos { display: flex; gap: 13px; justify-content: center; margin-bottom: 26px; }
+.pu-punto {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 1.5px solid color-mix(in srgb, var(--dato, #2ad4f0) 40%, transparent);
+  transition: background .12s, border-color .12s;
+}
+.pu-punto.lleno { background: var(--dato, #2ad4f0); border-color: transparent; }
+
+.pu-puntos.mal { animation: pu-temblor .3s; }
+@keyframes pu-temblor {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-8px); }
+  75%      { transform: translateX(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pu-puntos.mal { animation: none; }
+  .pu-punto { transition: none; }
+}
+
+.pu-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+.pu-tecla {
+  /* `aspect-ratio` y no una altura fija: a 390 las teclas salen de 88×70 y en
+     una pantalla estrecha encogen solas sin dejar de ser cómodas. El mínimo
+     garantiza los 44px de objetivo táctil aunque la caja se estreche. */
+  aspect-ratio: 1.25; min-height: 44px;
+  border-radius: 14px;
+  background: var(--vidrio, rgba(255, 255, 255, .04));
+  border: 1px solid var(--borde, rgba(255, 255, 255, .08));
+  font: 500 20px/1 var(--cifra, 'Space Grotesk', system-ui, sans-serif);
+  font-variant-numeric: tabular-nums;
+  color: var(--dato-suave, #cfd6dd);
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.pu-tecla:hover { border-color: var(--borde-vivo, rgba(255, 255, 255, .18)); }
+.pu-tecla:active { background: color-mix(in srgb, var(--dato, #2ad4f0) 14%, transparent); }
+.pu-tecla:focus-visible {
+  outline: 2px solid var(--dato, #2ad4f0);
+  outline-offset: 2px;
+}
+.pu-tecla:disabled { opacity: .45; cursor: default; }
+
+/* «Salir» y «⌫» no son dígitos: más pequeñas y apagadas, para que el ojo caiga
+   en los números. */
+.pu-tecla-sec {
+  font: 500 13px/1 var(--texto, 'Inter', system-ui, sans-serif);
+  color: var(--apagado, #7d8b96);
+}
+.pu-tecla-sec svg { width: 21px; height: 21px; display: block; margin: 0 auto; }
+
+/* ── el cierre de sesión, dentro del menú del engranaje ──────────────────── */
+
+.tm-salir {
+  /* Separado del resto por una línea: cambiar de tema y cerrar sesión no son
+     la misma clase de acción, y aquí van a un dedo de distancia. */
+  margin-top: 6px; padding-top: 8px;
+  border-top: 1px solid var(--borde, rgba(255, 255, 255, .08));
+  color: var(--acento, #ff8a3d);
+}
+.tm-salir[data-ocupado] { opacity: .55; cursor: default; }

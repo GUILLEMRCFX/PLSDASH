@@ -20,3 +20,11 @@
 # cada carga sería tirar la única descarga que de verdad importa.
 /val/v2/vendor/*
   Cache-Control: public, max-age=31536000, immutable
+
+# `/val/` ya no es el panel: es la redirección al v2, y si se queda cacheada
+# dura el tiempo que el navegador decida. Es la puerta de entrada desde el
+# Vault, así que no puede quedarse pegada a una versión vieja.
+/val
+  Cache-Control: no-cache
+/val/index.html
+  Cache-Control: no-cache
