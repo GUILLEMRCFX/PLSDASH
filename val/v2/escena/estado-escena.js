@@ -32,6 +32,11 @@
  *     ~8,1 h que tarda en acumularse el excedente y baja de golpe cuando el
  *     protocolo lo retira. La escena respira al ritmo del ciclo real.
  *
+ *   · `pendiente` por nodo → EN COLA DE ACTIVACIÓN. No es un canal continuo
+ *     como los otros tres: es un hecho, y por eso late en vez de graduarse. Un
+ *     validador esperando turno no ha ganado nada y no tiene bloques, así que
+ *     sin esto se dibujaría exactamente igual que uno muerto.
+ *
  *   · `frescura` → EDAD DEL DATO. En el shader desatura hasta gris. Si el NUC
  *     deja de reportar, la esfera pierde el color: el mismo hecho que cuenta el
  *     pulso, dicho en el fondo de la pantalla y sin texto.
@@ -82,6 +87,15 @@ export function nodosDesde(detalle = [], porValidador = {}) {
     // Inventar un reparto sería pintar una diferencia que no se sabe si existe.
     intensidad: max > 0 ? SUELO + (bloques[i] / max) * (1 - SUELO) : 0.5,
     activo: d.slashed !== true && d.estado === 'active_ongoing',
+    /* ⚠ PENDIENTE ES UN TERCER ESTADO, no «no activo».
+       Un validador recien depositado tiene CERO bloques y no esta
+       `active_ongoing`, asi que con dos estados salia con la intensidad del
+       suelo y el halo apagado: idéntico a uno muerto. Y es lo contrario — está
+       a punto de empezar. La esfera lo late; ver `esfera.js`. */
+    pendiente: d.pendiente === true || String(d.estado || '').startsWith('pending'),
+    // Para el rótulo al señalarlo: desde cuándo espera, si se sabe.
+    estado: d.estado || null,
+    enColaDesdeTs: Number(d.en_cola_desde_ts) || null,
   }));
 }
 

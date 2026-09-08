@@ -15,9 +15,11 @@ PUERTO="${PUERTO:-8899}"
 # en dos segundos en vez de en tres minutos.
 SIN_NAVEGADOR=(
   "pruebas/sintaxis-test.mjs"
+  "pruebas/nuc-test.py"
   "pruebas/precio-panel-test.mjs"
   "pruebas/inversiones-test.mjs"
   "pruebas/rutas-test.mjs"
+  "pruebas/doce-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"
@@ -44,7 +46,9 @@ correr() {
   [ -f "$t" ] || { echo "  (no está: $t)"; return 0; }
   printf '%-34s ' "$t"
   local log="/tmp/plsdash-$(basename "$t").log"
-  if [[ "$t" == *.mjs ]]; then
+  if [[ "$t" == *.py ]]; then
+    timeout 600 python3 "$t" > "$log" 2>&1
+  elif [[ "$t" == *.mjs ]]; then
     timeout 600 node --import ./pruebas/resolver.mjs "$t" > "$log" 2>&1
   else
     timeout 600 node "$t" > "$log" 2>&1

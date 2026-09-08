@@ -82,6 +82,14 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
   const falta = Math.max(0, deposito - reunido);
   const pct = Math.max(0, Math.min(100, (reunido / deposito) * 100));
 
+  /* ⚠ EL OBJETIVO CUMPLIDO ERA UN AGUJERO. Con `reunido >= deposito`, `falta`
+     vale 0, `proyectar()` devuelve `dias = 0` y `fmtPlazo(0)` devuelve null:
+     el panel enseñaba «0 PLS · Faltan para el depósito» y debajo «Sin ritmo
+     medible para estimar el plazo», que es literalmente lo contrario de lo que
+     pasa. Es el estado al que se llega justo antes de ampliar — o sea el más
+     importante de todos y el único que nadie había visto. */
+  const yaEsta = reunido >= deposito;
+
   const ritmo = ritmoDiario({
     serie, snapshots24h, plsDiaKV: v.pls_dia, fmt,
   });
@@ -145,13 +153,22 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
         <span class="p-marca">${fmt(pct, 1)} %</span>
       </header>
 
+      ${yaEsta ? `
+      <div class="cifra">
+        <span class="c-num sim-gana">${fmt(Math.floor(reunido / deposito))}<span class="u">${
+          Math.floor(reunido / deposito) === 1 ? 'validador' : 'validadores'}</span></span>
+        <span class="c-eti">Ya lo tienes reunido</span>
+        <span class="c-sub">${fmt(reunido)} PLS en la wallet · el depósito son ${
+          fmtCompacto(deposito)} PLS${
+          reunido - deposito > 0 ? ` · sobran ${fmtCompacto(reunido - deposito)}` : ''}</span>
+      </div>` : `
       <div class="cifra">
         <span class="c-num">${fmt(falta)}<span class="u">PLS</span></span>
         <span class="c-eti">Faltan para el depósito</span>
         ${hayPrecio
           ? `<span class="c-sub">≈ ${fmt(falta * precio.precio, 2)} $</span>`
           : '<span class="c-sub alerta">Sin precio de PLS: no se convierte a dólares.</span>'}
-      </div>
+      </div>`}
 
       <div class="avance" role="presentation">
         <div class="a-barra">${barra}</div>
@@ -165,7 +182,11 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
            cuánto tardarías. Ese es el orden en que se lee. -->
       ${mandoSimulador(aporte)}
 
-      ${plazo ? `
+      ${yaEsta ? `
+      <p class="c-sub">Cuando lo deposites, este panel vuelve a contar hacia el
+        siguiente: el objetivo sale de <code>stake_total / total</code>, así que
+        se mueve solo.</p>
+      ` : plazo ? `
       <div class="cifra" id="simPlazo">
         <span class="c-num">${escapar(plazo)}</span>
         <span class="c-eti">${aporte > 0 ? 'Aportando eso' : 'Al ritmo actual'}</span>

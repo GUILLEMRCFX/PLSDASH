@@ -84,9 +84,35 @@ def prom_query(query, momento=None):
         return None
 
 
+# La beacon API devuelve FAR_FUTURE_EPOCH (2^64-1) en `activation_epoch`
+# mientras un validador esta depositado pero aun sin turno en la cola.
+FAR_FUTURE_EPOCH = 2 ** 64 - 1
+
+
 def epoch_a_fecha(epoch):
+    """Epoch → fecha UTC, o None si esa epoch no es una fecha de verdad.
+
+    ⚠ DEVOLVER None NO ES UNA CORTESIA: es lo que impide que el recolector
+      MUERA el dia que deposites un validador nuevo.
+
+      Un validador en cola trae `activation_epoch = 2^64-1`. Con eso,
+      GENESIS + epoch*320 se sale del rango de `time_t` y
+      `datetime.fromtimestamp` lanza OverflowError. Como `leer_validadores()`
+      no envuelve el bucle, la excepcion sube hasta `recolectar()` y el
+      recolector no publica NADA: a los 15 minutos el panel se pone DESFASADO
+      y se queda asi las 12-18 horas que dura la cola. Justo lo contrario de
+      lo que hay que enseñar cuando amplias.
+
+      Comprobado: epoch 320041 → 2026-08-08; epoch 2^64-1 → OverflowError.
+    """
+    if not isinstance(epoch, int) or epoch < 0 or epoch >= FAR_FUTURE_EPOCH:
+        return None
     ts = GENESIS_TIME + epoch * SLOTS_POR_EPOCH * SEGUNDOS_POR_SLOT
-    return datetime.fromtimestamp(ts, tz=timezone.utc)
+    try:
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        # Cualquier epoch absurda que no sea exactamente la del futuro lejano.
+        return None
 
 
 # ----------------------------------------------------------------------
@@ -142,8 +168,11 @@ def leer_validadores():
     validadores = []
     total_balance = 0
     activos = 0
+    pendientes = 0
     slashed = 0
     activation_epoch_min = None
+
+    ahora_utc = datetime.now(timezone.utc)
 
     for v in data["data"]:
         balance = int(v["balance"]) / 1e9          # gwei → PLS
@@ -151,39 +180,59 @@ def leer_validadores():
         estado = v["status"]
         info = v["validator"]
         act_epoch = int(info["activation_epoch"])
+        act_dt = epoch_a_fecha(act_epoch)
+
+        # ⚠ PENDIENTE NO ES CAIDO, y esta es la linea que lo separa.
+        #   `pending_initialized` y `pending_queued` son un validador
+        #   depositado esperando turno: 12-18 h en las que no valida, no gana y
+        #   NO PASA NADA. Un `exited_*` o un `active_exiting` si son otra cosa.
+        pendiente = estado.startswith("pending")
 
         if estado.startswith("active"):
             activos += 1
+        if pendiente:
+            pendientes += 1
         if info.get("slashed"):
             slashed += 1
-        if activation_epoch_min is None or act_epoch < activation_epoch_min:
+        # Solo cuentan las activaciones REALES para el arranque del grupo: la
+        # de un pendiente es None y no puede ser el minimo de nada.
+        if act_dt is not None and (activation_epoch_min is None or act_epoch < activation_epoch_min):
             activation_epoch_min = act_epoch
 
         total_balance += balance
-        act_dt = epoch_a_fecha(act_epoch)
         validadores.append({
             "indice": int(v["index"]),
             "pubkey": info["pubkey"],
             "pubkey_corta": info["pubkey"][:8] + "…" + info["pubkey"][-6:],
             "estado": estado,
+            "pendiente": pendiente,
             "balance": round(balance, 4),
             "ganado": round(ganado, 4),
             "slashed": info.get("slashed", False),
-            "activation_epoch": act_epoch,
+            # `None` cuando aun no tiene turno asignado. Se publica igual: que
+            # el panel sepa que el dato NO EXISTE es distinto de no mandarlo.
+            "activation_epoch": None if act_dt is None else act_epoch,
             # Cada uno con SU activación, no la del grupo. Es lo que permite
             # calcular el APR por validador-hora y distinguir a un recién
             # activado de uno rezagado: ver el bloque de arriba.
-            "activacion_ts": int(act_dt.timestamp()),
-            "activacion_utc": act_dt.isoformat(),
-            "horas_activo": round((datetime.now(timezone.utc) - act_dt).total_seconds() / 3600, 2),
+            "activacion_ts": None if act_dt is None else int(act_dt.timestamp()),
+            "activacion_utc": None if act_dt is None else act_dt.isoformat(),
+            "horas_activo": None if act_dt is None
+                            else round((ahora_utc - act_dt).total_seconds() / 3600, 2),
+            # Desde cuando espera. La API no da el instante del deposito, asi
+            # que se cuenta desde que este recolector lo vio por primera vez;
+            # `push.py` lo fija al escribir el evento de deposito.
+            "en_cola_desde_ts": None,
         })
 
     stake_total = STAKE_POR_VALIDADOR * len(validadores)
     ganado_total = total_balance - stake_total
 
-    activacion = epoch_a_fecha(activation_epoch_min)
-    ahora = datetime.now(timezone.utc)
-    horas_activo = (ahora - activacion).total_seconds() / 3600
+    # Puede no haber NINGUNA activacion real: los primeros minutos tras el
+    # primer deposito de todos. Entonces no hay grupo del que medir horas.
+    activacion = epoch_a_fecha(activation_epoch_min) if activation_epoch_min is not None else None
+    horas_activo = None if activacion is None \
+        else (ahora_utc - activacion).total_seconds() / 3600
 
     # `pls_hora` y `apr_pct` van a None A PROPOSITO. Ver el bloque de arriba:
     # desde aqui no se pueden calcular bien, y una cifra plausible pero falsa
@@ -196,12 +245,15 @@ def leer_validadores():
     return {
         "total": len(validadores),
         "activos": activos,
+        # Depositados y esperando turno. Se publica aparte para que el panel
+        # pueda decir «1 en cola» en vez de «1 fuera de servicio».
+        "pendientes": pendientes,
         "slashed": slashed,
         "balance_total": round(total_balance, 4),
         "stake_total": stake_total,
         "ganado_total": round(ganado_total, 4),
-        "activacion_utc": activacion.isoformat(),
-        "horas_activo": round(horas_activo, 2),
+        "activacion_utc": None if activacion is None else activacion.isoformat(),
+        "horas_activo": None if horas_activo is None else round(horas_activo, 2),
         "pls_hora": pls_hora,
         "pls_dia": None,
         "apr_pct": apr,
@@ -299,24 +351,36 @@ def leer_nodo():
 # Composición
 # ----------------------------------------------------------------------
 
+def salud_de(vals, nodo):
+    """Estado global en una palabra. Fuera de `recolectar()` a proposito: asi
+    se puede probar con numeros a mano sin pedirle nada a la red, y la prueba
+    llama a ESTA funcion en vez de a una copia suya que se quedaria vieja.
+
+    ⚠ UN PENDIENTE NO ES UN AVISO. La regla era `activos < total`, y con ella
+      el panel decia que algo iba mal durante las 12-18 h que un validador
+      recien depositado pasa en la cola de activacion. No va mal: es lo que
+      pasa cuando amplias, y es justo el dia que mas se mira el panel. Lo que
+      si es un aviso son los que faltan por CUALQUIER OTRO motivo.
+    """
+    if vals is None or nodo is None:
+        return "sin_datos"
+    if vals.get("slashed", 0) > 0:
+        return "critico"
+    if vals["activos"] < vals["total"] - vals.get("pendientes", 0):
+        return "aviso"
+    if not nodo.get("sincronizado"):
+        return "aviso"
+    if (nodo.get("disco_usado_pct") or 0) > 85:
+        return "aviso"
+    return "ok"
+
+
 def recolectar():
     ahora = datetime.now(timezone.utc)
     vals = leer_validadores()
     nodo = leer_nodo()
 
-    # Estado global de un vistazo
-    if vals is None or nodo is None:
-        salud = "sin_datos"
-    elif vals["slashed"] > 0:
-        salud = "critico"
-    elif vals["activos"] < vals["total"]:
-        salud = "aviso"
-    elif not nodo.get("sincronizado"):
-        salud = "aviso"
-    elif (nodo.get("disco_usado_pct") or 0) > 85:
-        salud = "aviso"
-    else:
-        salud = "ok"
+    salud = salud_de(vals, nodo)
 
     return {
         "version": 1,

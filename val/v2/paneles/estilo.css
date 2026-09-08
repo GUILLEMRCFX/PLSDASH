@@ -518,6 +518,15 @@
   border-radius: 7px;
   padding: 9px 11px;
 }
+/* ⚠ NO TODA NOTA ES UNA ALERTA. «Un validador en cola de activación» se pintaba
+   en el naranja de aviso justo debajo de un OPERATIVO verde: la palabra decía
+   que todo va bien y la caja decía lo contrario, en la misma tarjeta y a dos
+   centímetros. Visto en la captura a 390. Cuando el estado es bueno, la nota
+   informa y se pinta como lo que es. */
+.p-aviso.info {
+  color: var(--dato-suave);
+  border-color: var(--borde);
+}
 
 .vacio {
   font: 400 12px/1.45 var(--texto);
@@ -692,9 +701,14 @@
 .v-nota {
   grid-column: 1 / -1;
   color: var(--acento); font-size: 12px;
-  letter-spacing: .01em; 
+  letter-spacing: .01em;
   margin-top: 3px;
 }
+/* ⚠ «En cola de activación» NO es un problema, y en la captura a 390 salía en
+   el mismo naranja que el «rezagado» de la fila de arriba: dos cosas opuestas
+   pintadas igual, una debajo de la otra. La fila ya no lleva el fondo de
+   alerta; la nota tampoco puede llevar su color. */
+.v-nota.espera { color: var(--bien); }
 
 .vfila.mal {
   background: linear-gradient(to right,
@@ -1667,3 +1681,61 @@ details[open] > .ap-abrir::before { transform: rotate(45deg); }
 
 .ps-sube { color: var(--bien); }
 .ps-baja { color: var(--acento); }
+
+/* ─────────────────────────────────────────── cómo se ha construido
+
+   Una línea temporal de arriba abajo: cada activación, con su fecha y cuántos
+   entraron. El hilo es un borde del `<ol>` y no un elemento propio, así que
+   crece con la lista sin nada que ajustar. */
+.hi-lista {
+  list-style: none; margin: 12px 0 10px; padding: 0 0 0 18px;
+  border-left: 1px solid var(--borde);
+  display: grid; gap: 12px;
+}
+.hi-fila {
+  display: grid;
+  /* Fecha y «qué» en la primera línea, índices y acumulado en la segunda: a
+     390 las cuatro no caben en una fila sin partir palabras. */
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  position: relative;
+  align-items: baseline;
+}
+.hi-punto {
+  position: absolute; left: -23px; top: 5px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--dato);
+  box-shadow: 0 0 0 3px var(--fondo);      /* tapa el hilo por detrás */
+}
+.hi-fecha { font: 500 13px/1.3 var(--texto); color: var(--dato-suave); }
+.hi-que   { font: 600 13px/1.3 var(--cifra); color: var(--dato); text-align: right; }
+.hi-idx   { font-size: 11px; color: var(--apagado); }
+.hi-acum  { font-size: 11px; color: var(--apagado); text-align: right; }
+
+/* El hito abierto: los que esperan turno. Late, como en la esfera, y va en el
+   color de «va bien» — no le pasa nada, es que aún no ha empezado. */
+.hi-cola .hi-punto { background: var(--bien); animation: hi-latido 2.4s ease-in-out infinite; }
+.hi-cola .hi-fecha,
+.hi-cola .hi-que   { color: var(--bien); }
+@keyframes hi-latido {
+  0%, 100% { transform: scale(1);   opacity: .55; }
+  50%      { transform: scale(1.5); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hi-cola .hi-punto { animation: none; opacity: 1; }
+}
+
+/* ─────────────────────────────────────────── «tienes para uno entero»
+
+   No es un aviso que aparece y se va: se queda mientras el saldo dé para ello,
+   porque lo que dice no es «acaba de pasar algo» sino «puedes depositar ya». */
+.listo {
+  margin: 10px 0 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bien) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--bien) 30%, transparent);
+  display: grid; gap: 3px;
+}
+.listo-t { font: 600 14px/1.3 var(--texto); color: var(--bien); }
+.listo-s { font: 400 11.5px/1.4 var(--texto); color: var(--apagado); }

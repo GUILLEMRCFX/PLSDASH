@@ -45,6 +45,8 @@ a página lo que devuelve el explorador.
 | fichero | qué cubre | navegador |
 |---|---|---|
 | `sintaxis-test.mjs` | que todo parsee, que el CSS cuadre de llaves | no |
+| `nuc-test.py` | el recolector y la deteccion de eventos del NUC | no |
+| `doce-test.mjs` | lo que pasa al añadir un validador: cola, esfera, hitos | no |
 | `precio-panel-test.mjs` | «Si PLS valiera otra cosa»: escala, sacrificio, marcas | no |
 | `inversiones-test.mjs` | `/api/inversiones`: clasificar, `ver`, cursores | no |
 | `rutas-test.mjs` | qué endpoints se piden de verdad, reconstruyendo las URL | no |
