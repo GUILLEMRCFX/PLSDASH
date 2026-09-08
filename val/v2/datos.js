@@ -119,8 +119,14 @@ export function tempNvme(snapshots24h = []) {
 export function saludGlobal(datos) {
   const { estado, ahoraS } = datos;
 
+  /* ⚠ Este estado ya casi no se ve, y conviene saber por qué sigue aquí. Desde
+     que el v2 tiene puerta propia, `sesion: false` lo atrapa el arranque y
+     enseña el PIN en vez de pintar el panel — no manda a ningún sitio, porque
+     ya no hay otro panel al que mandar. Esto queda como red: si algún camino
+     pinta con la sesión caída, que lo diga en vez de enseñar números viejos
+     como si fueran de ahora. */
   if (!datos.sesion) {
-    return { palabra: 'SIN SESIÓN', tono: 'aviso', nota: 'Entra por /val/ para abrir sesión.' };
+    return { palabra: 'SIN SESIÓN', tono: 'aviso', nota: 'La sesión ha caducado. Vuelve a meter el PIN.' };
   }
   if (!estado) {
     return { palabra: 'SIN DATOS', tono: 'critico', nota: 'El panel no ha podido leer el estado.' };

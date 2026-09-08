@@ -104,5 +104,21 @@ export function iniciarCarga(caja, pieza, opciones = {}) {
       })();
       return fin;
     },
+    /**
+     * Quitarla sin coreografía y sin entregar nada.
+     *
+     * Existe por un caso concreto: se arranca a la vez que la primera petición
+     * de datos, y esa petición puede contestar «no hay sesión». Entonces no hay
+     * panel al que entregar la esfera y lo que toca enseñar es la puerta del
+     * PIN, así que la pantalla se retira en el sitio. Sin esto habría dos capas
+     * a pantalla completa peleando por el mismo hueco.
+     *
+     * Deja `fin` puesto para que un `terminar()` posterior no la resucite.
+     */
+    abortar() {
+      if (fin) return;
+      fin = Promise.resolve();
+      vista.destruir();
+    },
   };
 }

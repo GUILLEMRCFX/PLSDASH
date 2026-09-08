@@ -19,6 +19,7 @@ SIN_NAVEGADOR=(
   "pruebas/inversiones-test.mjs"
 )
 CON_NAVEGADOR=(
+  "pruebas/puerta-test.js"
   "pruebas/wallets-test.js"
   "pruebas/invest-vista-test.js"
   "pruebas/vault-test.js"

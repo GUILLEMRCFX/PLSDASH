@@ -132,6 +132,16 @@ const caja = p => p.evaluate(() => {
        navegación 300 ms después. Se esperan las dos: nada de sueños a ojo. */
     const fogonazo = () => p.evaluate(() => !!document.querySelector('.vault-fogonazo.on'));
     await hasta(fogonazo);
+    if (!(await fogonazo())) {
+      /* Cuando esto falla hay que saber POR QUÉ, no solo que falló: si el
+         recorrido no llegó al final es un problema de la prueba, y si llegó y
+         no hay destello es un problema de `vault.js`. Sin este dato la única
+         salida es volver a lanzarla a ver si pasa. */
+      const d = await desplazamiento(p);
+      const existe = await p.evaluate(() => !!document.querySelector('.vault-fogonazo'));
+      console.log(`        recorrido ${d}px · elemento ${existe ? 'creado sin .on' : 'no creado'}`
+        + ` · destino ${destinoDe(p)}`);
+    }
     ok('aparece el fogonazo', await fogonazo(), true);
     await haNavegado(p);
     ok('navega a /val/', destinoDe(p), '/val/');
