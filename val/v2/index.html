@@ -126,6 +126,10 @@
   #rotulo .r-id{color:var(--dato);letter-spacing:.02em;font-weight:600}
   #rotulo .r-blq{color:var(--apagado);font-size:11px}
   #rotulo.inactivo .r-id{color:var(--acento)}
+  /* El que espera turno se rotula en el color de «va bien», no en el de alerta:
+     no le pasa nada, es que aún no ha empezado. */
+  #rotulo.pendiente .r-id{color:var(--bien)}
+  #rotulo.pendiente .r-blq{color:var(--bien);opacity:.85}
 
   /* Pie de la pestaña de la esfera: qué codifica lo que se está viendo. Sin
      esto, un punto más gordo que otro es decoración.
@@ -268,7 +272,8 @@
       <p class="esfera-pie">
         <span>Un punto por validador · <b>el tamaño</b> son sus bloques propuestos</span>
         <span><b>El brillo</b> sube con el ciclo de barrido y cae al cobrarlo</span>
-        <span><b>Gris</b> = dato viejo · toca un punto para ver cuál es</span>
+        <span><b>Gris</b> = dato viejo · <b>latiendo</b> = esperando activación</span>
+        <span>Toca un punto para ver cuál es</span>
       </p>
     </div>
   </div>
@@ -293,6 +298,7 @@
   import { panelPrecio } from './paneles/precio-historico.js';
   import { panelPrecioSimulado, engancharPrecioSimulado } from './paneles/precio-simulado.js';
   import { panelValidadores } from './paneles/validadores.js';
+  import { panelHitos } from './paneles/hitos.js';
   import { panelSaludNodo } from './paneles/salud-nodo.js';
   import { panelEstadoGlobal } from './paneles/estado-global.js';
   import { panelRegistro } from './paneles/registro.js';
@@ -328,9 +334,15 @@
     alSenalar(n) {
       if (!n) { rotulo.hidden = true; return; }
       rotulo.querySelector('.r-id').textContent = n.indice;
-      rotulo.querySelector('.r-blq').textContent =
-        n.bloques === 1 ? '1 bloque' : `${n.bloques} bloques`;
-      rotulo.classList.toggle('inactivo', n.activo === false);
+      /* El que espera turno no tiene bloques que contar, y decir «0 bloques»
+         sería contestar a la pregunta equivocada: lo que hay que saber de él
+         es que aún no ha empezado. */
+      rotulo.querySelector('.r-blq').textContent = n.pendiente
+        ? 'esperando activación'
+        : n.bloques === 1 ? '1 bloque' : `${n.bloques} bloques`;
+      // Pendiente NO es inactivo: no se pinta en el color de lo que va mal.
+      rotulo.classList.toggle('inactivo', n.activo === false && !n.pendiente);
+      rotulo.classList.toggle('pendiente', n.pendiente === true);
       // El segundo `translate` es el centrado sobre el nodo, en porcentaje del
       // propio rótulo: tiene que ir aquí y no en el CSS, porque escribir
       // `transform` desde JS sustituye la propiedad entera.
@@ -371,7 +383,7 @@
   const PESTANAS = [
     { id: 'resumen',     paneles: [panelResumen, panelPrecio] },
     { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelPrecioSimulado, panelAportaciones] },
-    { id: 'validadores', paneles: [panelValidadores, panelTrayectoria] },
+    { id: 'validadores', paneles: [panelValidadores, panelHitos, panelTrayectoria] },
     { id: 'nodo',        paneles: [panelSaludNodo, panelEstadoGlobal, panelRegistro] },
     // `estatica`: su HTML lo escribió el documento y no se regenera nunca. Ver
     // el aviso junto a `#v-esfera` en el marcado.

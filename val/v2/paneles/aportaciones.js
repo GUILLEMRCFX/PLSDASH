@@ -14,7 +14,13 @@
  * Esa cuenta solo cuadraría si de la wallet no saliera nunca nada. Lo que hay
  * de verdad es:
  *
- *     saldo = ganado + aportado − lo que hayas sacado − gas
+ *     saldo = ganado + aportado − depositado − lo que hayas sacado − gas
+ *
+ * ⚠ EL DEPÓSITO NO ES DINERO QUE SE VA, y sin ese término la cuenta lo llamaba
+ *   así. Al depositar un validador nuevo salen 32M de la wallet y el desglose
+ *   los enseñaba como «32.000.000 salidos», junto al gas. No es una salida: es
+ *   capital que cambia de sitio — de la wallet al stake— y sigue siendo tuyo.
+ *   Se cuenta aparte, con su nombre.
  *
  * `ganado` es todo lo barrido DESDE SIEMPRE, no lo que queda de ello. Así que
  * la resta puede salir negativa, y eso no es un error: es que has movido PLS
@@ -49,10 +55,13 @@ export function desglosarSaldo(datos) {
 
   const ganado = Number(datos?.ganancia?.total) || 0;
   const aportado = Number(datos?.aportaciones?.total_pls) || 0;
-  const resto = saldo - ganado - aportado;
+  const depositado = depositadoEnAmpliaciones(datos);
+  // El signo: el depósito salió de la wallet, así que se SUMA de vuelta para
+  // saber qué queda sin explicar. Ver la cabecera.
+  const resto = saldo - ganado - aportado + depositado;
 
   return {
-    saldo, ganado, aportado,
+    saldo, ganado, aportado, depositado,
     // Positivo: ha entrado algo que no está apuntado. Negativo: ha salido.
     resto,
     // Si es ruido, no se enseña: una tercera cifra por 12 PLS de gas estorba
@@ -63,6 +72,41 @@ export function desglosarSaldo(datos) {
     //   palabras en vez de dar por hecho que sí.
     hayRegistro: (datos?.aportaciones?.aportaciones || []).length > 0,
   };
+}
+
+/**
+ * Lo que ha salido de la wallet para depositar validadores NUEVOS.
+ *
+ * Es la misma idea que usa Inversiones para reconocer un depósito en la
+ * portada —la FORMA, no una cifra escrita— pero aquí no hace falta mirar la
+ * cadena: el propio estado dice cuántos validadores hay y cuándo se activó
+ * cada uno.
+ *
+ * Cuenta como ampliación todo el que se activó DESPUÉS del primero del grupo,
+ * más los que están ahora en cola. El depósito inicial no se cuenta: es
+ * anterior a que existiera nada que medir, y `ganado` tampoco lo incluye.
+ *
+ * ⚠ El importe sale de `stake_total / total`, NUNCA escrito. El día que el
+ *   protocolo cambie el tamaño del depósito, esto sigue valiendo.
+ *
+ * @returns {number} 0 si no se puede saber. Cero es «no lo descuento», que es
+ *   el lado seguro: como mucho vuelve a verse como salida, que es lo de antes.
+ */
+export function depositadoEnAmpliaciones(datos) {
+  const v = datos?.estado?.validadores || {};
+  const detalle = v.detalle || [];
+  const deposito = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : 0;
+  if (!(deposito > 0) || !detalle.length) return 0;
+
+  const activaciones = detalle
+    .map(d => Number(d.activacion_ts))
+    .filter(ts => Number.isFinite(ts) && ts > 0);
+  if (!activaciones.length) return 0;
+
+  const primera = Math.min(...activaciones);
+  const ampliaciones = activaciones.filter(ts => ts > primera).length
+    + (Number(v.pendientes) || 0);
+  return ampliaciones * deposito;
 }
 
 /** «hace 3 días» / «12 ago». Corto: la fecha exacta va en el `title`. */

@@ -55,6 +55,38 @@ const UMBRAL_REZAGADO = 0.85;
  * Sin `activacion_ts` —recolector viejo— nadie es reciente y todo queda como
  * antes: se degrada, no se rompe.
  */
+/**
+ * En cola de activación: depositado y esperando turno, 12-18 h.
+ *
+ * No es «no activo». Se mira `pendiente` —que publica el recolector— y, como
+ * respaldo, el propio estado de la beacon API, para que un recolector viejo no
+ * deje esto sin funcionar.
+ */
+function esPendiente(d) {
+  return d?.pendiente === true || String(d?.estado || '').startsWith('pending');
+}
+
+/**
+ * Desde cuándo espera turno, si se puede saber.
+ *
+ * ⚠ La beacon API NO dice cuándo se depositó: `activation_epoch` es el futuro
+ *   lejano mientras no hay turno asignado, y no hay ningún otro campo con la
+ *   fecha. Así que la referencia es el REGISTRO: `push.py` escribe un evento
+ *   la primera vez que ve a ese índice en la cola. Si el evento no está —se ha
+ *   salido de la ventana de 60, o el depósito es anterior a que se escribiera—
+ *   se dice el estado a secas y no se inventa una hora.
+ */
+function esperando(indice, eventos = [], ahoraS) {
+  const ev = eventos.find(e => Number(e.validador) === Number(indice)
+    && /cola de activaci/i.test(String(e.titulo || '')));
+  const ts = ev ? Number(ev.ts) : NaN;
+  if (!Number.isFinite(ts) || !Number.isFinite(ahoraS) || ts <= 0) return '';
+  const h = (ahoraS - ts) / 3600;
+  if (h < 1) return 'desde hace menos de una hora';
+  if (h < 48) return `esperando ${Math.round(h)} h`;
+  return `esperando ${Math.round(h / 24)} días`;
+}
+
 function esReciente(d, desdeTs) {
   const ts = Number(d.activacion_ts);
   return Number.isFinite(ts) && desdeTs != null && ts > desdeTs;
@@ -104,14 +136,22 @@ export function panelValidadores(datos) {
   const ciclos = datos.ganancia?.ciclos || [];
   const ultimoBarrido = ciclos.length ? Number(ciclos[ciclos.length - 1].ts) : null;
 
-  const recientes = new Set(
-    detalle.filter(d => esReciente(d, ultimoBarrido)).map(d => d.indice));
+  /* ⚠ EL QUE ESPERA TURNO NO ENTRA EN NINGUNA COMPARACIÓN. Un validador en
+     cola tiene cero ganado por definición —aún no ha validado ni un slot— así
+     que dentro de la media arrastraría al grupo hacia abajo y dejaría a todos
+     los demás pareciendo mejores de lo que son. Es el mismo problema que ya
+     resolvía `esReciente` para el recién activado, un paso antes. */
+  const enCola = new Set(detalle.filter(esPendiente).map(d => d.indice));
 
-  // La referencia se calcula SIN los recién activados: si no, uno que lleva
-  // dos horas arrastraría la media del grupo hacia abajo y taparía a un
-  // rezagado de verdad.
+  const recientes = new Set(
+    detalle.filter(d => !enCola.has(d.indice) && esReciente(d, ultimoBarrido))
+      .map(d => d.indice));
+
+  // La referencia se calcula SIN los recién activados ni los que esperan: si
+  // no, uno que lleva dos horas arrastraría la media del grupo hacia abajo y
+  // taparía a un rezagado de verdad.
   const valores = detalle
-    .filter(d => !recientes.has(d.indice))
+    .filter(d => !recientes.has(d.indice) && !enCola.has(d.indice))
     .map(d => Number(d.ganado) || 0);
   const ref = referenciaGrupo(valores);
 
@@ -143,28 +183,35 @@ export function panelValidadores(datos) {
   const activos = detalle.filter(d => d.estado === 'active_ongoing').length;
   const totalBloques = Object.values(bloques).reduce((a, n) => a + Number(n || 0), 0);
   const rezagados = ref
-    ? detalle.filter(d => !recientes.has(d.indice)
+    ? detalle.filter(d => !recientes.has(d.indice) && !enCola.has(d.indice)
         && (Number(d.ganado) || 0) < ref * UMBRAL_REZAGADO).length
     : 0;
-  const problemas = detalle.filter(d => d.slashed || d.estado !== 'active_ongoing').length + rezagados;
+  // Un pendiente no es un problema: se cuenta aparte y se dice como lo que es.
+  const problemas = detalle.filter(d =>
+    d.slashed || (d.estado !== 'active_ongoing' && !esPendiente(d))).length + rezagados;
+
+  const ahoraS = Number(datos?.ahoraS) || Math.floor(Date.now() / 1000);
+  const espera = i => esperando(i, datos?.eventos || [], ahoraS);
 
   const filas = [...detalle].sort((a, b) => a.indice - b.indice).map(d => {
     const ganado = Number(d.ganado) || 0;
     const balance = Number(d.balance);
     const nBloques = Number(bloques[d.indice] || 0);
     const reciente = recientes.has(d.indice);
-    const rezagado = !reciente && ref != null && ganado < ref * UMBRAL_REZAGADO;
+    const cola = enCola.has(d.indice);
+    const rezagado = !reciente && !cola && ref != null && ganado < ref * UMBRAL_REZAGADO;
     // Por debajo del depósito significa penalización: el balance solo baja de
     // ahí si la cadena ha quitado. Es lo ÚNICO que hace informativa esta
     // columna — el resto del tiempo los diez marcan el mismo 32M, porque
     // balance = depósito + ganado y el ganado ya está a su izquierda.
-    const penalizado = stakeUnitario != null && Number.isFinite(balance) && balance < stakeUnitario;
-    const fueraDeJuego = d.slashed || d.estado !== 'active_ongoing';
+    const penalizado = !cola && stakeUnitario != null && Number.isFinite(balance) && balance < stakeUnitario;
+    const fueraDeJuego = d.slashed || (d.estado !== 'active_ongoing' && !cola);
     const mal = rezagado || fueraDeJuego || penalizado;
 
     // El motivo va en palabras, no solo en el color: quien no distinga el
     // naranja tiene que poder ver igualmente cuál está raro y por qué.
     const nota = d.slashed ? 'slashed'
+      : cola ? `en cola de activación${espera(d.indice) ? ` · ${espera(d.indice)}` : ''}`
       : d.estado !== 'active_ongoing' ? String(d.estado || 'inactivo')
       : penalizado ? 'por debajo del depósito'
       : rezagado ? 'rezagado'
@@ -182,7 +229,7 @@ export function panelValidadores(datos) {
         <span class="v-gan">${fmt(ganado)}</span>
         <span class="v-bal${penalizado ? ' alerta' : ''}">${
           penalizado ? fmt(balance) : fmtCompacto(balance)}</span>
-        ${nota ? `<span class="v-nota">${escapar(nota)}</span>` : ''}
+        ${nota ? `<span class="v-nota${cola ? ' espera' : ''}">${escapar(nota)}</span>` : ''}
       </a>`;
   }).join('');
 

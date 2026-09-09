@@ -158,20 +158,74 @@ def detectar_eventos(datos, previo):
     v = datos.get("validadores") or {}
     n = datos.get("nodo") or {}
 
+    detalle = v.get("detalle") or []
     activos = v.get("activos")
     activos_prev = previo.get("activos")
 
-    # Validadores que dejan de estar activos
-    if activos is not None and activos_prev is not None and activos < activos_prev:
-        eventos.append((ahora, "caida",
-                        f"{activos_prev - activos} validador(es) inactivo(s)",
-                        f"Activos: {activos} de {v.get('total')}", None, None))
+    # ─────────────────────────────────────────────────────────────────────
+    # ACTIVACION vs RECUPERACION
+    #
+    # ⚠ NO SE PUEDEN DISTINGUIR MIRANDO EL RECUENTO, y esa era la trampa. Al
+    #   activarse el validador nuevo, `activos` sube de 11 a 12 y `total` ya
+    #   valia 12 desde el deposito: exactamente la misma forma que tiene un
+    #   validador que estaba caido y vuelve. El registro decia «Validadores
+    #   recuperados» el dia mas importante del panel.
+    #
+    #   Lo que si lo distingue es QUIEN. Si el indice que aparece activo no
+    #   estaba en la lista anterior, es nuevo; si estaba y habia dejado de
+    #   estar activo, se ha recuperado. Por eso el estado local guarda ahora
+    #   los indices y no solo el recuento.
+    #
+    #   Sin lista previa —primera ejecucion tras actualizar— no se inventa
+    #   nada: se cae al comportamiento de antes, que es el recuento.
+    # ─────────────────────────────────────────────────────────────────────
+    act_ahora = sorted(int(d["indice"]) for d in detalle
+                       if str(d.get("estado", "")).startswith("active"))
+    act_prev = previo.get("activos_indices")
+    pend_ahora = sorted(int(d["indice"]) for d in detalle if d.get("pendiente"))
+    pend_prev = previo.get("pendientes_indices")
 
-    # Recuperación
-    if activos is not None and activos_prev is not None and activos > activos_prev:
-        eventos.append((ahora, "recuperacion",
-                        "Validadores recuperados",
-                        f"Activos: {activos} de {v.get('total')}", None, None))
+    if act_prev is not None:
+        antes_act = set(act_prev)
+        antes_pend = set(pend_prev or [])
+        antes_inact = set(previo.get("inactivos_indices") or [])
+        conocidos = antes_act | antes_pend | antes_inact
+        ahora_act = set(act_ahora)
+        ahora_pend = set(pend_ahora)
+        resumen = f"Activos: {len(act_ahora)} de {v.get('total')}"
+
+        for i in act_ahora:
+            if i in antes_act:
+                continue                       # ya validaba: nada que contar
+            if i in antes_pend or i not in conocidos:
+                # Estaba en cola, o no lo habiamos visto nunca. Es nuevo.
+                eventos.append((ahora, "activacion", f"Validador {i} activado",
+                                resumen, None, i))
+            elif i in antes_inact:
+                eventos.append((ahora, "recuperacion", f"Validador {i} vuelve a validar",
+                                resumen, None, i))
+
+        for i in act_prev:
+            # Pasar de activo a pendiente no existe, pero si lo hiciera no seria
+            # una caida: se filtra por si acaso.
+            if i not in ahora_act and i not in ahora_pend:
+                eventos.append((ahora, "caida", f"Validador {i} inactivo",
+                                resumen, None, i))
+
+        for i in pend_ahora:
+            if i not in conocidos:
+                eventos.append((ahora, "aviso", f"Validador {i} en cola de activacion",
+                                "Depositado, esperando turno", None, i))
+    else:
+        # Camino antiguo, por recuento. Se conserva para la primera ejecucion.
+        if activos is not None and activos_prev is not None and activos < activos_prev:
+            eventos.append((ahora, "caida",
+                            f"{activos_prev - activos} validador(es) inactivo(s)",
+                            f"Activos: {activos} de {v.get('total')}", None, None))
+        if activos is not None and activos_prev is not None and activos > activos_prev:
+            eventos.append((ahora, "recuperacion",
+                            "Validadores recuperados",
+                            f"Activos: {activos} de {v.get('total')}", None, None))
 
     # Slashing (crítico)
     slashed = v.get("slashed", 0)
@@ -415,6 +469,15 @@ def main():
     guardar_estado_local({
         "ts": datos["generado_ts"],
         "activos": v.get("activos"),
+        # Los INDICES, no solo el recuento: es lo unico que distingue una
+        # activacion de una recuperacion. Ver `detectar_eventos`.
+        "activos_indices": sorted(int(d["indice"]) for d in (v.get("detalle") or [])
+                                  if str(d.get("estado", "")).startswith("active")),
+        "pendientes_indices": sorted(int(d["indice"]) for d in (v.get("detalle") or [])
+                                     if d.get("pendiente")),
+        "inactivos_indices": sorted(int(d["indice"]) for d in (v.get("detalle") or [])
+                                    if not str(d.get("estado", "")).startswith("active")
+                                    and not d.get("pendiente")),
         "slashed": v.get("slashed", 0),
         "ganado": v.get("ganado_total"),
         "uptime_horas": n.get("uptime_horas"),

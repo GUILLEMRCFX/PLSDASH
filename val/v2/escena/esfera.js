@@ -429,7 +429,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   // aquí para que nadie —nosotros dentro de unos meses incluidos— la lea como
   // si dijera algo sobre la topología.
   let nNodos = 0, mallaNodos = null, mallaCadena = null;
-  let intensidades = [], activos = [], metaNodos = [], dirNodos = [];
+  let intensidades = [], activos = [], pendientes = [], metaNodos = [], dirNodos = [];
 
   /**
    * CONSTELACIÓN. Cada validador es un punto brillante con un halo.
@@ -474,14 +474,23 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       attribute vec3 aDir;
       attribute float aInt;
       attribute float aAct;
+      attribute float aPend;
       attribute float aIndice;
       uniform float uTam;
       uniform float uSenalado;
       uniform float uDestIdx; uniform float uDestT;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
-      varying float vDest;
+      varying float vDest; varying float vPul;
       void main(){
         vP = position.xy; vI = aInt; vAct = aAct;
+        /* EL LATIDO DEL QUE ESPERA TURNO.
+           Un validador en cola no ha ganado nada y no tiene bloques: con los
+           dos estados de antes se dibujaba igual que uno muerto. Late a ~0,42 Hz
+           —lento, como una respiración— entre 0 y 1. No es una rueda de carga:
+           es el mismo lenguaje que ya usa la esfera, brillo que sube y baja. */
+        // Con movimiento reducido no late: se queda encendido y fijo. Sigue
+        // distinguiéndose de un nodo muerto, que es lo que importa.
+        vPul = aPend > 0.5 ? mix(0.62, 0.5 + 0.5 * sin(uTiempo * 2.6), uRespiracion) : 0.0;
         vSen = abs(aIndice - uSenalado) < 0.5 ? 1.0 : 0.0;
         // Envolvente del destello: sube en 120 ms y cae en ~1,4 s. Corta, para
         // que se lea como un golpe y no como una animación en bucle.
@@ -491,7 +500,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         // compensa en el fragmento para no crecer con él.
         float s = TAM_MIN + aInt * TAM_RANGO;
         vec4 mv = modelViewMatrix * vec4(deformar(aDir), 1.0);
-        mv.xy += position.xy * s * uTam * (1.0 + vSen * 0.18 + vDest * 1.10);
+        mv.xy += position.xy * s * uTam * (1.0 + vSen * 0.18 + vDest * 1.10 + vPul * 0.30);
         gl_Position = projectionMatrix * mv;
       }`
       .replace(/TAM_MIN/g, TAM_MIN.toFixed(3))
@@ -499,7 +508,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     fragmentShader: /* glsl */`
       uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
-      varying float vDest;
+      varying float vDest; varying float vPul;
       void main(){
         float r = length(vP) * 2.0;
 
@@ -515,13 +524,18 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
 
         // Un validador fuera de juego pierde el halo y se queda en un punto
         // apagado: sigue estando —es tuyo— pero deja de brillar.
-        halo *= vAct;
+        // El que espera turno SÍ conserva el halo: no está fuera de juego, está
+        // a punto de entrar, y es el halo el que respira.
+        halo *= max(vAct, vPul);
         float i = nucleo * (0.85 + vI * 0.55) + halo * (0.55 + vI * 0.9);
-        i *= (0.45 + vAct * 0.55);
+        i *= (0.45 + max(vAct, vPul * 0.85) * 0.55);
         i *= (1.0 + vSen * 0.85);
         // El destello suma un halo ancho además de subir el brillo: el punto
         // no solo se pone más fuerte, se HINCHA. Eso es lo que se ve de reojo.
         i += vDest * (exp(-pow(r / 1.15, 2.0)) * 0.9 + nucleo * 1.6);
+        // Y un halo ancho propio, para que el latido se vea de reojo sin tener
+        // que estar mirando ese punto.
+        i += vPul * exp(-pow(r / 1.05, 2.0)) * 0.30;
         if (i < 0.004) discard;
 
         // El núcleo tira a blanco y el halo se queda naranja: es lo que lo hace
@@ -554,11 +568,13 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     const aDir = new Float32Array(n * 3);
     const aInt = new Float32Array(n);
     const aAct = new Float32Array(n);
+    const aPend = new Float32Array(n);
     const aIdx = new Float32Array(n);
     dirs.forEach((d, i) => {
       aDir[i * 3] = d.x; aDir[i * 3 + 1] = d.y; aDir[i * 3 + 2] = d.z;
       aInt[i] = intensidades[i] ?? 0.5;
       aAct[i] = activos[i] === false ? 0 : 1;
+      aPend[i] = pendientes[i] === true ? 1 : 0;
       aIdx[i] = i;
     });
     // Las direcciones se guardan para poder saber qué nodo hay bajo el dedo.
@@ -568,6 +584,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     g.setAttribute('aDir', new THREE.InstancedBufferAttribute(aDir, 3));
     g.setAttribute('aInt', new THREE.InstancedBufferAttribute(aInt, 1));
     g.setAttribute('aAct', new THREE.InstancedBufferAttribute(aAct, 1));
+    g.setAttribute('aPend', new THREE.InstancedBufferAttribute(aPend, 1));
     g.setAttribute('aIndice', new THREE.InstancedBufferAttribute(aIdx, 1));
     mallaNodos = new THREE.Mesh(g, matNodo);
     mallaNodos.frustumCulled = false;
@@ -819,6 +836,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     const lista = estado.nodos || [];
     intensidades = lista.map(v => Math.max(0, Math.min(1, v.intensidad ?? 0.5)));
     activos = lista.map(v => v.activo !== false);
+    pendientes = lista.map(v => v.pendiente === true);
     // Lo que la esfera NO interpreta pero sí devuelve al señalar un nodo. Se
     // guarda tal cual: aquí no se sabe qué es un índice de validador.
     metaNodos = lista.map(v => ({ ...v }));
@@ -826,11 +844,13 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     else if (mallaNodos) {
       const aI = mallaNodos.geometry.getAttribute('aInt');
       const aA = mallaNodos.geometry.getAttribute('aAct');
+      const aP = mallaNodos.geometry.getAttribute('aPend');
       for (let i = 0; i < intensidades.length; i++) {
         aI.array[i] = intensidades[i];
         aA.array[i] = activos[i] === false ? 0 : 1;
+        aP.array[i] = pendientes[i] === true ? 1 : 0;
       }
-      aI.needsUpdate = true; aA.needsUpdate = true;
+      aI.needsUpdate = true; aA.needsUpdate = true; aP.needsUpdate = true;
     }
     if (estado.energia  != null) energiaObjetivo  = Math.max(0, Math.min(1, estado.energia));
     if (estado.frescura != null) frescuraObjetivo = Math.max(0, Math.min(1, estado.frescura));

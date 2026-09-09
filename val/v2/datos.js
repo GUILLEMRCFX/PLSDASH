@@ -150,12 +150,27 @@ export function saludGlobal(datos) {
   }
 
   const v = estado.validadores || {};
-  const fuera = Number(v.total) - Number(v.activos);
+  /* ⚠ UN PENDIENTE NO ES UN AVISO, y esta resta es toda la diferencia.
+     La regla era `total - activos`, y con ella el panel decia que algo iba mal
+     durante las 12-18 h que un validador recien depositado pasa en la cola de
+     activacion. No va mal: es lo que pasa al ampliar, y es justo el dia que
+     mas se mira el panel. `pendientes` lo publica el recolector; sin el campo
+     —recolector viejo— se comporta como antes y no se rompe nada. */
+  const enCola = Number(v.pendientes) || 0;
+  const fuera = Number(v.total) - Number(v.activos) - enCola;
   if (fuera > 0) {
     return { palabra: 'AVISO', tono: 'aviso',
              nota: fuera === 1
                ? 'Un validador fuera de servicio.'
                : `${fuera} validadores fuera de servicio.` };
+  }
+  /* La cola sí se dice, pero no como aviso: es informacion, y el tono es el
+     mismo que cuando todo va bien. */
+  if (enCola > 0) {
+    return { palabra: 'OPERATIVO', tono: 'ok',
+             nota: enCola === 1
+               ? 'Un validador en cola de activación.'
+               : `${enCola} validadores en cola de activación.` };
   }
   if (estado.salud === 'aviso' || n.optimistic) {
     return { palabra: 'AVISO', tono: 'aviso',

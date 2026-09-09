@@ -140,6 +140,9 @@ export function panelResumen(datos) {
         <span class="s-desglose">${
           d.hayRegistro
             ? `${fmt(d.ganado)} ganados · ${fmt(d.aportado)} aportados${
+                // El depósito va con su nombre: no es una salida, es capital
+                // que ha cambiado de sitio y sigue siendo tuyo.
+                d.depositado > 0 ? ` · ${fmtCompacto(d.depositado)} depositados` : ''}${
                 d.restoVisible
                   ? ` · ${fmt(Math.abs(d.resto))} ${d.resto < 0 ? 'salidos' : 'sin identificar'}`
                   : ''}`
@@ -192,7 +195,32 @@ export function panelResumen(datos) {
     : '<dd>–</dd>';
 
   const faltanActivaciones = apr && !apr.deTodos;
-  const fueraDeServicio = Number(v.total) - Number(v.activos) > 0;
+  /* ⚠ Los que esperan turno NO cuentan como fuera de servicio. Sin esta resta,
+     la línea de validadores se ponía naranja las 12-18 h que dura la cola de
+     activación: el día que amplías, el panel diciendo que algo va mal. */
+  const enCola = Number(v.pendientes) || 0;
+  const fueraDeServicio = Number(v.total) - Number(v.activos) - enCola > 0;
+
+  /* ── «Tienes para un validador entero» ──────────────────────────────────
+     El depósito SALE DE LOS DATOS: `stake_total / total`. No se escribe 32M
+     por el mismo motivo de siempre — el día que el protocolo lo cambie, un
+     número a fuego miente y nadie se entera.
+
+     Y se queda MIENTRAS el saldo dé para ello, no es un aviso que aparece y se
+     va: lo que se está diciendo no es «acaba de pasar algo», es «puedes
+     depositar ya». Eso es cierto hasta que depositas. */
+  // `deposito` ya está calculado arriba, para el APR por validador-hora.
+  const saldoAhora = d ? Number(d.saldo) : null;
+  const cuantos = deposito > 0 && saldoAhora != null
+    ? Math.floor(saldoAhora / deposito) : 0;
+  const listoHtml = cuantos < 1 ? '' : `
+      <p class="listo" role="status">
+        <span class="listo-t">${cuantos === 1
+          ? 'Tienes para un validador entero'
+          : `Tienes para ${fmt(cuantos)} validadores enteros`}</span>
+        <span class="listo-s">${fmt(saldoAhora)} PLS en la wallet · el depósito son ${
+          fmtCompacto(deposito)} PLS</span>
+      </p>`;
 
   return `
     <section class="panel resumen"${alerta ? ' data-alerta' : ''} aria-labelledby="prs-t">
@@ -207,7 +235,9 @@ export function panelResumen(datos) {
           `<span class="p-marca ${alerta ? 'alerta' : 'bien'}">${escapar(salud.palabra)}</span>`)}
       </header>
 
-      ${salud.nota ? `<p class="p-aviso">${escapar(salud.nota)}</p>` : ''}
+      ${salud.nota
+        ? `<p class="p-aviso${salud.tono === 'ok' ? ' info' : ''}">${escapar(salud.nota)}</p>`
+        : ''}
 
       <div class="portada">
         ${portada}
@@ -215,6 +245,7 @@ export function panelResumen(datos) {
       </div>
 
       ${saldoHtml}
+      ${listoHtml}
 
       ${ritmo
         ? ritmo.html
@@ -227,6 +258,9 @@ export function panelResumen(datos) {
              porque es el mismo hecho contado de dos maneras. -->
         <div><dt>Validadores</dt><dd${fueraDeServicio ? ' class="alerta"' : ''}>${
           fmt(v.activos)} / ${fmt(v.total)}${
+          // La cola se dice aquí mismo, para que el «11 / 12» no se lea como
+          // que falta uno por un problema.
+          enCola > 0 ? ` · <span class="bien">${fmt(enCola)} en cola</span>` : ''}${
           /* Espacio duro: a 390 la línea parte en tres columnas y sin él la
              unidad se quedaba sola en el renglón de abajo. */
           Number(v.stake_total) > 0 ? ` · ${fmtCompacto(v.stake_total)}&nbsp;PLS` : ''}</dd></div>
