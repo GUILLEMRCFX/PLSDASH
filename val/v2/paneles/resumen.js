@@ -112,8 +112,14 @@ export function panelResumen(datos) {
   // compartido: la cuenta ingenua (`total / stake_total × 8760`) miente en
   // cuanto los validadores tienen distinta antigüedad, y aquí la tienen.
   const deposito = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : null;
+  /* ⚠ EL QUE ESPERA A ENTRAR EN LA CADENA SE SACA DEL APR. No aporta ni una
+     hora-validador —no existe para la cadena— así que en el denominador no
+     cambia nada; lo que sí hacía es disparar `deTodos: false` y con él la
+     coletilla «del resto no se conoce la hora de activación», que durante toda
+     la espera convertía un estado normal en un aviso de datos incompletos. */
+  const enCadena = (v.detalle || []).filter(d => !(d.esperando === true || d.estado === 'esperando'));
   const apr = acum ? aprValidadorHora({
-    total: acum.total, detalle: v.detalle || [], deposito, ahoraS: datos.ahoraS,
+    total: acum.total, detalle: enCadena, deposito, ahoraS: datos.ahoraS,
   }) : null;
 
   const ritmo = tablaRitmo(datos);
@@ -200,6 +206,11 @@ export function panelResumen(datos) {
      activación: el día que amplías, el panel diciendo que algo va mal. */
   const enCola = Number(v.pendientes) || 0;
   const fueraDeServicio = Number(v.total) - Number(v.activos) - enCola > 0;
+  /* Con clave en el NUC y sin conocer la cadena. `claves` es lo que cuenta
+     Lighthouse (`total_validators`); sin el campo —recolector viejo— vale
+     `total` y esta línea queda exactamente como estaba. */
+  const esperandoN = Number(v.esperando) || 0;
+  const claves = Number(v.claves) || Number(v.total) || 0;
 
   /* ── «Tienes para un validador entero» ──────────────────────────────────
      El depósito SALE DE LOS DATOS: `stake_total / total`. No se escribe 32M
@@ -257,9 +268,13 @@ export function panelResumen(datos) {
              decía cuánto rinde y no cuánto hay rindiendo. Va junto al recuento
              porque es el mismo hecho contado de dos maneras. -->
         <div><dt>Validadores</dt><dd${fueraDeServicio ? ' class="alerta"' : ''}>${
-          fmt(v.activos)} / ${fmt(v.total)}${
-          // La cola se dice aquí mismo, para que el «11 / 12» no se lea como
-          // que falta uno por un problema.
+          /* El denominador son las CLAVES, no los que la cadena conoce: si
+             acabas de depositar, tienes doce y la cadena sabe de once, y el
+             panel tiene que decir doce — es lo mismo que cuenta Lighthouse. */
+          fmt(v.activos)} / ${fmt(claves)}${
+          // Las dos esperas se dicen aquí mismo, para que el «11 / 12» no se
+          // lea como que falta uno por un problema.
+          esperandoN > 0 ? ` · <span class="bien">${fmt(esperandoN)} esperando</span>` : ''}${
           enCola > 0 ? ` · <span class="bien">${fmt(enCola)} en cola</span>` : ''}${
           /* Espacio duro: a 390 la línea parte en tres columnas y sin él la
              unidad se quedaba sola en el renglón de abajo. */
@@ -270,7 +285,7 @@ export function panelResumen(datos) {
       <p class="c-sub">${
         ritmo ? escapar(ritmo.nota) : 'Aún no hay tramo medido suficiente para proyectar.'
       }${faltanActivaciones
-        ? ` El rendimiento sale de ${fmt(apr.conActivacion)} de ${fmt(v.detalle.length)} validadores:`
+        ? ` El rendimiento sale de ${fmt(apr.conActivacion)} de ${fmt(enCadena.length)} validadores:`
           + ' del resto no se conoce la hora de activación.'
         : ''}</p>
     </section>`;

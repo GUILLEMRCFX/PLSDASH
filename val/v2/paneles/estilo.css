@@ -718,6 +718,36 @@
 .vfila.mal .v-id,
 .vfila.mal .v-gan { color: var(--acento); }
 
+/* ── El que espera a entrar en la cadena ────────────────────────────────────
+   Es un `div`, no un `a`: sin índice no hay página en el explorador a la que
+   ir. Así que aquí se le quita lo que sugiere que se pueda pulsar —el fondo al
+   pasar por encima— y se le deja la pubkey en su sitio.
+
+   El punto que late es el mismo lenguaje que usan la esfera y la línea
+   temporal para lo mismo: está a punto de empezar, no está roto. */
+/* `.mono` la escriben la línea temporal y la fila del que espera para los
+   índices y las pubkeys —cifras que se comparan carácter a carácter—, y la
+   regla no existía: la clase estaba puesta y no hacía nada desde que se añadió
+   la línea temporal. */
+.mono { font-family: var(--tecnico); }
+
+.vfila.espera { cursor: default; }
+.vfila.espera:hover { background-color: transparent; }
+.vfila.espera .v-id { color: var(--bien); font-size: 12px; letter-spacing: .01em; }
+.vfila.espera .v-gan,
+.vfila.espera .v-bal { color: var(--apagado); }
+.vfila.espera .v-nota { color: var(--bien); }
+.vfila.espera .v-nota::before {
+  content: ''; display: inline-block;
+  width: 5px; height: 5px; margin-right: 6px;
+  border-radius: 50%; background: var(--bien);
+  vertical-align: middle;
+  animation: hi-latido 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vfila.espera .v-nota::before { animation: none; opacity: 1; }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    PESTAÑAS, PULSO Y ANIMACIÓN
    ═══════════════════════════════════════════════════════════════════════════ */

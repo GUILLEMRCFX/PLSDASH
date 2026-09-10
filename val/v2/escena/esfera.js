@@ -870,7 +870,12 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
    * @returns {boolean} false si ese validador no está en la escena.
    */
   function destello(indiceValidador) {
-    const i = metaNodos.findIndex(m => Number(m.indice) === Number(indiceValidador));
+    // `m.indice` es null en el que aún espera a entrar en la cadena, y
+    // `Number(null)` es 0 — no NaN. Sin exigir que sea finito, un destello
+    // del validador 0 iluminaría al que espera.
+    const buscado = Number(indiceValidador);
+    if (!Number.isFinite(buscado)) return false;
+    const i = metaNodos.findIndex(m => m.indice != null && Number(m.indice) === buscado);
     if (i < 0 || !dirNodos[i]) return false;
     matNodo.uniforms.uDestIdx.value = i;
     uDestDir.value.copy(dirNodos[i]);

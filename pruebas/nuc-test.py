@@ -158,6 +158,148 @@ ok("y una caida sigue siendo una caida", tipos(evs), ["caida"])
 evs = push.detectar_eventos(datos([A(i) for i in range(1, 13)]), {"activos": 11})
 ok("sin lista previa, camino antiguo", tipos(evs), ["recuperacion"])
 
+print("\n=== 4. EL QUE TIENE CLAVE Y LA CADENA NO CONOCE ===")
+# ⚠ ESTO ES LO QUE HACIA DESAPARECER AL VALIDADOR 12 DURANTE 12-18 H.
+#   `leer_validadores` pregunta a la beacon API POR PUBKEY, y la API devuelve
+#   solo las que conoce: la del deposito recien hecho no viene, sin error de
+#   ninguna clase. Antes se perdia ahi. Ahora se cruza con los keystores del
+#   disco, que es donde el dato SI existe desde el minuto uno.
+
+PK = ["0x" + f"{i:02x}" * 48 for i in range(1, 13)]   # doce claves de mentira
+
+
+def beacon_con(pubkeys, estado="active_ongoing"):
+    """Respuesta de la beacon API con solo esas pubkeys."""
+    return {"data": [
+        {"index": str(109549 + i), "balance": str(32_000_000 * 10 ** 9),
+         "status": estado,
+         "validator": {"pubkey": pk, "slashed": False, "activation_epoch": "320041"}}
+        for i, pk in enumerate(pubkeys)]}
+
+
+def con_claves(locales, respuesta):
+    collector._pubkeys_locales = lambda: locales
+    collector.get_json = lambda url: respuesta
+    return collector.leer_validadores()
+
+
+guardado = (collector._pubkeys_locales, collector.get_json)
+try:
+    v = con_claves(PK, beacon_con(PK[:11]))
+    ok("la cadena conoce once", v["total"], 11)
+    ok("y hay doce claves", v["claves"], 12)
+    ok("asi que uno espera", v["esperando"], 1)
+    okque("y NO desaparece del detalle", len(v["detalle"]) == 12, str(len(v["detalle"])))
+
+    e = [d for d in v["detalle"] if d.get("esperando")]
+    ok("solo uno marcado como esperando", len(e), 1)
+    ok("es la clave que falta", e[0]["pubkey"], PK[11])
+    ok("sin indice, porque la cadena no se lo ha dado", e[0]["indice"], None)
+    okque("con la pubkey abreviada", "…" in e[0]["pubkey_corta"], e[0]["pubkey_corta"])
+    ok("cuenta como pendiente para el panel", e[0]["pendiente"], True)
+    ok("y sin balance inventado", e[0]["balance"], None)
+
+    # ⚠ EL DINERO NO SE MUEVE. Una clave en el disco no demuestra un deposito
+    #   —se generan antes de depositar—, y si `stake_total` la sumara,
+    #   `ganado_total = balance_total - stake_total` se iria 32M por debajo y
+    #   envenenaria el APR, el reparto del saldo y el titular.
+    ok("el stake cuenta solo lo que confirma la cadena", v["stake_total"], 11 * 32_000_000)
+    ok("asi que lo ganado sigue cuadrando", round(v["ganado_total"]), 0)
+    okque("y el deposito unitario sigue siendo exacto",
+          v["stake_total"] / v["total"] == 32_000_000,
+          str(v["stake_total"] / v["total"]))
+
+    ok("un pendiente en cola no cuenta como esperando",
+       con_claves(PK[:11], beacon_con(PK[:11], "pending_queued"))["esperando"], 0)
+    ok("sin claves de sobra, no espera nadie",
+       con_claves(PK[:11], beacon_con(PK[:11]))["esperando"], 0)
+
+    # La salud no se mueve: `total` solo cuenta lo que la cadena devuelve, asi
+    # que un esperando no puede restar de nada.
+    ok("y esperar NO es un aviso",
+       collector.salud_de(con_claves(PK, beacon_con(PK[:11])),
+                          {"sincronizado": True, "disco_usado_pct": 50}), "ok")
+finally:
+    collector._pubkeys_locales, collector.get_json = guardado
+
+print("\n=== 5. DESDE CUANDO ESPERA, Y SIN CONTARLO DOS VECES ===")
+
+
+def datos_con(detalle, ts=5000):
+    return {"generado_ts": ts,
+            "validadores": {"total": len([d for d in detalle if d["indice"] is not None]),
+                            "activos": len([d for d in detalle
+                                            if str(d.get("estado", "")).startswith("active")]),
+                            "slashed": 0, "detalle": detalle},
+            "nodo": {}}
+
+
+def E(pk):
+    return {"indice": None, "pubkey": pk, "pubkey_corta": pk[:8] + "…" + pk[-6:],
+            "estado": "esperando", "pendiente": True, "esperando": True,
+            "en_cola_desde_ts": None}
+
+
+def Ap(i, pk):
+    d = A(i)
+    d.update(pubkey=pk, esperando=False, en_cola_desde_ts=None)
+    return d
+
+
+def Pp(i, pk):
+    d = P(i)
+    d.update(pubkey=pk, esperando=False, en_cola_desde_ts=None)
+    return d
+
+
+BASE_PK = [f"0xaa{i:02x}" for i in range(1, 12)]
+NUEVA = "0xbb99"
+activos11 = [Ap(i, BASE_PK[i - 1]) for i in BASE_PK and range(1, 12)]
+
+# Sin lista previa de pubkeys no se anuncia nada: primera ejecucion tras
+# actualizar, y las once que ya estaban no son noticia.
+d1 = datos_con(activos11 + [E(NUEVA)])
+ok("primera ejecucion: no se inventa un anuncio",
+   tipos(push.detectar_eventos(d1, {"activos": 11, "activos_indices": list(range(1, 12))})), [])
+
+prev5 = {"activos": 11, "activos_indices": list(range(1, 12)),
+         "pendientes_indices": [], "inactivos_indices": [], "esperando_pubkeys": []}
+evs = push.detectar_eventos(d1, prev5)
+ok("al aparecer la clave, se anuncia", tipos(evs), ["aviso"])
+okque("y se dice que la cadena aun no lo conoce",
+      "esperando a entrar en la cadena" in evs[0][2], str(evs))
+
+prev6 = dict(prev5, esperando_pubkeys=[NUEVA])
+ok("mientras espera, no se repite",
+   push.detectar_eventos(d1, prev6), [])
+
+# ⚠ AQUI ESTA LA TRAMPA DE CONTAR DOS VECES. Cuando la cadena adopta el
+#   deposito, ese validador aparece por primera vez como `pending_queued` con
+#   un indice que nadie habia visto: la regla de «indice desconocido en cola →
+#   aviso» lo anunciaria otra vez. Es el mismo hecho un paso mas adelante.
+d2 = datos_con(activos11 + [Pp(12, NUEVA)])
+ok("cuando la cadena lo adopta, NO se anuncia otra vez",
+   push.detectar_eventos(d2, prev6), [])
+ok("pero uno que aparece en cola sin haber pasado por aqui, si",
+   tipos(push.detectar_eventos(d2, prev5)), ["aviso"])
+
+# El reloj de la espera: por PUBKEY, no por indice. Si fuera por indice, se
+# pondria a cero justo al pasar de «esperando» a «en cola», que es cuando la
+# cadena le da numero.
+m1 = push.marcar_espera(datos_con(activos11 + [E(NUEVA)], ts=1000), {})
+ok("la primera vez, se apunta el instante", m1, {NUEVA: 1000})
+d3 = datos_con(activos11 + [Pp(12, NUEVA)], ts=90000)
+push.marcar_espera(d3, {"visto_desde": m1})
+ok("y al entrar en la cadena NO se reinicia",
+   d3["validadores"]["detalle"][-1]["en_cola_desde_ts"], 1000)
+d4 = datos_con(activos11 + [Ap(12, NUEVA)], ts=99000)
+ok("cuando ya valida, se suelta la marca", push.marcar_espera(d4, {"visto_desde": m1}), {})
+
+# Y el guarda que impide que todo esto mate al push.
+ok("un indice ausente no revienta nada", push._idx({"indice": None}), None)
+ok("ni uno que no es un numero", push._idx({"indice": "x"}), None)
+ok("y uno normal se lee", push._idx({"indice": "7"}), 7)
+
 print("\n" + "=" * 52)
 print(f"FALLAN {fallos} de {pruebas}" if fallos else f"TODO CORRECTO ({pruebas})")
 sys.exit(1 if fallos else 0)
