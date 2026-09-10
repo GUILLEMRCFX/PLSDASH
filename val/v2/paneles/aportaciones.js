@@ -104,8 +104,23 @@ export function depositadoEnAmpliaciones(datos) {
   if (!activaciones.length) return 0;
 
   const primera = Math.min(...activaciones);
+  /* Los que esperan a entrar en la cadena cuentan igual que los que ya están
+     en cola.
+     ⚠ Y SÍ, AQUÍ SE CUENTA UNA CLAVE QUE PODRÍA NO ESTAR DEPOSITADA, al revés
+       que en el recolector, que a propósito no la suma a `stake_total`. La
+       diferencia no es capricho:
+
+         · `stake_total` alimenta el APR, el depósito unitario y el objetivo.
+           Un error ahí envenena cinco cifras en silencio.
+         · esto es un cubo de conciliación —«dinero que salió de la wallet y no
+           se ha perdido»— y se enseña rotulado como tal.
+
+       Y los dos errores posibles no son igual de graves. Si has depositado y
+       no se cuenta, el panel dice que se han ido 32M: alarmante y falso. Si la
+       clave está generada y aún no has depositado, dice que sobran 32M sin
+       explicar: raro, y dura lo que tardes en depositar. */
   const ampliaciones = activaciones.filter(ts => ts > primera).length
-    + (Number(v.pendientes) || 0);
+    + (Number(v.pendientes) || 0) + (Number(v.esperando) || 0);
   return ampliaciones * deposito;
 }
 

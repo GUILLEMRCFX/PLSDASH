@@ -63,28 +63,67 @@ const UMBRAL_REZAGADO = 0.85;
  * deje esto sin funcionar.
  */
 function esPendiente(d) {
-  return d?.pendiente === true || String(d?.estado || '').startsWith('pending');
+  return d?.pendiente === true || String(d?.estado || '').startsWith('pending')
+    || esEsperando(d);
 }
+
+/**
+ * Esperando a que la cadena lo conozca.
+ *
+ * Es un paso ANTES que la cola: hay un keystore en el disco del NUC y la
+ * beacon API no devuelve nada para esa pubkey. El recolector lo publica igual
+ * en vez de descartarlo, que es lo que hacía hasta el 10-sep-2026.
+ *
+ * ⚠ No tiene índice. La cadena da el número al adoptar el depósito, así que
+ *   todo lo que aquí identifique un validador tiene que aguantar un `null`.
+ */
+function esEsperando(d) {
+  return d?.esperando === true || d?.estado === 'esperando';
+}
+
+/**
+ * Con qué se identifica una fila.
+ *
+ * El índice, mientras lo haya; y si no, la pubkey. Con `indice` a `null` como
+ * clave de un `Set`, dos que esperasen a la vez serían el mismo elemento y uno
+ * de los dos heredaría el estado del otro.
+ */
+const clave = d => (d?.indice == null ? `pk:${d?.pubkey || d?.pubkey_corta || '?'}` : d.indice);
 
 /**
  * Desde cuándo espera turno, si se puede saber.
  *
  * ⚠ La beacon API NO dice cuándo se depositó: `activation_epoch` es el futuro
  *   lejano mientras no hay turno asignado, y no hay ningún otro campo con la
- *   fecha. Así que la referencia es el REGISTRO: `push.py` escribe un evento
- *   la primera vez que ve a ese índice en la cola. Si el evento no está —se ha
- *   salido de la ventana de 60, o el depósito es anterior a que se escribiera—
- *   se dice el estado a secas y no se inventa una hora.
+ *   fecha. Del que aún no está en la cadena no dice absolutamente nada.
+ *
+ *   Así que quien lo sabe es `push.py`, que corre cada pocos minutos y recuerda
+ *   entre ejecuciones cuándo vio esa PUBKEY por primera vez; lo publica en
+ *   `en_cola_desde_ts`. Es un «al menos desde», no el instante del depósito, y
+ *   se lee así. Como respaldo queda el registro de eventos —lo que se usaba
+ *   antes—, que solo sirve una vez la cadena le ha dado número. Si no hay
+ *   ninguna de las dos cosas, se dice el estado a secas y no se inventa hora.
  */
-function esperando(indice, eventos = [], ahoraS) {
-  const ev = eventos.find(e => Number(e.validador) === Number(indice)
-    && /cola de activaci/i.test(String(e.titulo || '')));
-  const ts = ev ? Number(ev.ts) : NaN;
+function esperando(d, eventos = [], ahoraS) {
+  /* Primero, el campo: `push.py` lleva la cuenta POR PUBKEY, así que el reloj
+     sobrevive al momento en que la cadena adopta el depósito y le da número.
+     El registro solo sabe de índices y ahí el reloj se pondría a cero. */
+  let ts = Number(d?.en_cola_desde_ts);
+  if (!Number.isFinite(ts) || ts <= 0) {
+    const ev = d?.indice == null ? null : eventos.find(e =>
+      Number(e.validador) === Number(d.indice)
+      && /cola de activaci/i.test(String(e.titulo || '')));
+    ts = ev ? Number(ev.ts) : NaN;
+  }
   if (!Number.isFinite(ts) || !Number.isFinite(ahoraS) || ts <= 0) return '';
   const h = (ahoraS - ts) / 3600;
-  if (h < 1) return 'desde hace menos de una hora';
-  if (h < 48) return `esperando ${Math.round(h)} h`;
-  return `esperando ${Math.round(h / 24)} días`;
+  // Solo la duración. El verbo lo pone quien lo use: la nota del que está en
+  // cola ya dice «en cola», y la del que espera a la cadena ya dice
+  // «esperando» — repetirlo daba «esperando a entrar en la cadena · esperando
+  // 3 h», que a 1440 además partía la línea dejando la «h» sola.
+  if (h < 1) return 'menos de una hora';
+  if (h < 48) return `${Math.round(h)} h`;
+  return `${Math.round(h / 24)} días`;
 }
 
 function esReciente(d, desdeTs) {
@@ -141,17 +180,17 @@ export function panelValidadores(datos) {
      que dentro de la media arrastraría al grupo hacia abajo y dejaría a todos
      los demás pareciendo mejores de lo que son. Es el mismo problema que ya
      resolvía `esReciente` para el recién activado, un paso antes. */
-  const enCola = new Set(detalle.filter(esPendiente).map(d => d.indice));
+  const enCola = new Set(detalle.filter(esPendiente).map(clave));
 
   const recientes = new Set(
-    detalle.filter(d => !enCola.has(d.indice) && esReciente(d, ultimoBarrido))
-      .map(d => d.indice));
+    detalle.filter(d => !enCola.has(clave(d)) && esReciente(d, ultimoBarrido))
+      .map(clave));
 
   // La referencia se calcula SIN los recién activados ni los que esperan: si
   // no, uno que lleva dos horas arrastraría la media del grupo hacia abajo y
   // taparía a un rezagado de verdad.
   const valores = detalle
-    .filter(d => !recientes.has(d.indice) && !enCola.has(d.indice))
+    .filter(d => !recientes.has(clave(d)) && !enCola.has(clave(d)))
     .map(d => Number(d.ganado) || 0);
   const ref = referenciaGrupo(valores);
 
@@ -183,7 +222,7 @@ export function panelValidadores(datos) {
   const activos = detalle.filter(d => d.estado === 'active_ongoing').length;
   const totalBloques = Object.values(bloques).reduce((a, n) => a + Number(n || 0), 0);
   const rezagados = ref
-    ? detalle.filter(d => !recientes.has(d.indice) && !enCola.has(d.indice)
+    ? detalle.filter(d => !recientes.has(clave(d)) && !enCola.has(clave(d))
         && (Number(d.ganado) || 0) < ref * UMBRAL_REZAGADO).length
     : 0;
   // Un pendiente no es un problema: se cuenta aparte y se dice como lo que es.
@@ -191,14 +230,20 @@ export function panelValidadores(datos) {
     d.slashed || (d.estado !== 'active_ongoing' && !esPendiente(d))).length + rezagados;
 
   const ahoraS = Number(datos?.ahoraS) || Math.floor(Date.now() / 1000);
-  const espera = i => esperando(i, datos?.eventos || [], ahoraS);
+  const espera = d => esperando(d, datos?.eventos || [], ahoraS);
 
-  const filas = [...detalle].sort((a, b) => a.indice - b.indice).map(d => {
+  // El que aún no tiene número va al final: es el último que ha llegado, y
+  // `a.indice - b.indice` con un `null` da NaN, que deja el orden a merced de
+  // cómo estuviera el array.
+  const orden = d => (d?.indice == null ? Number.POSITIVE_INFINITY : Number(d.indice));
+
+  const filas = [...detalle].sort((a, b) => orden(a) - orden(b)).map(d => {
     const ganado = Number(d.ganado) || 0;
     const balance = Number(d.balance);
     const nBloques = Number(bloques[d.indice] || 0);
-    const reciente = recientes.has(d.indice);
-    const cola = enCola.has(d.indice);
+    const reciente = recientes.has(clave(d));
+    const cola = enCola.has(clave(d));
+    const fuera = esEsperando(d);
     const rezagado = !reciente && !cola && ref != null && ganado < ref * UMBRAL_REZAGADO;
     // Por debajo del depósito significa penalización: el balance solo baja de
     // ahí si la cadena ha quitado. Es lo ÚNICO que hace informativa esta
@@ -210,26 +255,50 @@ export function panelValidadores(datos) {
 
     // El motivo va en palabras, no solo en el color: quien no distinga el
     // naranja tiene que poder ver igualmente cuál está raro y por qué.
+    const desde = espera(d);
     const nota = d.slashed ? 'slashed'
-      : cola ? `en cola de activación${espera(d.indice) ? ` · ${espera(d.indice)}` : ''}`
+      : fuera ? `esperando a entrar en la cadena${desde ? ` · ${desde}` : ''}`
+      : cola ? `en cola de activación${desde ? ` · esperando ${desde}` : ''}`
       : d.estado !== 'active_ongoing' ? String(d.estado || 'inactivo')
       : penalizado ? 'por debajo del depósito'
       : rezagado ? 'rezagado'
       : reciente ? 'recién activado · aún sin ciclo completo'
       : '';
 
+    /* ⚠ EL QUE ESPERA NO LLEVA ENLACE. El explorador indexa por índice y este
+       no lo tiene: el enlace sería `…/validator/null` y llevaría a un 404. Se
+       pinta como `div`, no como `a`, para que tampoco reciba el foco del
+       teclado — un enlace enfocable que no va a ninguna parte es peor que la
+       falta del enlace. */
+    const cuerpo = `
+        <span class="v-id${fuera ? ' mono' : ''}">${
+          escapar(fuera ? (d.pubkey_corta || 'sin número') : d.indice)}</span>
+        <span class="v-marca">${nBloques ? `⬦${nBloques}` : ''}</span>
+        <!-- Ni ganado ni balance: no es que valgan cero, es que la cadena no
+             sabe nada de él todavía. Un solo guion en la columna del balance
+             lo dice; dos guiones sueltos, uno en cada columna, se leen como
+             dos cifras rotas. -->
+        <span class="v-gan">${fuera ? '' : fmt(ganado)}</span>
+        <span class="v-bal${penalizado ? ' alerta' : ''}">${
+          fuera ? '—' : penalizado ? fmt(balance) : fmtCompacto(balance)}</span>
+        ${nota ? `<span class="v-nota${cola ? ' espera' : ''}">${escapar(nota)}</span>` : ''}`;
+
+    const estilo = `style="--barra:${(fuera ? 0 : (ganado / tope) * 100).toFixed(1)}%${
+      ref != null ? `;--ref:${((ref / tope) * 100).toFixed(1)}%` : ''}"`;
+
+    if (fuera) {
+      return `
+      <div class="vfila espera" ${estilo}
+         title="${escapar(d.pubkey_corta || '')} — hay clave en el NUC y la cadena todavía no la conoce">
+        ${cuerpo}
+      </div>`;
+    }
+
     return `
       <a class="vfila${mal ? ' mal' : ''}" href="${EXPLORADOR}${encodeURIComponent(d.indice)}"
-         target="_blank" rel="noopener noreferrer"
-         style="--barra:${((ganado / tope) * 100).toFixed(1)}%${
-           ref != null ? `;--ref:${((ref / tope) * 100).toFixed(1)}%` : ''}"
+         target="_blank" rel="noopener noreferrer" ${estilo}
          title="Validador ${escapar(d.indice)} · ${escapar(d.pubkey_corta || '')} — ver en g4mm4.io">
-        <span class="v-id">${escapar(d.indice)}</span>
-        <span class="v-marca">${nBloques ? `⬦${nBloques}` : ''}</span>
-        <span class="v-gan">${fmt(ganado)}</span>
-        <span class="v-bal${penalizado ? ' alerta' : ''}">${
-          penalizado ? fmt(balance) : fmtCompacto(balance)}</span>
-        ${nota ? `<span class="v-nota${cola ? ' espera' : ''}">${escapar(nota)}</span>` : ''}
+        ${cuerpo}
       </a>`;
   }).join('');
 

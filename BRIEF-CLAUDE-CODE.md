@@ -49,6 +49,37 @@ Los demás (`comprobar.py`, `explorador.py`, `validacion.py`,
 y saca las pubkeys del disco. **Antes era una lista fija y el undécimo se quedó
 fuera sin que nadie lo notara**: los diez seguían saliendo bien.
 
+### Tres estados, no dos
+
+La beacon API se consulta **por pubkey**, y devuelve solo las que conoce: las
+demás las omite, sin error de ninguna clase. Así que un validador recién
+depositado desaparecía del panel durante las 12-18 h que tarda la cadena en
+adoptarlo. El dato existía en el disco de la misma máquina —el keystore— y no
+se estaba usando. Es la misma cuenta que hace Lighthouse al decir
+`total_validators: 12, active_validators: 11`.
+
+| estado | qué es | cómo se detecta |
+|---|---|---|
+| `esperando` | clave en el disco, la cadena no la conoce | las pubkeys locales que la beacon API no devuelve |
+| `pendiente` | la cadena lo conoce, sin turno de activación | `status` empieza por `pending_` |
+| activo | validando | `status` empieza por `active` |
+
+Los campos que se publican: `total` (los que conoce la cadena), `pendientes`,
+`esperando` y `claves` (= `total + esperando`). Un `esperando` va en `detalle`
+con `indice: null`, sin balance y con `pendiente: true`.
+
+⚠ **El dinero NO cuenta al que espera.** Un keystore no demuestra un depósito
+—se generan antes de depositar—, así que `stake_total`, `balance_total` y
+`ganado_total` siguen contando solo lo que la cadena confirma. De ahí que
+`deposito = stake_total / total` siga dando 32M exactos, que es de donde salen
+el objetivo del panel y el aviso de «ya tienes para uno entero».
+
+**Desde cuándo espera** lo lleva `push.py`, no la cadena: recuerda entre
+ejecuciones cuándo vio esa **pubkey** por primera vez y lo publica en
+`en_cola_desde_ts`. Por pubkey y no por índice a propósito — el índice no existe
+hasta que la cadena adopta el depósito, y llevarlo por índice pondría el reloj a
+cero justo en ese momento.
+
 Datos reales: activados el **7-ago-2026 a las 09:45 UTC**
 (`ACTIVACION_TS = 1786095955`), 32.000.000 PLS por validador, wallet de retirada
 `0x952E0311DdDCe7090d61a275f411a6ddF879BDc8`.
@@ -129,11 +160,29 @@ cortos.
 
 ### Del código
 
+**Un dato que legítimamente no existe, metido en una conversión que da por hecho
+que sí, mata al recolector entero.** Ha pasado dos veces con la misma forma:
+`epoch_a_fecha(2^64-1)` lanzaba `OverflowError`, e `int(d["indice"])` lanza
+`TypeError` cuando el validador aún no tiene índice. Ninguna de las dos está
+envuelta en su bucle, así que la excepción sube hasta arriba y **no se publica
+nada** — el panel se queda DESFASADO durante toda la espera, que es justo
+cuando más se mira. Antes de meter un campo nuevo que pueda venir a `None`,
+buscar todos los `int(...)`, `round(...)` y rebanadas que lo tocan; el que se
+escapó la segunda vez estaba en `imprimir_resumen`, o sea en `--resumen`, que es
+lo primero que se ejecuta a mano cuando algo va raro.
+
 **Una comilla inversa dentro de un comentario que vive dentro de una plantilla
 ha tumbado la página nueve veces.** La comilla cierra la plantilla, el resto del
 fichero se lee como código y el módulo revienta con un error que no señala al
 comentario. Pasa sobre todo en comentarios HTML (`<!-- … -->`) y GLSL dentro de
 literales. `pruebas/sintaxis-test.mjs` lo caza.
+
+**`Number(null)` es `0`, no `NaN`.** Un `.sort((a, b) => Number(a.indice) -
+Number(b.indice))` con un índice ausente no deja el elemento donde estaba: lo
+manda al principio. En la esfera, eso metía al validador nuevo en la primera
+posición y movía de sitio a los once que ya estaban, sin que hubiera pasado
+nada. Donde un campo pueda faltar, el comparador tiene que decirlo a mano
+(`d.indice == null ? Infinity : Number(d.indice)`).
 
 **Una llave `}` de más o de menos en CSS no da error de sintaxis.** El navegador
 cierra el bloque por su cuenta y sigue, así que lo que se ve es que una regla

@@ -12,6 +12,7 @@ import { desglosarSaldo, depositadoEnAmpliaciones } from '/val/v2/paneles/aporta
 import { nodosDesde } from '/val/v2/escena/estado-escena.js';
 import { hitosDesde, panelHitos } from '/val/v2/paneles/hitos.js';
 import { panelValidadores } from '/val/v2/paneles/validadores.js';
+import { tituloObjetivo } from '/val/v2/paneles/trayectoria.js';
 
 let fallos = 0, pruebas = 0;
 const ok = (que, real, esperado) => {
@@ -209,6 +210,150 @@ console.log('\n=== 5. EL RECIÉN LLEGADO NO ARRASTRA AL GRUPO ===');
   };
   okQue('con todos iguales, ninguno es rezagado',
     !/rezagado/.test(panelValidadores(datos)), '');
+}
+
+console.log('\n=== 6. EL QUE ESPERA A ENTRAR EN LA CADENA ===');
+/* El estado un paso ANTES de la cola: hay keystore en el NUC y la beacon API
+   no devuelve nada para esa pubkey. Hasta el 10-sep-2026 el recolector lo
+   descartaba y el panel no tenía absolutamente nada que enseñar durante las
+   12-18 h que tarda la cadena en adoptar el depósito. */
+const PKL = '0xb7c31d55aa0099887766554433221100ffeeddccbbaa99887766554433221100aa';
+/** Uno con clave en disco y sin respuesta de la cadena. */
+const E = (pk = PKL, desde = null) => ({
+  indice: null, pubkey: pk, pubkey_corta: `${pk.slice(0, 8)}…${pk.slice(-6)}`,
+  estado: 'esperando', pendiente: true, esperando: true,
+  balance: null, ganado: null, slashed: false,
+  activacion_ts: null, activation_epoch: null, en_cola_desde_ts: desde,
+});
+
+/* `total` cuenta SOLO lo que la cadena conoce — de ahí sale
+   `deposito = stake_total / total`— y `claves` lo que hay en el disco. */
+const conEspera = (enCadena, esperan) => ({
+  generado_ts: AHORA - 60, salud: 'ok',
+  validadores: {
+    total: enCadena.length,
+    activos: enCadena.filter(d => d.estado.startsWith('active')).length,
+    pendientes: enCadena.filter(d => d.pendiente).length,
+    esperando: esperan.length,
+    claves: enCadena.length + esperan.length,
+    slashed: 0,
+    stake_total: DEPOSITO * enCadena.length,
+    detalle: [...enCadena, ...esperan],
+  },
+  nodo: { sincronizado: true, optimistic: false },
+});
+
+{
+  const estado = conEspera(ONCE, [E()]);
+  const s = saludGlobal({ sesion: true, ahoraS: AHORA, estado });
+  ok('nada va mal por esperar', [s.palabra, s.tono], ['OPERATIVO', 'ok']);
+  okQue('y se dice con esas palabras',
+    /Un validador esperando a entrar en la cadena/.test(s.nota || ''), s.nota);
+  okQue('sin llamarlo «en cola», que es otra cosa',
+    !/en cola/.test(s.nota || ''), s.nota);
+}
+{
+  // Las dos esperas a la vez, que es lo que pasa si amplías de dos en dos.
+  const s = saludGlobal({ sesion: true, ahoraS: AHORA,
+    estado: conEspera([...ONCE, P(110500)], [E()]) });
+  okQue('las dos esperas se distinguen en la misma frase',
+    /esperando a entrar en la cadena/.test(s.nota) && /en cola de activación/.test(s.nota),
+    s.nota);
+  ok('y sigue sin ser un aviso', s.tono, 'ok');
+}
+{
+  // Un caído de verdad manda sobre las dos.
+  const s = saludGlobal({ sesion: true, ahoraS: AHORA,
+    estado: conEspera([...ONCE.slice(0, 10), X(109876)], [E()]) });
+  ok('un caído sigue mandando', s.palabra, 'AVISO');
+}
+
+{
+  const nodos = nodosDesde(conEspera(ONCE, [E()]).validadores.detalle, {});
+  ok('la esfera enseña doce nodos', nodos.length, 12);
+  /* ⚠ EL ORDEN IMPORTA MÁS DE LO QUE PARECE. Las posiciones se reparten por el
+     orden del array, y `Number(null)` es 0 —no NaN—: sin ordenar a propósito,
+     el nodo nuevo se colaba en la PRIMERA posición y movía de sitio a los once
+     que ya estaban, sin que hubiera pasado nada. */
+  ok('y el que espera va el último', nodos[11].indice, null);
+  ok('los once de siempre no se mueven', nodos[0].indice, 109549);
+  ok('el que espera late', nodos[11].pendiente, true);
+  ok('marcado como lo que es', nodos[11].esperando, true);
+  ok('y no como activo', nodos[11].activo, false);
+  okQue('con su pubkey para poder nombrarlo', /…/.test(nodos[11].pubkeyCorta || ''), '');
+  okQue('los demás no laten', nodos.filter(n => n.pendiente).length === 1);
+}
+
+{
+  const { hitos, enCola, esperando } = hitosDesde(conEspera(ONCE, [E()]).validadores.detalle, 0);
+  ok('los hitos con fecha no cambian', hitos.length, 2);
+  ok('el que espera va aparte de la cola', esperando.length, 1);
+  ok('y la cola sigue vacía', enCola.length, 0);
+  const html = panelHitos({ estado: conEspera(ONCE, [E()]) });
+  okQue('la línea temporal lo enseña', /esperando a entrar en la cadena/.test(html), '');
+  okQue('llamándolo por su clave, que es lo único que tiene',
+    /0xb7c31d/.test(html), '');
+}
+
+{
+  // Once iguales: así el «1 con aviso» que se vigila abajo solo puede venir
+  // del que espera, que es justo lo que hay que descartar.
+  const iguales = [...Array(11)].map((_, i) => A(109549 + i, 30, 5000));
+  const datos = {
+    ahoraS: AHORA,
+    estado: conEspera(iguales, [E(PKL, AHORA - 3 * 3600)]),
+    ganancia: { ciclos: [{ ts: AHORA - 3600 }], por_validador: {} },
+    eventos: [],
+  };
+  const html = panelValidadores(datos);
+  okQue('la tabla lo enseña', /esperando a entrar en la cadena/.test(html), '');
+  okQue('y desde cuándo, del campo del recolector',
+    /esperando a entrar en la cadena · 3 h/.test(html), '');
+  okQue('sin repetir «esperando» dos veces en la misma nota',
+    !/esperando a entrar en la cadena · esperando/.test(html), '');
+  /* ⚠ SIN ENLACE. El explorador indexa por índice y éste no tiene: el enlace
+     sería `/validator/null` y llevaría a un 404. Se pinta como `div`. */
+  okQue('sin enlace al explorador, que sería un 404',
+    !/validator\/null/.test(html), 'hay un enlace a /validator/null');
+  okQue('y no como fila enfocable', /<div class="vfila espera"/.test(html), '');
+  okQue('no se le inventa un balance', !/>0<\/span>\s*<span class="v-nota espera/.test(html), '');
+  okQue('y no cuenta como problema', !/1 con aviso/.test(html), '');
+}
+{
+  // El de verdad: que no tape a un rezagado, igual que el de la cola.
+  const sanos = [...Array(10)].map((_, i) => A(109549 + i, 30, 5000));
+  const cojo = A(109876, 30, 3900);
+  const html = panelValidadores({
+    ahoraS: AHORA, estado: conEspera([...sanos, cojo], [E()]),
+    ganancia: { ciclos: [{ ts: AHORA - 3600 }], por_validador: {} }, eventos: [],
+  });
+  okQue('el rezagado de verdad SIGUE saliendo', /rezagado/.test(html), '');
+}
+
+{
+  /* ⚠ EL OBJETIVO NO PUEDE PARPADEAR. `total` son los que conoce la cadena, así
+     que sin sumar el que espera el título decía «Validador #12» mientras el
+     #12 estaba entrando, y saltaba a #13 al adoptarlo. */
+  ok('el objetivo cuenta el que ya has depositado',
+    tituloObjetivo(conEspera(ONCE, [E()])), 'Validador #13');
+  ok('y no cambia cuando la cadena lo adopta',
+    tituloObjetivo(conEspera([...ONCE, P(110500)], [])), 'Validador #13');
+  ok('sin nadie esperando, como siempre',
+    tituloObjetivo(conEspera(ONCE, [])), 'Validador #12');
+}
+
+{
+  /* El dinero: si has depositado, la wallet bajó 32M. Sin contarlo, el panel
+     diría que se han ido 32M — el fallo que ya se arregló para los de la cola,
+     un paso antes. */
+  const datos = {
+    estado: conEspera(ONCE, [E()]),
+    ganancia: { saldo_wallet: 8e6, total: 60e6 },
+    aportaciones: { total_pls: 12e6, aportaciones: [{ id: 1 }] },
+  };
+  ok('el que espera cuenta como depósito', depositadoEnAmpliaciones(datos), 64e6);
+  ok('y la cuenta cuadra', Math.round(desglosarSaldo(datos).resto), 0);
+  okQue('así que nada aparece como «salido»', !desglosarSaldo(datos).restoVisible, '');
 }
 
 console.log('\n' + '='.repeat(52));

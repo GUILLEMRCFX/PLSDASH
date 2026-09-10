@@ -53,9 +53,16 @@ import { fmt, fmtCompacto, escapar } from './formato.js';
  * se dice «siguiente validador» en vez de inventarse un número.
  */
 export function tituloObjetivo(estado) {
-  const total = Number(estado?.validadores?.total);
+  const v = estado?.validadores || {};
+  const total = Number(v.total);
+  /* ⚠ CUENTAN TAMBIÉN LOS QUE ESPERAN. `total` son los que la cadena conoce, y
+     el que acabas de depositar no está ahí todavía: sin sumarlo, el objetivo
+     sería «Validador #12» mientras el #12 está entrando, y saltaría a #13 solo
+     cuando la cadena lo adoptase. El objetivo es el siguiente que NO tienes,
+     y una clave en el disco ya la tienes. */
+  const espera = Number(v.esperando) || 0;
   return Number.isFinite(total) && total > 0
-    ? `Validador #${total + 1}`
+    ? `Validador #${total + espera + 1}`
     : 'Siguiente validador';
 }
 

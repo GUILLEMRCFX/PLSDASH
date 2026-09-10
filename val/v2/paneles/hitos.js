@@ -32,6 +32,11 @@
  *   la tienen. `activation_epoch` vale el futuro lejano hasta que el protocolo
  *   les asigna turno. Salen como un hito abierto al final, sin fecha, que es
  *   exactamente lo que son.
+ *
+ *   Y hay un paso antes: el que tiene la clave en el disco del NUC y la cadena
+ *   todavía no conoce. Ése ni siquiera tiene índice. Va en su propio hito
+ *   abierto, porque decir «en cola» de algo que la cadena no ha visto sería
+ *   contar una espera que aún no ha empezado.
  */
 
 import { fmt, escapar } from './formato.js';
@@ -45,13 +50,17 @@ export const TITULO = 'Cómo se ha construido';
  * entran en epochs consecutivas, con minutos de diferencia, y enseñarlos como
  * diez hitos sería enseñar el mismo hecho diez veces.
  *
- * @returns {{hitos:Array, enCola:Array}} hitos de más antiguo a más nuevo.
+ * @returns {{hitos:Array, enCola:Array, esperando:Array}} hitos de más antiguo
+ *   a más nuevo; `enCola` los que la cadena conoce sin turno, y `esperando`
+ *   los que la cadena no conoce todavía.
  */
 export function hitosDesde(detalle = [], tzMin = new Date().getTimezoneOffset()) {
   const enCola = [];
+  const esperando = [];
   const porDia = new Map();
 
   for (const d of detalle) {
+    if (d.esperando === true || d.estado === 'esperando') { esperando.push(d); continue; }
     const ts = Number(d.activacion_ts);
     if (!Number.isFinite(ts) || ts <= 0) { enCola.push(d); continue; }
     // El día, en la hora de quien mira: una activación de las 00:30 en España
@@ -71,7 +80,11 @@ export function hitosDesde(detalle = [], tzMin = new Date().getTimezoneOffset())
   let suma = 0;
   for (const h of hitos) { suma += h.indices.length; h.acumulado = suma; }
 
-  return { hitos, enCola: enCola.sort((a, b) => Number(a.indice) - Number(b.indice)) };
+  return {
+    hitos,
+    enCola: enCola.sort((a, b) => Number(a.indice) - Number(b.indice)),
+    esperando,
+  };
 }
 
 const FECHA = { day: 'numeric', month: 'long', year: 'numeric' };
@@ -101,8 +114,8 @@ export function panelHitos(datos) {
       </section>`;
   }
 
-  const { hitos, enCola } = hitosDesde(detalle);
-  if (!hitos.length && !enCola.length) {
+  const { hitos, enCola, esperando } = hitosDesde(detalle);
+  if (!hitos.length && !enCola.length && !esperando.length) {
     return `
       <section class="panel" aria-labelledby="ph-t">
         <header class="p-cab"><h2 id="ph-t">${TITULO}</h2></header>
@@ -134,13 +147,26 @@ export function panelHitos(datos) {
         <span class="hi-acum">esperando turno</span>
       </li>`;
 
+  /* El hito de más arriba de todos: la clave existe y la cadena no la conoce.
+     Se le llama por la pubkey porque índice no tiene. */
+  const espera = !esperando.length ? '' : `
+      <li class="hi-fila hi-cola">
+        <span class="hi-punto" aria-hidden="true"></span>
+        <span class="hi-fecha">sin fecha</span>
+        <span class="hi-que">${escapar(cuantos(esperando.length))}</span>
+        <span class="hi-idx mono">${escapar(esperando.length === 1
+          ? (esperando[0].pubkey_corta || '')
+          : `${esperando.length} claves`)}</span>
+        <span class="hi-acum">esperando a entrar en la cadena</span>
+      </li>`;
+
   return `
     <section class="panel" aria-labelledby="ph-t">
       <header class="p-cab">
         <h2 id="ph-t">${TITULO}</h2>
         <span class="p-marca">${fmt(detalle.length)}</span>
       </header>
-      <ol class="hi-lista">${filas}${cola}</ol>
+      <ol class="hi-lista">${filas}${cola}${espera}</ol>
       <p class="c-sub">Cada hito es un día con activaciones. Los que entraron
         juntos van en la misma línea: diez depósitos a la vez se activan con
         minutos de diferencia y contarlos por separado sería el mismo hecho

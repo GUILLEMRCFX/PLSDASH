@@ -333,11 +333,18 @@
     escalon: ['alto', 'medio', 'bajo'].includes(forzado) ? forzado : null,
     alSenalar(n) {
       if (!n) { rotulo.hidden = true; return; }
-      rotulo.querySelector('.r-id').textContent = n.indice;
+      /* Sin índice —la cadena aún no lo conoce— se le llama por su clave,
+         que es lo único que tiene. Poner «null» ahí sería peor que no poner
+         nada. */
+      rotulo.querySelector('.r-id').textContent =
+        n.indice == null ? (n.pubkeyCorta || 'sin número') : n.indice;
       /* El que espera turno no tiene bloques que contar, y decir «0 bloques»
          sería contestar a la pregunta equivocada: lo que hay que saber de él
-         es que aún no ha empezado. */
-      rotulo.querySelector('.r-blq').textContent = n.pendiente
+         es que aún no ha empezado. Y las dos esperas no son la misma: una
+         está en la cadena sin turno, la otra ni siquiera la conoce. */
+      rotulo.querySelector('.r-blq').textContent = n.esperando
+        ? 'esperando a entrar en la cadena'
+        : n.pendiente
         ? 'esperando activación'
         : n.bloques === 1 ? '1 bloque' : `${n.bloques} bloques`;
       // Pendiente NO es inactivo: no se pinta en el color de lo que va mal.

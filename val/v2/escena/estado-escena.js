@@ -76,12 +76,25 @@ const acotar = (n, min = 0, max = 1) => Math.max(min, Math.min(max, n));
  *   endpoint no promete ningún orden.
  */
 export function nodosDesde(detalle = [], porValidador = {}) {
-  const lista = [...detalle].sort((a, b) => Number(a.indice) - Number(b.indice));
+  /* ⚠ EL QUE ESPERA NO TIENE ÍNDICE —la cadena aún no se lo ha dado— y
+     `Number(null)` es 0, no NaN: sin este orden explícito el nodo nuevo se
+     colaría en la PRIMERA posición de la esfera y empujaría a los once de
+     sitio. Va al final, que además es donde tiene sentido: es el último que
+     ha llegado. */
+  const orden = d => {
+    const i = Number(d?.indice);
+    return Number.isFinite(i) && d?.indice != null ? i : Number.POSITIVE_INFINITY;
+  };
+  const lista = [...detalle].sort((a, b) => orden(a) - orden(b));
   const bloques = lista.map(d => Number(porValidador[d.indice]) || 0);
   const max = Math.max(0, ...bloques);
 
   return lista.map((d, i) => ({
-    indice: Number(d.indice),
+    indice: d.indice == null ? null : Number(d.indice),
+    // La pubkey corta es lo único con lo que se le puede llamar mientras no
+    // tenga número. El rótulo de la esfera la usa en su lugar.
+    pubkeyCorta: d.pubkey_corta || null,
+    esperando: d.esperando === true || d.estado === 'esperando',
     bloques: bloques[i],
     // Sin datos de bloques —el explorador no responde— todos valen lo mismo.
     // Inventar un reparto sería pintar una diferencia que no se sabe si existe.
@@ -92,7 +105,8 @@ export function nodosDesde(detalle = [], porValidador = {}) {
        `active_ongoing`, asi que con dos estados salia con la intensidad del
        suelo y el halo apagado: idéntico a uno muerto. Y es lo contrario — está
        a punto de empezar. La esfera lo late; ver `esfera.js`. */
-    pendiente: d.pendiente === true || String(d.estado || '').startsWith('pending'),
+    pendiente: d.pendiente === true || String(d.estado || '').startsWith('pending')
+      || d.estado === 'esperando',
     // Para el rótulo al señalarlo: desde cuándo espera, si se sabe.
     estado: d.estado || null,
     enColaDesdeTs: Number(d.en_cola_desde_ts) || null,

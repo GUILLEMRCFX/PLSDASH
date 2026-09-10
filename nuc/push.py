@@ -151,6 +151,74 @@ def guardar_estado_local(estado):
 # Detección de eventos
 # ----------------------------------------------------------------------
 
+def _idx(d):
+    """El indice como entero, o None.
+
+    ⚠ UN VALIDADOR QUE ESPERA NO TIENE INDICE: la cadena aun no se lo ha
+      dado. Sin este guarda, `int(d["indice"])` lanza TypeError con `None`,
+      el push muere y no se publica nada — el mismo agujero exacto que el
+      OverflowError de `epoch_a_fecha`, y por el mismo motivo: un dato que
+      legitimamente no existe metido en una conversion que asume que si.
+    """
+    i = d.get("indice")
+    if i is None:
+        return None
+    try:
+        return int(i)
+    except (TypeError, ValueError):
+        return None
+
+
+def _indices(detalle, filtro):
+    """Los indices de los que cumplen `filtro`, sin los que no tienen."""
+    return sorted(i for i in (_idx(d) for d in detalle if filtro(d)) if i is not None)
+
+
+def _pubkeys(detalle, filtro):
+    return sorted(str(d.get("pubkey")) for d in detalle
+                  if filtro(d) and d.get("pubkey"))
+
+
+def _espera(d):
+    return bool(d.get("esperando"))
+
+
+def marcar_espera(datos, previo):
+    """Rellena `en_cola_desde_ts` y devuelve el mapa actualizado.
+
+    ⚠ LA CLAVE ES LA PUBKEY, NO EL INDICE, y no es un detalle. El indice no
+      existe hasta que la cadena adopta el deposito, asi que llevar la cuenta
+      por indice pondria el reloj a cero justo en el momento en que pasa de
+      «esperando» a «en cola» — el panel diria «esperando 0 h» despues de
+      doce horas de espera. Por pubkey, la cuenta es continua desde la
+      primera vez que se vio la clave hasta que se activa.
+
+    Ni la beacon API ni los keystores traen esta fecha. El unico que puede
+    saberla es este script, que corre cada pocos minutos y recuerda entre
+    ejecuciones. Es una aproximacion por arriba —«al menos desde»— y se
+    documenta como tal.
+    """
+    v = datos.get("validadores") or {}
+    detalle = v.get("detalle") or []
+    ahora = datos.get("generado_ts")
+    visto = dict(previo.get("visto_desde") or {})
+
+    esperan = [d for d in detalle if d.get("pendiente") or _espera(d)]
+    for d in esperan:
+        pk = str(d.get("pubkey") or "")
+        if not pk:
+            continue
+        if pk not in visto:
+            visto[pk] = ahora
+        d["en_cola_desde_ts"] = visto[pk]
+
+    # Los que ya validan sueltan su marca: si algun dia vuelven a esperar
+    # —no pasa, pero el fichero no deberia crecer para siempre— se cuenta de
+    # nuevo desde cero.
+    vivos = {str(d.get("pubkey") or "") for d in esperan}
+    return {pk: ts for pk, ts in visto.items() if pk in vivos}
+
+
 def detectar_eventos(datos, previo):
     """Compara con la ejecución anterior y devuelve eventos nuevos."""
     eventos = []
@@ -179,11 +247,30 @@ def detectar_eventos(datos, previo):
     #   Sin lista previa —primera ejecucion tras actualizar— no se inventa
     #   nada: se cae al comportamiento de antes, que es el recuento.
     # ─────────────────────────────────────────────────────────────────────
-    act_ahora = sorted(int(d["indice"]) for d in detalle
-                       if str(d.get("estado", "")).startswith("active"))
+    act_ahora = _indices(detalle, lambda d: str(d.get("estado", "")).startswith("active"))
     act_prev = previo.get("activos_indices")
-    pend_ahora = sorted(int(d["indice"]) for d in detalle if d.get("pendiente"))
+    # Solo los que la cadena YA conoce: el que espera no tiene indice, y se
+    # lleva aparte por pubkey unas lineas mas abajo.
+    pend_ahora = _indices(detalle, lambda d: d.get("pendiente") and not _espera(d))
     pend_prev = previo.get("pendientes_indices")
+
+    # ── Los que esperan a que la cadena los conozca ──────────────────────
+    #
+    # Se anuncian AQUI, en cuanto aparece la clave en el disco, y no doce
+    # horas despues cuando la cadena la adopta. Es la primera noticia que
+    # puede dar el panel de que has ampliado.
+    esp_ahora = _pubkeys(detalle, _espera)
+    esp_prev = previo.get("esperando_pubkeys")
+    if esp_prev is not None:
+        cortas = {str(d.get("pubkey")): d.get("pubkey_corta") for d in detalle}
+        for pk in esp_ahora:
+            if pk in set(esp_prev):
+                continue
+            eventos.append((ahora, "aviso",
+                            "Validador nuevo esperando a entrar en la cadena",
+                            f"Clave {cortas.get(pk) or pk[:12]} · "
+                            "depositado o a punto, la cadena aun no lo conoce",
+                            None, None))
 
     if act_prev is not None:
         antes_act = set(act_prev)
@@ -212,8 +299,18 @@ def detectar_eventos(datos, previo):
                 eventos.append((ahora, "caida", f"Validador {i} inactivo",
                                 resumen, None, i))
 
+        # ⚠ NO SE REPITE LO YA ANUNCIADO. Si esta pubkey ya salio como
+        #   «esperando a entrar en la cadena», que ahora la cadena le haya
+        #   dado numero es el mismo hecho un paso mas adelante, no uno nuevo.
+        #   El registro contaria dos veces la misma ampliacion.
+        ya_anunciadas = set(previo.get("esperando_pubkeys") or [])
+        pk_de = {}
+        for d in detalle:
+            i = _idx(d)
+            if i is not None:
+                pk_de[i] = str(d.get("pubkey") or "")
         for i in pend_ahora:
-            if i not in conocidos:
+            if i not in conocidos and pk_de.get(i) not in ya_anunciadas:
                 eventos.append((ahora, "aviso", f"Validador {i} en cola de activacion",
                                 "Depositado, esperando turno", None, i))
     else:
@@ -368,6 +465,12 @@ def guardar_validadores_dia(cfg, datos, fecha):
     """
     v = datos.get("validadores") or {}
     for x in v.get("detalle", []):
+        # El que espera no entra: la clave de esta tabla es (fecha, indice) y
+        # todavia no tiene indice. Tampoco tendria nada que guardar — ni
+        # balance ni ganado — asi que la fila seria una fila vacia con la
+        # clave a NULL.
+        if _idx(x) is None:
+            continue
         sql = ("INSERT OR REPLACE INTO validador_diario "
                "(fecha, indice, balance, ganado, estado) VALUES (?,?,?,?,?)")
         d1_query(cfg, sql, [fecha, x["indice"], x["balance"], x["ganado"], x["estado"]])
@@ -437,6 +540,11 @@ def main():
     v = datos.get("validadores") or {}
     n = datos.get("nodo") or {}
 
+    # 0 · Desde cuándo espera cada uno. ⚠ ANTES DE PUBLICAR: `marcar_espera`
+    #     escribe `en_cola_desde_ts` dentro de `datos`, y si esto fuera
+    #     después el panel recibiría el campo a `None` durante toda la espera.
+    visto_desde = marcar_espera(datos, previo)
+
     # 1 · Estado actual → KV (siempre)
     publicar_kv(cfg, datos)
 
@@ -471,13 +579,18 @@ def main():
         "activos": v.get("activos"),
         # Los INDICES, no solo el recuento: es lo unico que distingue una
         # activacion de una recuperacion. Ver `detectar_eventos`.
-        "activos_indices": sorted(int(d["indice"]) for d in (v.get("detalle") or [])
-                                  if str(d.get("estado", "")).startswith("active")),
-        "pendientes_indices": sorted(int(d["indice"]) for d in (v.get("detalle") or [])
-                                     if d.get("pendiente")),
-        "inactivos_indices": sorted(int(d["indice"]) for d in (v.get("detalle") or [])
-                                    if not str(d.get("estado", "")).startswith("active")
-                                    and not d.get("pendiente")),
+        "activos_indices": _indices(v.get("detalle") or [],
+                                    lambda d: str(d.get("estado", "")).startswith("active")),
+        "pendientes_indices": _indices(v.get("detalle") or [],
+                                       lambda d: d.get("pendiente") and not _espera(d)),
+        "inactivos_indices": _indices(
+            v.get("detalle") or [],
+            lambda d: not str(d.get("estado", "")).startswith("active")
+            and not d.get("pendiente")),
+        # Por pubkey, porque es lo unico que tienen: sin indice no hay lista de
+        # indices que valga.
+        "esperando_pubkeys": _pubkeys(v.get("detalle") or [], _espera),
+        "visto_desde": visto_desde,
         "slashed": v.get("slashed", 0),
         "ganado": v.get("ganado_total"),
         "uptime_horas": n.get("uptime_horas"),
@@ -488,8 +601,10 @@ def main():
     })
 
     marca = "[dry] " if DRY else ""
+    espera = v.get("esperando") or 0
     print(f"{marca}OK · {v.get('activos')}/{v.get('total')} activos · "
-          f"{v.get('ganado_total'):,.0f} PLS · salud {datos.get('salud')}")
+          + (f"{espera} esperando · " if espera else "")
+          + f"{v.get('ganado_total'):,.0f} PLS · salud {datos.get('salud')}")
 
 
 if __name__ == "__main__":

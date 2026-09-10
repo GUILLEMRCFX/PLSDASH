@@ -41,6 +41,11 @@ def _pubkeys_locales():
             pass
     return sorted(pk)
 
+
+def _corta(pubkey):
+    """`0x8f3a…b12c9d` — la pubkey como se puede leer de un vistazo."""
+    return pubkey[:8] + "…" + pubkey[-6:]
+
 STAKE_POR_VALIDADOR = 32_000_000                  # PLS
 GENESIS_TIME = 1683785555                         # de /eth/v1/beacon/genesis
 SLOTS_POR_EPOCH = 32
@@ -158,9 +163,41 @@ def leer_validadores():
 
     Ese mismo dato es el que permite no marcar como «rezagado» a un
     validador que simplemente acaba de entrar.
+
+    ─────────────────────────────────────────────────────────────────────
+    TRES ESTADOS, NO DOS
+
+    Esta funcion pregunta a la beacon API POR PUBKEY. Mientras la cadena no
+    ha adoptado un deposito, esa pubkey NO VIENE EN LA RESPUESTA: el
+    endpoint devuelve los que conoce y omite los demas, sin error. Hasta el
+    10-sep-2026 el validador nuevo desaparecia ahi, en silencio, y el panel
+    no tenia nada que enseñar durante las 12-18 h que tarda la adopcion.
+
+    Pero el dato SI existe, y esta en el disco de esta misma maquina: los
+    keystores. Si hay doce claves y la cadena devuelve once, la que falta es
+    la que espera. Es la misma cuenta que hace Lighthouse cuando dice
+    `total_validators: 12, active_validators: 11`.
+
+    Asi que se publican tres estados:
+
+      · esperando  — clave en el disco, la cadena no la conoce todavia.
+      · pendiente  — la cadena la conoce y no le ha dado turno (`pending_*`).
+      · activo     — validando.
+
+    ⚠ LO QUE NO SE HACE: mover el dinero. Una clave en el disco NO demuestra
+      que se haya depositado — se generan antes de depositar—, asi que
+      `stake_total`, `balance_total` y `ganado_total` siguen contando SOLO lo
+      que la cadena confirma. De ahi que el estado se llame «esperando
+      deposito o procesamiento»: desde aqui las dos cosas se ven igual, y
+      sumar 32M por una clave recien generada seria inventarse un ingreso.
+
+      La consecuencia buena de esa decision: `deposito = stake_total / total`
+      sigue dando 32M exactos, que es de donde salen el objetivo del panel y
+      el aviso de «ya tienes para uno entero».
     ─────────────────────────────────────────────────────────────────────
     """
-    ids = ",".join(_pubkeys_locales())
+    locales = _pubkeys_locales()
+    ids = ",".join(locales)
     data = get_json(f"{BEACON}/eth/v1/beacon/states/head/validators?id={ids}")
     if not data:
         return None
@@ -171,6 +208,7 @@ def leer_validadores():
     pendientes = 0
     slashed = 0
     activation_epoch_min = None
+    en_cadena = set()
 
     ahora_utc = datetime.now(timezone.utc)
 
@@ -200,12 +238,15 @@ def leer_validadores():
             activation_epoch_min = act_epoch
 
         total_balance += balance
+        en_cadena.add(str(info["pubkey"]).lower())
         validadores.append({
             "indice": int(v["index"]),
             "pubkey": info["pubkey"],
-            "pubkey_corta": info["pubkey"][:8] + "…" + info["pubkey"][-6:],
+            "pubkey_corta": _corta(info["pubkey"]),
             "estado": estado,
             "pendiente": pendiente,
+            # En la cadena, aunque sin turno. Ver el bloque de los tres estados.
+            "esperando": False,
             "balance": round(balance, 4),
             "ganado": round(ganado, 4),
             "slashed": info.get("slashed", False),
@@ -225,7 +266,48 @@ def leer_validadores():
             "en_cola_desde_ts": None,
         })
 
-    stake_total = STAKE_POR_VALIDADOR * len(validadores)
+    # ── Los que tienen clave aqui y la cadena aun no conoce ──────────────
+    #
+    # No se descartan: se publican por lo que son. Sin indice —la cadena no
+    # se lo ha dado todavia— y sin balance, porque desde aqui no se puede
+    # saber si el deposito esta hecho. Lo que si se sabe con certeza es que
+    # la clave existe, y eso es lo que se enseña.
+    en_cadena_total = len(validadores)
+    esperando = []
+    for pk in locales:
+        if pk.lower() in en_cadena:
+            continue
+        esperando.append({
+            "indice": None,
+            "pubkey": pk,
+            "pubkey_corta": _corta(pk),
+            "estado": "esperando",
+            # `pendiente` es el paraguas —«aun no valida, y eso no es un
+            # fallo»— y `esperando` la distincion fina. El panel usa el
+            # primero para no marcarlo en rojo y el segundo para decir por
+            # que espera.
+            "pendiente": True,
+            "esperando": True,
+            "balance": None,
+            "ganado": None,
+            "slashed": False,
+            "activation_epoch": None,
+            "activacion_ts": None,
+            "activacion_utc": None,
+            "horas_activo": None,
+            # Desde cuando espera. Lo fija `push.py`, que es quien recuerda
+            # entre ejecuciones cuando vio esta pubkey por primera vez.
+            "en_cola_desde_ts": None,
+        })
+    validadores.extend(esperando)
+
+    # ⚠ SOBRE `en_cadena_total` Y NO `len(validadores)`: el dinero cuenta solo
+    #   lo que la cadena confirma. Si aqui entrara el que espera, `stake_total`
+    #   subiria 32M sin que nadie los haya depositado necesariamente, y peor:
+    #   `ganado_total = balance_total - stake_total` se iria 32M por debajo,
+    #   envenenando el APR, el reparto del saldo y el titular. Ver el bloque de
+    #   los tres estados en la cabecera.
+    stake_total = STAKE_POR_VALIDADOR * en_cadena_total
     ganado_total = total_balance - stake_total
 
     # Puede no haber NINGUNA activacion real: los primeros minutos tras el
@@ -243,11 +325,18 @@ def leer_validadores():
     apr = None
 
     return {
-        "total": len(validadores),
+        # Los que la cadena conoce. `deposito = stake_total / total` depende de
+        # que estos dos vayan del mismo conjunto.
+        "total": en_cadena_total,
         "activos": activos,
         # Depositados y esperando turno. Se publica aparte para que el panel
         # pueda decir «1 en cola» en vez de «1 fuera de servicio».
         "pendientes": pendientes,
+        # Con clave en el disco y sin respuesta de la cadena.
+        "esperando": len(esperando),
+        # Lo que dice Lighthouse en sus logs: `total_validators`. Es el numero
+        # de claves que hay, lo sepa la cadena o no.
+        "claves": en_cadena_total + len(esperando),
         "slashed": slashed,
         "balance_total": round(total_balance, 4),
         "stake_total": stake_total,
@@ -361,6 +450,10 @@ def salud_de(vals, nodo):
       recien depositado pasa en la cola de activacion. No va mal: es lo que
       pasa cuando amplias, y es justo el dia que mas se mira el panel. Lo que
       si es un aviso son los que faltan por CUALQUIER OTRO motivo.
+
+      Los que estan ESPERANDO —clave en disco, la cadena no los conoce— no
+      entran en esta cuenta por construccion: `total` solo cuenta lo que la
+      cadena devuelve, asi que no pueden restar de nada.
     """
     if vals is None or nodo is None:
         return "sin_datos"
@@ -402,12 +495,25 @@ def imprimir_resumen(d):
 
     if v:
         print(f"\n  VALIDADORES")
-        print(f"    Activos          {v['activos']}/{v['total']}")
+        print(f"    Activos          {v['activos']}/{v['total']}"
+              + (f"  ({v['claves']} claves en disco)" if v.get("esperando") else ""))
+        if v.get("pendientes"):
+            print(f"    En cola          {v['pendientes']} — depositado, esperando turno")
+        if v.get("esperando"):
+            print(f"    Esperando        {v['esperando']} — clave en disco, la cadena no la conoce")
         print(f"    En staking       {v['balance_total']:,.0f} PLS")
         print(f"    Ganado           {v['ganado_total']:,.2f} PLS")
         print(f"    Ritmo y APR      los calcula el panel (ver cabecera de leer_validadores)")
-        print(f"    Primera alta     {v['activacion_utc'][:16].replace('T', ' ')} ({v['horas_activo']:.0f} h)")
-        antiguedades = sorted({round(x["horas_activo"]) for x in v["detalle"]})
+        # ⚠ Los dos `None` de aqui abajo son reales, no defensivos: el que
+        #   espera no tiene fecha de alta, y el dia del primer deposito de
+        #   todos NADIE la tiene. Sin estos guardas, `--resumen` revienta
+        #   justo el dia que se usa.
+        if v.get("activacion_utc"):
+            print(f"    Primera alta     {v['activacion_utc'][:16].replace('T', ' ')} ({v['horas_activo']:.0f} h)")
+        else:
+            print(f"    Primera alta     ninguna todavia")
+        antiguedades = sorted({round(x["horas_activo"]) for x in v["detalle"]
+                               if x.get("horas_activo") is not None})
         if len(antiguedades) > 1:
             print(f"    Antigüedades     {antiguedades} h — NO son todos iguales")
         if v["slashed"]:
@@ -433,8 +539,13 @@ def imprimir_resumen(d):
     if v and v.get("detalle"):
         print(f"\n  DETALLE")
         for x in v["detalle"]:
+            if x.get("esperando"):
+                print(f"   · {'—':>9}  {x['pubkey_corta']}  {'esperando a entrar en la cadena':>30}")
+                continue
             marca = " " if x["estado"].startswith("active") else "!"
-            print(f"   {marca} {x['indice']}  {x['pubkey_corta']}  {x['balance']:>14,.2f}  +{x['ganado']:>8,.2f}")
+            bal = "sin dato" if x["balance"] is None else f"{x['balance']:,.2f}"
+            gan = "" if x["ganado"] is None else f"  +{x['ganado']:>8,.2f}"
+            print(f"   {marca} {x['indice']}  {x['pubkey_corta']}  {bal:>14}{gan}")
     print()
 
 

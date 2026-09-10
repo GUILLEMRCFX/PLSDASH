@@ -165,12 +165,31 @@ export function saludGlobal(datos) {
                : `${fuera} validadores fuera de servicio.` };
   }
   /* La cola sí se dice, pero no como aviso: es informacion, y el tono es el
-     mismo que cuando todo va bien. */
-  if (enCola > 0) {
-    return { palabra: 'OPERATIVO', tono: 'ok',
-             nota: enCola === 1
-               ? 'Un validador en cola de activación.'
-               : `${enCola} validadores en cola de activación.` };
+     mismo que cuando todo va bien.
+
+     ⚠ SON DOS ESPERAS DISTINTAS y se cuentan aparte:
+
+       · `esperando`  — hay una clave en el disco de la que la cadena no sabe
+         nada. Es lo PRIMERO que se puede decir al ampliar: aparece en cuanto
+         el keystore existe, no doce horas después.
+       · `pendientes` — la cadena ya lo conoce y no le ha dado turno.
+
+     Un validador nuevo pasa por las dos, en ese orden, y la frase cambia con
+     él. Ninguna de las dos es un aviso. */
+  const esperando = Number(v.esperando) || 0;
+  if (enCola > 0 || esperando > 0) {
+    const partes = [];
+    if (esperando > 0) {
+      partes.push(esperando === 1
+        ? 'Un validador esperando a entrar en la cadena'
+        : `${esperando} validadores esperando a entrar en la cadena`);
+    }
+    if (enCola > 0) {
+      partes.push(enCola === 1
+        ? (esperando > 0 ? 'otro en cola de activación' : 'Un validador en cola de activación')
+        : `${enCola} ${esperando > 0 ? 'más' : 'validadores'} en cola de activación`);
+    }
+    return { palabra: 'OPERATIVO', tono: 'ok', nota: `${partes.join(' · ')}.` };
   }
   if (estado.salud === 'aviso' || n.optimistic) {
     return { palabra: 'AVISO', tono: 'aviso',
