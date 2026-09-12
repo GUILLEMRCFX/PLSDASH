@@ -20,6 +20,7 @@ SIN_NAVEGADOR=(
   "pruebas/inversiones-test.mjs"
   "pruebas/rutas-test.mjs"
   "pruebas/doce-test.mjs"
+  "pruebas/esfera-calibracion-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"

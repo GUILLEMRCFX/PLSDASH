@@ -76,3 +76,18 @@ no se han reconstruido: eran datos reales de D1 que ya no están. Cubrían
 `paneles-test`, `paneles34`, `paneles5678`, `pestanas`, `esfera-test`,
 `carga-test`, `nav-test` y las de la portada (`frontend`, `logos`, `polvo`,
 `iphone`). Hay que rehacerlas cuando se toquen esas partes.
+
+De `esfera-test` ya está recuperada la parte que importaba: la ley que
+convierte bloques en tamaño vive en `esfera-calibracion-test.mjs`, sin
+navegador. Lo que sigue faltando de aquélla es la comprobación de que la escena
+se monta y sobrevive a un cambio de tema.
+
+### Medir píxeles de la esfera
+
+Lo que una prueba de funciones puras no puede decir es cuánto se distingue una
+cosa de otra EN PANTALLA. Para eso se captura la esfera y se miden los
+diámetros de los núcleos, con dos pasadas: una de **control** en la que todos
+los validadores tienen los mismos bloques —lo que se mida de dispersión ahí es
+ruido de perspectiva, no dato— y otra con los bloques de verdad. La señal útil
+es el cociente entre las dos. El resultado de la última medida está en la
+cabecera de las constantes de `escena/esfera.js`.

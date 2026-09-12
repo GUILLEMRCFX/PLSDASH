@@ -53,13 +53,73 @@ import { PERIODO_S, GRACIA_S } from '../paneles/pulso.js';
 export const MUERTO_S = 15 * 60;
 
 /**
- * Suelo de la intensidad de un nodo.
+ * Cuánto se aparta de la referencia un nodo para llegar al extremo.
  *
- * El que menos bloques lleva no puede quedar en cero: seguiría siendo un
- * validador tuyo, activo y ganando, y apagarlo del todo diría lo contrario.
- * El rango útil es lo que queda por encima.
+ * `1` = el doble de la mediana llega al tamaño máximo, y cero bloques al
+ * mínimo. Es una ventana RELATIVA, y ahí está toda la gracia: si dentro de
+ * tres meses el grupo va de 5 a 30 bloques en vez de 0 a 13, la mediana sube
+ * con él y el dibujo es el mismo. No hay que recalibrar nada.
  */
-const SUELO = 0.28;
+const VENTANA = 1;
+
+/** La mediana, que es la referencia del grupo. */
+function mediana(v) {
+  if (!v.length) return 0;
+  const o = [...v].sort((a, b) => a - b);
+  const m = o.length >> 1;
+  return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2;
+}
+
+/**
+ * Bloques propuestos → intensidad de 0 a 1, comparando con el GRUPO.
+ *
+ * ## Por qué no se divide por el máximo
+ *
+ * Hasta el 12-sep-2026 esto era `SUELO + bloques / max * (1 - SUELO)`, con el
+ * suelo a 0,28. Dos problemas, y el segundo es el grave:
+ *
+ *   1. El suelo se comía el 28 % de la escala ANTES de empezar. Estaba ahí
+ *      para que un validador con cero bloques no desapareciera, que es una
+ *      condición correcta — pero puesta en el sitio equivocado. Ahora el
+ *      mínimo visible lo garantiza la GEOMETRÍA (`TAM_MIN`, `NUCLEO`), que es
+ *      donde se decide qué se ve, y el dato puede usar la escala entera.
+ *
+ *   2. ⚠ DIVIDIR POR EL MÁXIMO HACE QUE LA ESCALA ENCOJA SOLA. Cuando se
+ *      calibró, el rango era de 1 a 7 bloques y un bloque de diferencia movía
+ *      1/7 de la escala. Hoy va de 0 a 13 y el mismo bloque mueve 1/13: la
+ *      mitad. Dentro de tres meses irá de 5 a 30 y moverá 1/30. Cuanto más
+ *      tiempo lleva el nodo funcionando, menos se distingue nada — que es
+ *      exactamente al revés de lo que hace falta.
+ *
+ * Comparar con la MEDIANA del grupo no tiene ese problema: es una medida
+ * relativa. Si todos doblan sus bloques, el dibujo no cambia. Si uno se queda
+ * a cero mientras los demás van por seis, se ve, hoy y dentro de un año.
+ *
+ * Y dice la verdad en el caso aburrido: doce validadores casi iguales salen
+ * casi iguales, porque lo son. Con el máximo como referencia, el que llevara
+ * un bloque más que el resto salía al tope de la escala como si fuera otra
+ * cosa.
+ *
+ * @param {number[]} bloques  bloques propuestos, en el orden de los nodos.
+ * @returns {number[]} intensidades de 0 a 1.
+ */
+export function intensidadesDesde(bloques = []) {
+  const v = bloques.map(n => {
+    const x = Number(n);
+    return Number.isFinite(x) && x > 0 ? x : 0;
+  });
+  if (!v.length) return [];
+
+  let ref = mediana(v);
+  // Más de la mitad del grupo a cero: la mediana no sirve de referencia y se
+  // cae a la media, que solo vale cero si NADIE ha propuesto nada.
+  if (!(ref > 0)) ref = v.reduce((a, b) => a + b, 0) / v.length;
+  // Y si tampoco hay media, no hay nada que comparar: todos al medio. Repartir
+  // tamaños ahí sería dibujar una diferencia que no existe.
+  if (!(ref > 0)) return v.map(() => 0.5);
+
+  return v.map(n => acotar(0.5 + (n - ref) / (2 * VENTANA * ref)));
+}
 
 /** Banda de brillo del ciclo. Ver la nota de `energia`. */
 const ENERGIA_MIN = 0.35;
@@ -87,7 +147,10 @@ export function nodosDesde(detalle = [], porValidador = {}) {
   };
   const lista = [...detalle].sort((a, b) => orden(a) - orden(b));
   const bloques = lista.map(d => Number(porValidador[d.indice]) || 0);
-  const max = Math.max(0, ...bloques);
+  // Sin datos de bloques —el explorador no responde— todos valen lo mismo.
+  // Inventar un reparto sería pintar una diferencia que no se sabe si existe.
+  const hayBloques = bloques.some(n => n > 0);
+  const intensidades = hayBloques ? intensidadesDesde(bloques) : bloques.map(() => 0.5);
 
   return lista.map((d, i) => ({
     indice: d.indice == null ? null : Number(d.indice),
@@ -96,9 +159,7 @@ export function nodosDesde(detalle = [], porValidador = {}) {
     pubkeyCorta: d.pubkey_corta || null,
     esperando: d.esperando === true || d.estado === 'esperando',
     bloques: bloques[i],
-    // Sin datos de bloques —el explorador no responde— todos valen lo mismo.
-    // Inventar un reparto sería pintar una diferencia que no se sabe si existe.
-    intensidad: max > 0 ? SUELO + (bloques[i] / max) * (1 - SUELO) : 0.5,
+    intensidad: intensidades[i],
     activo: d.slashed !== true && d.estado === 'active_ongoing',
     /* ⚠ PENDIENTE ES UN TERCER ESTADO, no «no activo».
        Un validador recien depositado tiene CERO bloques y no esta

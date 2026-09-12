@@ -107,21 +107,58 @@ function direccionesFibonacci(n) {
 }
 
 /* ─────────────────────────────────────────────── constelación
-   Tamaño del quad de cada nodo, en unidades de `cfg.halo`. El rango es lo que
-   separa visualmente al de un bloque del de siete: con 0,085..0,205 el mayor
-   mide 2,4 veces el menor, que se distingue de un vistazo sin que el grande se
-   coma la malla. El núcleo mide siempre 0,052, en las mismas unidades. */
-const TAM_MIN = 0.070;
-const TAM_RANGO = 0.170;
-const NUCLEO = 0.050;
+   Tamaño del quad de cada nodo, en unidades de `cfg.halo`. El quad marca hasta
+   dónde llega el HALO; el núcleo es el punto brillante de dentro y su radio en
+   pantalla es `NUCLEO · (1 + intensidad · NUCLEO_CRECE)`, independiente del
+   quad (el fragmento lo divide por el mismo factor que escaló el quad).
 
-/* Cuánto crece el NÚCLEO con los bloques, además del halo.
-   Primera versión: el núcleo era de tamaño fijo y solo crecía el halo. En
-   captura no se leía — con el halo a 0,30 sobre negro, lo único que se ve es el
-   punto, y todos los puntos medían igual. La codificación estaba, pero no se
-   veía, que para el caso es no estar. Ahora el núcleo también crece, la mitad
-   que el halo: el de siete bloques mide 1,55 veces el de uno. */
-const NUCLEO_CRECE = 0.55;
+   ── Recalibrado el 12-sep-2026, y esta vez MEDIDO EN PÍXELES ──────────────
+
+   Lo de antes (TAM_MIN 0,070 · TAM_RANGO 0,170 · NUCLEO 0,050 · CRECE 0,55)
+   se calibró con un rango de 1 a 7 bloques, y el comentario afirmaba «el de
+   siete mide 1,55 veces el de uno». Esa cuenta estaba mal: salía de comparar
+   contra intensidad 0, y el de un bloque no valía 0 sino 0,38 por el suelo del
+   mapeo. El ratio real era 1,28 entonces y 1,34 con el rango de hoy (0..13).
+
+   Medido de verdad —capturando la esfera y midiendo el diámetro de cada
+   núcleo, catorce fotogramas, con una pasada de control en la que TODOS los
+   validadores tienen los mismos bloques para saber cuánto ensucia la
+   perspectiva— salía esto:
+
+     ruido de la perspectiva (control):  1,61×
+     dispersión medida (0..13):          1,88×
+     señal neta:                         1,17×
+
+   O sea: la diferencia entre el que tiene 0 bloques y el que tiene 13 era de
+   un 17 %, enterrada bajo un 61 % que solo dependía de a qué lado de la esfera
+   hubiera caído el nodo. Por eso no se distinguía: el ruido era tres veces y
+   media la señal.
+
+   Se arreglan las dos cosas. El rango, aquí. El ruido, con `COMPENSA_PROF`. */
+const TAM_MIN = 0.092;
+const TAM_RANGO = 0.148;      // el máximo sigue en 0,240: el halo NO crece más
+const NUCLEO = 0.052;
+
+/* Cuánto crece el NÚCLEO con la intensidad, además del halo.
+   El núcleo es lo que de verdad se ve —con el halo bajo y sobre negro, el ojo
+   lee el punto—, así que es donde tiene que estar el rango. De 0,55 a 1,30:
+   el radio del núcleo va de 0,052 a 0,120, o sea 2,30× en radio y 5,3× en
+   área. El halo va de 0,092 a 0,240 (2,61×) SIN subir el tope de antes, que
+   era la condición para que no aplaste la malla. */
+const NUCLEO_CRECE = 1.30;
+
+/* Cuánto se corrige el encogimiento por distancia.
+   La cámara está a 3,05 del centro y la esfera tiene radio 1, así que un nodo
+   de la cara de atrás se proyecta 1,98 veces más pequeño que uno de delante
+   sin que eso signifique NADA: es el mismo validador. Medido, ese ruido era
+   1,61× y se comía la codificación entera.
+
+   A 1 el tamaño en pantalla no dependería de la profundidad en absoluto. Se
+   deja en 0,80 y no en 1: los nodos no se tapan entre sí —van en mezcla
+   aditiva y sin prueba de profundidad—, así que el tamaño es la única pista de
+   que la esfera es una esfera, y quitarla del todo la aplana. Con 0,80 el
+   ruido residual baja a ~1,15×, muy por debajo de la señal. */
+const COMPENSA_PROF = 0.80;
 
 /** Geometría instanciada a partir de una base, sin usar instanceMatrix. */
 function instanciar(base, n) {
@@ -463,6 +500,10 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     uniforms: { ...uniformes, uFrescura, uEnergia,
       uTam: { value: cfg.halo }, uColor: { value: NARANJA.clone() },
       uSenalado: { value: -1 },
+      // Distancia cámara→centro. La pone `aplicarCamara()`, que es quien la
+      // mueve con el zoom. Sin esto la compensación de profundidad se
+      // descalibraría al hacer pellizco.
+      uProf: { value: 3.05 },
       /* Destello de bloque. `uDestIdx` es el índice del validador que acaba de
          proponer uno; `uDestT`, los segundos transcurridos desde entonces, o
          -1 cuando no hay ninguno vivo. Ver `destello()` más abajo. */
@@ -477,6 +518,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       attribute float aPend;
       attribute float aIndice;
       uniform float uTam;
+      uniform float uProf;
       uniform float uSenalado;
       uniform float uDestIdx; uniform float uDestT;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
@@ -500,11 +542,23 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         // compensa en el fragmento para no crecer con él.
         float s = TAM_MIN + aInt * TAM_RANGO;
         vec4 mv = modelViewMatrix * vec4(deformar(aDir), 1.0);
-        mv.xy += position.xy * s * uTam * (1.0 + vSen * 0.18 + vDest * 1.10 + vPul * 0.30);
+        /* ⚠ COMPENSACIÓN DE PROFUNDIDAD. El desplazamiento va en espacio de
+           vista y luego pasa por la proyección, así que un nodo de la cara de
+           atrás se dibuja ~2 veces más pequeño que uno de delante. Eso no
+           significa nada —es el mismo validador— y medido se comía la
+           codificación: 1,61× de ruido contra 1,17× de señal.
+
+           Multiplicando por profundidad/uProf el tamaño en pantalla deja de
+           depender del lado. COMPENSA_PROF gradúa cuánto se corrige; ver su
+           constante para por qué no va a 1. */
+        float comp = mix(1.0, max(-mv.z, 0.35) / uProf, COMPENSA_PROF);
+        mv.xy += position.xy * s * uTam * comp
+                 * (1.0 + vSen * 0.18 + vDest * 1.10 + vPul * 0.30);
         gl_Position = projectionMatrix * mv;
       }`
       .replace(/TAM_MIN/g, TAM_MIN.toFixed(3))
-      .replace(/TAM_RANGO/g, TAM_RANGO.toFixed(3)),
+      .replace(/TAM_RANGO/g, TAM_RANGO.toFixed(3))
+      .replace(/COMPENSA_PROF/g, COMPENSA_PROF.toFixed(3)),
     fragmentShader: /* glsl */`
       uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
@@ -527,7 +581,14 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         // El que espera turno SÍ conserva el halo: no está fuera de juego, está
         // a punto de entrar, y es el halo el que respira.
         halo *= max(vAct, vPul);
-        float i = nucleo * (0.85 + vI * 0.55) + halo * (0.55 + vI * 0.9);
+        /* ⚠ EL SUELO DEL BRILLO SUBE porque el del dato ha bajado a cero.
+           Antes la intensidad mínima era 0,28 —el suelo vivía en el mapeo— y
+           el nodo más pequeño llegaba aquí con 0,85 + 0,28·0,55 = 1,00. Ahora
+           llega con 0,00, así que el término base absorbe ese suelo: 0,92 en
+           vez de 0,85, y el tope se queda exactamente donde estaba (1,40). Un
+           validador con cero bloques sigue viéndose; lo que cambia es que ya
+           no se le regala un trozo de la escala de tamaños. */
+        float i = nucleo * (0.92 + vI * 0.48) + halo * (0.70 + vI * 0.75);
         i *= (0.45 + max(vAct, vPul * 0.85) * 0.55);
         i *= (1.0 + vSen * 0.85);
         // El destello suma un halo ancho además de subir el brillo: el punto
@@ -621,6 +682,9 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     camara.position.z = distanciaBase / zoom;
     camara.updateProjectionMatrix();
     const d = camara.position.z;
+    // La compensación de profundidad de los nodos se mide contra ESTA
+    // distancia. Si no se actualizara, un pellizco descalibraría los tamaños.
+    matNodo.uniforms.uProf.value = d;
     const silueta = 1 / Math.sqrt(Math.max(1e-4, 1 - 1 / (d * d)));
     matAtmosfera.uniforms.uSilueta.value = silueta / 2.0;
   }

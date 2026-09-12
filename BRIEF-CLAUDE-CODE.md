@@ -177,6 +177,26 @@ fichero se lee como código y el módulo revienta con un error que no señala al
 comentario. Pasa sobre todo en comentarios HTML (`<!-- … -->`) y GLSL dentro de
 literales. `pruebas/sintaxis-test.mjs` lo caza.
 
+**Un dato codificado en el TAMAÑO de algo en 3D compite con la perspectiva, y
+la perspectiva suele ganar.** Los nodos de la esfera cifran los bloques
+propuestos en su tamaño. Medido en píxeles, la diferencia entre el validador
+con 0 bloques y el que tiene 13 era de **1,17×**, enterrada bajo un **1,61×**
+que solo dependía de en qué cara de la esfera hubiera caído el nodo —la cámara
+está a 3,05 y la esfera tiene radio 1—. El ruido era tres veces y media la
+señal. Antes de calibrar nada que se dibuje en perspectiva, **medir primero
+cuánto ruido mete la profundidad**, con una pasada de control en la que todos
+los elementos valen lo mismo. Se corrige escalando el quad por su propia
+profundidad (`COMPENSA_PROF`).
+
+**Una escala normalizada por el máximo se degrada sola.** La misma esfera
+dividía los bloques por el máximo del grupo: con un rango de 1 a 7, un bloque
+de diferencia movía 1/7 de la escala; con 0 a 13 mueve 1/13; con 5 a 30 movería
+1/30. Cuanto más tiempo lleva el sistema funcionando, menos se distingue nada,
+y toca recalibrar cada pocos meses. Comparar contra la **mediana** del grupo no
+tiene ese problema y además no se lo lleva por delante un caso con suerte. Y el
+suelo para que el mínimo siga viéndose va en la GEOMETRÍA, no en el mapeo del
+dato: puesto en el mapeo se comía el 28 % de la escala antes de empezar.
+
 **`Number(null)` es `0`, no `NaN`.** Un `.sort((a, b) => Number(a.indice) -
 Number(b.indice))` con un índice ausente no deja el elemento donde estaba: lo
 manda al principio. En la esfera, eso metía al validador nuevo en la primera
@@ -344,5 +364,5 @@ no existe.
 | **La tabla `ajustes` quedó huérfana** en D1 al retirar el precio de entrada editable | borrarla es una migración, y la migración está aparcada |
 | **Gráfica de recompensas** | aplazada de mutuo acuerdo |
 | **Bloquear de verdad `nuc/` y `pruebas/`** | `_routes.json` no lo hace; falta averiguar cuál es la forma correcta en Pages |
-| **Pruebas perdidas y no reconstruidas** | las que dependían de una fixture grande con datos reales de D1: `paneles-test`, `paneles34`, `paneles5678`, `pestanas`, `esfera-test`, `carga-test`, `nav-test`, y las de la portada `frontend`, `logos`, `polvo`, `iphone`. Anotadas en `pruebas/README.md` |
+| **Pruebas perdidas y no reconstruidas** | las que dependían de una fixture grande con datos reales de D1: `paneles-test`, `paneles34`, `paneles5678`, `pestanas`, `carga-test`, `nav-test`, y las de la portada `frontend`, `logos`, `polvo`, `iphone`. De `esfera-test` se recuperó la calibración en `esfera-calibracion-test.mjs`. Anotadas en `pruebas/README.md` |
 | **`vault-test` intermitente** | falló una vez de siete en la comprobación del fogonazo y no se ha podido reproducir. Lleva volcado de estado al fallar para saber de qué lado está |
