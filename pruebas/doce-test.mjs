@@ -356,6 +356,23 @@ const conEspera = (enCadena, esperan) => ({
   okQue('así que nada aparece como «salido»', !desglosarSaldo(datos).restoVisible, '');
 }
 
+console.log('\n=== 7. NADA QUE EL RECOLECTOR NO ESCRIBA ===');
+{
+  /* ⚠ «El próximo bloque en ~X días» salía de `red_validadores_activos`, un
+     campo que NO ESCRIBE NADIE: la línea no se enseñó jamás en producción y
+     nadie lo notó porque degradaba a hueco. Se retiró el 20-sep-2026.
+
+     Esta comprobación es la guardia: si alguien la reintroduce, tendrá que
+     traer el productor delante — y entonces habrá que cambiar esto a
+     propósito, que es justo el momento de acordarse. */
+  const html = panelValidadores({
+    ahoraS: AHORA, estado: estadoCon(ONCE),
+    ganancia: { ciclos: [{ ts: AHORA - 3600 }], por_validador: {} }, eventos: [],
+  });
+  okQue('no se estima el próximo bloque', !/el próximo en/.test(html), '');
+  okQue('ni se dice la cuota de la red', !/de la red/.test(html), '');
+}
+
 console.log('\n' + '='.repeat(52));
 console.log(fallos ? `FALLAN ${fallos} de ${pruebas}` : `TODO CORRECTO (${pruebas})`);
 process.exit(fallos ? 1 : 0);

@@ -478,27 +478,44 @@ def guardar_validadores_dia(cfg, datos, fecha):
 
 
 def cerrar_dia(cfg, datos, fecha):
-    """Cierra el día anterior calculando lo ganado en esa jornada."""
-    v = datos.get("validadores") or {}
+    """Cierra el día anterior.
+
+    ── QUE ESTA TABLA YA NO GUARDA, Y POR QUE ──────────────────────────────
+
+    `ganado_dia` y `ganado_acum` **se han dejado de escribir**. No es que se
+    hayan roto: es que la cuenta que los llenaba estaba mal desde el
+    principio.
+
+    `ganado_acum` guardaba `validadores.ganado_total`, que es el EXCEDENTE SIN
+    BARRER — lo acumulado desde el ultimo barrido, no lo ganado en total. Cae
+    en picado cada ~8,1 h cuando el protocolo barre, asi que el «acumulado»
+    subia y bajaba. Y como `ganado_dia` salia de `max(0, diferencia)`, los
+    dias en que el acumulado habia bajado anotaban un cero: 24 de 38 filas
+    valen 0.
+
+    ⚠ NO SE ARREGLA, SE DEJA DE ESCRIBIR, y es una decision deliberada:
+
+      · No lo lee nadie. Los dos paneles recomponen los dias desde `snapshots`
+        y `barridos` con `diarioReal()`, que es la cuenta buena.
+      · Arreglarlo no daria nada nuevo: seria una tercera copia del mismo
+        numero que ya se calcula bien en otro sitio.
+      · Y seguir escribiendo un numero que sabemos falso es el principio P1
+        en silencio — una cifra plausible pero falsa es peor que un hueco.
+        Que no se enseñe no lo hace menos falso: lo hace menos visible.
+
+    Las filas viejas se quedan como estan. Son historia, mala pero historia,
+    y el documento 03 dice lo que valen.
+
+    Es el mismo camino que ya siguieron `apr_medio` —guardaba valores que no
+    eran un APR de nada— y `bloques`, que nunca se relleno.
+
+    `minutos_caido` SI se escribe, y no se arrastra con COALESCE: se mide.
+    """
     n = datos.get("nodo") or {}
-    ganado_acum = v.get("ganado_total") or 0
 
-    # Lo ganado ayer = acumulado de hoy menos acumulado del cierre anterior
-    r = d1_query(cfg, "SELECT ganado_acum FROM daily ORDER BY fecha DESC LIMIT 1")
-    filas = d1_filas(r)
-    anterior = filas[0]["ganado_acum"] if filas else 0
-    ganado_dia = max(0, ganado_acum - (anterior or 0))
-
-    # `apr_medio` y `bloques` se han borrado de la tabla:
-    #   · apr_medio guardaba valores que no eran un APR de nada (0,056 … 1,484
-    #     con el APR real en el 9,5 %) y no lo leia ningun panel.
-    #   · bloques nunca se relleno: sumaba 0 en las 15 filas. Los bloques de
-    #     verdad estan marcados uno a uno en `barridos.es_bloque`.
-    #
-    # `minutos_caido` YA NO se arrastra con COALESCE: se mide (ver abajo).
     sql = """INSERT OR REPLACE INTO daily
-        (fecha, ganado_dia, ganado_acum, salud, disco_pct, minutos_caido)
-        VALUES (?,?,?,?,?,?)"""
+        (fecha, salud, disco_pct, minutos_caido)
+        VALUES (?,?,?,?)"""
 
     caidos = minutos_caidos(fecha)
     if caidos is None:
@@ -511,8 +528,7 @@ def cerrar_dia(cfg, datos, fecha):
     else:
         log(f"  minutos_caido: {caidos} min medidos")
 
-    params = [fecha, ganado_dia, ganado_acum,
-              datos.get("salud"), n.get("disco_usado_pct"), caidos]
+    params = [fecha, datos.get("salud"), n.get("disco_usado_pct"), caidos]
 
     r = d1_query(cfg, sql, params)
     ok = bool(r and r.get("success"))

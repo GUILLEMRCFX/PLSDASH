@@ -131,32 +131,26 @@ function esReciente(d, desdeTs) {
   return Number.isFinite(ts) && desdeTs != null && ts > desdeTs;
 }
 
-/* Segundos por slot en PulseChain. Esto SÍ es una constante legítima: es un
-   parámetro del protocolo, no un dato de nadie. */
-const SEGUNDOS_POR_SLOT = 10;
+/* ── «El próximo bloque en ~X días» se ha retirado ───────────────────────────
+   Salía de `diasPorBloque(v.total, estado.red_validadores_activos)`, y
+   `red_validadores_activos` NO LO ESCRIBÍA NADIE: ni el recolector, ni ningún
+   endpoint. Auditado a 20-sep-2026 contra todo el repositorio, un solo uso y
+   cero productores.
 
-/**
- * Cada cuánto toca proponer un bloque, en días.
- *
- * Es la cuota de la red: con `n` validadores de `red`, te toca esa fracción de
- * los slots del día. `null` si no se sabe cuántos hay en la red — y entonces no
- * se enseña, en vez de usar un respaldo escrito a fuego como hace el v1
- * (`RED_VALIDADORES_RESPALDO = 46905`), que el día que la red crezca convierte
- * el dato en una estimación silenciosamente vieja.
- */
-export function diasPorBloque(propios, red) {
-  const n = Number(propios), r = Number(red);
-  if (!(n > 0) || !(r > 0)) return null;
-  return 1 / ((n / r) * (86400 / SEGUNDOS_POR_SLOT));
-}
+   O sea que el divisor era siempre `null`, la función devolvía `null` y la
+   línea NO SE ENSEÑABA NUNCA en producción. Degradaba bien —un hueco, no una
+   cifra inventada— así que nadie lo notó: llevaba muerta desde que se escribió.
 
-/** «0,5 días», «3 días». Por debajo de un día se usa una cifra decimal. */
-function fmtDias(d, fmt) {
-  if (d == null) return null;
-  if (d < 1 / 24) return `${fmt(d * 24 * 60, 0)} min`;
-  if (d < 2) return `${fmt(d, 1)} días`;
-  return `${fmt(d, 0)} días`;
-}
+   ⚠ Y así es como se nos escapó: el guion con el que se hacen las CAPTURAS de
+     revisión sí inventaba el campo, así que en las capturas la línea salía
+     preciosa y en el teléfono no salía nunca. La suite no la cubría en
+     absoluto — ni a favor ni en contra—, que es otra forma de no enterarse.
+     Un dato que sale del estado se comprueba contra quien lo ESCRIBE, no
+     contra una fixture que se lo inventa.
+
+   Si algún día hace falta, el dato sale de contar los `active_ongoing` de la
+   beacon API en el recolector — y entonces se vuelve a escribir esto con su
+   productor delante, no al revés. */
 
 export function panelValidadores(datos) {
   const detalle = datos.estado?.validadores?.detalle || [];
@@ -208,12 +202,9 @@ export function panelValidadores(datos) {
   const v = datos.estado?.validadores || {};
   const stakeUnitario = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : null;
 
-  /* Cuándo toca el próximo bloque y qué parte de lo ganado sale de proponerlos.
-     Los dos venían del v1 y no estaban en el v2. El peso importa porque es LA
+  /* Qué parte de lo ganado sale de proponer bloques. Importa porque es LA
      explicación de que el rendimiento baile: proponer un bloque es suerte, y
      las atestaciones son el suelo. */
-  const red = Number(datos.estado?.red_validadores_activos) || null;
-  const proximo = fmtDias(diasPorBloque(v.total, red), fmt);
   const plsBloques = Number(datos.ganancia?.pls_bloques) || 0;
   const totalGanado = Number(datos.ganancia?.total) || 0;
   const peso = plsBloques > 0 && Number.isFinite(Number(datos.ganancia?.peso_bloques))
@@ -314,15 +305,22 @@ export function panelValidadores(datos) {
       <div class="vlista">${filas}</div>
 
       <dl class="p-fondo">
-        <div><dt>Bloques</dt><dd>${fmt(totalBloques)}${
-          proximo ? ` · el próximo en ~${escapar(proximo)}` : ''}</dd></div>
-        <div><dt>Ganado ahora</dt><dd>${fmt(detalle.reduce((a, d) => a + (Number(d.ganado) || 0), 0))}</dd></div>
+        <div><dt>Bloques</dt><dd>${fmt(totalBloques)}</dd></div>
+        <!-- ⚠ «Sin barrer ahora» y NO «Ganado ahora». Esta cifra es la suma
+             del EXCEDENTE SIN BARRER, que vuelve a cero cada ~8,1 h — y tres
+             líneas más abajo, en este mismo panel, «lo ganado» significa la
+             ganancia acumulada, que solo sube. Dos sentidos opuestos a un
+             palmo de distancia es exactamente lo que el glosario (documento
+             28) existe para evitar: «ganado» a secas no se usa. -->
+        <div><dt>Sin barrer ahora</dt><dd>${fmt(detalle.reduce((a, d) => a + (Number(d.ganado) || 0), 0))}</dd></div>
         <div><dt>Referencia</dt><dd>${ref == null ? '–' : fmt(ref)}</dd></div>
       </dl>
       ${peso != null ? `
-      <p class="c-sub">${fmt(peso, 1)} % de lo ganado viene de proponer bloques
+      <!-- «lo generado» y no «lo ganado»: es la ganancia acumulada, y ahora
+           comparte panel con «Sin barrer ahora», que es lo contrario. Era la
+           mitad que quedaba de la misma confusión. -->
+      <p class="c-sub">${fmt(peso, 1)} % de lo generado viene de proponer bloques
         —${fmtCompacto(plsBloques)} de ${fmtCompacto(totalGanado)} PLS—. El resto
-        son atestaciones, que es el rendimiento base y no depende de la suerte.
-        ${red ? `Tus ${v.total} entre los ${fmt(red)} de la red.` : ''}</p>` : ''}
+        son atestaciones, que es el rendimiento base y no depende de la suerte.</p>` : ''}
     </section>`;
 }
