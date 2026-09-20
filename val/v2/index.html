@@ -2,7 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- ⚠ `maximum-scale` y `user-scalable=no` SOLO sirven en la app instalada
+     desde la pantalla de inicio. Safari como navegador los ignora desde iOS 10,
+     a propósito. La otra mitad la cubren `touch-action` y `sin-zoom.js`; ver la
+     cabecera de ese módulo para el reparto entre las tres capas. -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1, user-scalable=no">
 <meta name="robots" content="noindex,nofollow">
 <!-- Declara que la barra de estado se pinta encima; sin esto el recorte que
      reporta iOS depende de la version. Ver la nota de `.marco`. -->
@@ -24,11 +28,23 @@
 <script type="module">
   import { aplicarGuardado } from '/val/v2/paneles/tema.js';
   aplicarGuardado();
+
+  /* Aquí arriba y no en el arranque de abajo: el arranque espera a la sesión y
+     a los datos, y hasta entonces ya se puede pellizcar la puerta del PIN. */
+  import { bloquearZoomDePagina } from '/val/v2/sin-zoom.js';
+  bloquearZoomDePagina();
 </script>
 <style>
   *{box-sizing:border-box}
-  html{height:100%}
+  /* ⚠ `pan-x pan-y` y NO `manipulation`: «manipulation» quita el doble toque
+     pero SIGUE permitiendo el pellizco, que es justo lo que hay que quitar.
+     Enumerar los desplazamientos permitidos deja fuera todo lo demás — el
+     pellizco y el doble toque— sin tocar el desplazamiento normal.
+     `#escena` lo estrecha a `none` para quedarse el gesto entero; `touch-action`
+     solo restringe hacia abajo en el árbol, nunca al revés. */
+  html{height:100%;touch-action:pan-x pan-y}
   body{
+    touch-action:pan-x pan-y;
     /* Negro puro. Cualquier degradado de fondo, por tenue que sea, levanta el
        nivel de negro entre las celdas y con él se va el contraste — que es
        donde de verdad se juega la sensación de nitidez. */

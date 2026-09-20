@@ -1353,6 +1353,16 @@
   font-variant-numeric: tabular-nums;
 }
 .ap-campo input:focus { outline: none; border-color: var(--borde-vivo); }
+/* ⚠ SEGUNDA CAUSA DEL MISMO SÍNTOMA, y ésta no la arregla bloquear el pellizco.
+   Safari en iOS AMPLÍA LA PÁGINA SOLO al enfocar un campo cuya letra mida menos
+   de 16 px, y deja el panel ampliado y desbordando por los lados — exactamente
+   lo que se ve al pellizcar. Lo normal es que `maximum-scale=1` lo suprima,
+   pero Safari también ignora eso fuera de la app instalada.
+   Se sube a 16 px solo donde hay dedo, para no engordar el campo en
+   escritorio: a puntero fino este zoom no existe. */
+@media (pointer: coarse) {
+  .ap-campo input { font-size: 16px; }
+}
 .ap-guardar {
   background: var(--dato-tinte); border: 1px solid var(--borde-vivo);
   border-radius: 9px; padding: 11px 15px; min-height: 42px;
