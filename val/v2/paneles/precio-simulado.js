@@ -217,7 +217,9 @@ export function cifras(r) {
   if (!r) return '';
   const partes = [];
   if (r.stake != null) partes.push(fila('Vale el stake', `${fmt(r.stake, 2)}<span class="u">$</span>`));
-  if (r.ganado != null) partes.push(fila('Vale lo ganado', `${fmt(r.ganado, 2)}<span class="u">$</span>`));
+  // «Lo generado», no «lo ganado»: el dato es la ganancia acumulada, y es el
+  // mismo nombre que usa el titular de Ganancias. Ver documento 28.
+  if (r.ganado != null) partes.push(fila('Vale lo generado', `${fmt(r.ganado, 2)}<span class="u">$</span>`));
   if (r.enUnAno != null) partes.push(fila('Dentro de un año',
     `${fmt(r.enUnAno, 2)}<span class="u">$</span>`, 'al ritmo de ahora, a este precio'));
 

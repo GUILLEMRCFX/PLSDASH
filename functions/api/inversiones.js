@@ -431,7 +431,25 @@ async function tanda(db, wallet, propias, sueloTs) {
     parte.push({ flujo: f.id, paginas: r.paginas, traidos: r.items.length,
                  estado: fin ? 'al dia' : (r.cursor ? 'bajando' : 'fondo') });
   });
-  await Promise.all(trabajos);
+  /* ⚠ `allSettled` y NO `all`. Son cinco flujos independientes contra el
+     explorador; con `all`, que uno devolviera un 500 tiraba la tanda ENTERA de
+     esta wallet y los otros cuatro perdían las páginas que ya habían traído.
+     Es el principio P8: que falle una parte no puede tumbar el conjunto.
+
+     El fallo no se traga: se anota en el parte, que es lo que distingue «el
+     explorador no contesta» de «no tienes actividad» cuando la pantalla sale
+     vacía. Y si fallan TODOS, se propaga como antes — ahí no hay nada que
+     salvar, y el bucle de wallets de arriba lo recoge. */
+  const remates = await Promise.allSettled(trabajos);
+  // `map` conserva el orden, así que `remates[i]` es de `FLUJOS[i]`: el parte
+  // puede decir QUÉ flujo falló y no solo que falló algo.
+  const rotos = remates
+    .map((r, i) => ({ r, f: FLUJOS[i] }))
+    .filter(({ r }) => r.status === 'rejected');
+  for (const { r, f } of rotos) {
+    parte.push({ flujo: f.id, estado: 'falló', error: String(r.reason?.message || r.reason) });
+  }
+  if (remates.length && rotos.length === remates.length) throw rotos[0].r.reason;
 
   const filas = agrupar(wallet, cestas).map(t => clasificar(t, propias));
   if (filas.length) await guardar(db, wallet, filas);
