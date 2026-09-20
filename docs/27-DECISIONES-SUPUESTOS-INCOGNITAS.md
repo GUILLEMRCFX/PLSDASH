@@ -57,6 +57,16 @@
 | **PR abierto es PR cerrado** | sep-2026 | Lo que venga después va en uno nuevo. |
 | **Todos los PR contra `main`** | sep-2026 | Encadenarlos hizo imposible saber qué estaba desplegado. |
 | **La suite vive en el repositorio** | sep-2026 | Dos veces se perdieron pruebas al reiniciarse el contenedor. |
+| **Si un cambio retira la única alternativa a algo, va en su propio commit** | sep-2026 | Para poder revertir solo eso. Al retirar el v1: la puerta en un commit, el borrado en otro. |
+| **Lo visual se mira antes de mandarlo** | sep-2026 | Captura a 1440 y a 390, mirada por quien la hace. Las dos correcciones de la puerta del PIN salieron de mirar la captura, no de mandarla. |
+
+### Interfaz
+
+| Decisión | Cuándo | Por qué |
+|---|---|---|
+| **Nada de números vivos escritos a fuego** | sep-2026 | El v1 tenía `const V11 = 32_000_000`. El depósito sale de `stake_total / total` y el objetivo de `total + 1`. La detección de depósitos en Inversiones busca la **forma**, no la cifra. Un hecho cerrado del pasado sí puede ser constante: el precio del sacrificio ocurrió una vez. |
+| **El color nunca viaja solo** | ago-2026 | Verde y naranja se distinguen mal bajo deuteranopía: todo estado lleva su palabra al lado. |
+| **La esfera es decoración con dato** | ago-2026 | El mismo dato está en la tabla de Validadores, que sí se puede leer y recorrer con teclado. |
 
 ---
 
@@ -80,6 +90,13 @@
 | **`nuc/precio_y_bloques.revisar_bloques()`** | `/api/val/ganancia` ya registra los bloques: saldrían duplicados. | ago-2026 |
 | **Aplicar el Foundation Method completo** | 28 documentos para describir decisiones ya tomadas es arqueología. Se hacen los que aportan. | sep-2026 |
 | **Abrir PLSDASH como producto** | Mercado de unos pocos miles de operadores, tres competidores gratuitos ya establecidos. Ver sección de incógnitas de negocio. | sep-2026 |
+| **Efectividad y atestaciones perdidas** | Engañosas tal y como se presentaban en el v1, y el coste de lo fallado era del orden de milésimas del total. No hay ni un dato de atestación en la base. | ago-2026 |
+| **Comparativa de percentil contra la red** | Pediría datos de ~109.000 validadores. Se sustituyó por la comparación contra la media propia. | ago-2026 |
+| **Modo kiosco** | No hay monitor dedicado. | ago-2026 |
+| **Panel de concentración de riesgo** y **coste de apagón** | No cambian nunca; van como nota fija y como campo del registro, no como panel. | ago-2026 |
+| **Animación de pulso / latido ECG** | Rechazada por poco profesional. El pulso de datos de hoy es otra cosa: dice si el NUC reporta. | ago-2026 |
+| **Deslizador del simulador en euros** | El v1 dividía euros entre un precio en dólares, o sea daba por hecho que 1 € = 1 $. Hacerlo bien exige un tipo de cambio real: otra fuente que se cae y hay que vigilar. | sep-2026 |
+| **Bloqueo por intentos de PIN fallidos** | Decisión explícita del propietario: el panel no está enlazado y es de solo lectura. Lo cubre una regla de Cloudflare sobre `/api/val/auth`, fuera del repositorio. **El PIN de 4 dígitos se queda como está.** | sep-2026 |
 
 ---
 

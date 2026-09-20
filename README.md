@@ -13,18 +13,23 @@ ruta fija y el navegador los carga tal cual están en el repositorio.
 
 ---
 
-## Estado a 8-sep-2026
+## Estado a 20-sep-2026
 
 Lo que conviene saber antes de leer nada más:
 
 - **El panel v1 ya no existe.** Eran 2.017 líneas en `val/index.html` con su
   propio PIN y su propia copia de la lógica. Se retiró el 8-sep-2026. Hoy
   `val/index.html` es una redirección a `/val/v2/`, y el panel es el v2.
-- **Once validadores**, no diez, y **sus índices no son correlativos**: el
-  undécimo recibió el **109876**, no el 109559. Ver la sección de trampas.
-- La documentación de trabajo —las trampas de los datos, las decisiones y lo
-  que queda pendiente— está en **`BRIEF-CLAUDE-CODE.md`**. Este fichero
-  describe *qué hay*; aquél, *por qué es así*.
+- **Doce validadores**, y **sus índices no son correlativos**: el undécimo
+  recibió el **109876** y el duodécimo el **110855**. Nunca uses rangos.
+- Este fichero describe *qué hay*. El *por qué es así* —los principios, el
+  modelo de barridos, el esquema real de D1, las decisiones ya superadas y el
+  vocabulario oficial— está en **[`docs/`](docs/00-INDICE.md)**.
+
+> **Antes de escribir una línea, dos documentos:**
+> [la constitución](docs/01-CONSTITUCION.md) y
+> [el glosario](docs/28-GLOSARIO.md). El segundo evita el fallo más repetido del
+> proyecto: **«ganado» a secas significa dos cosas opuestas** y no se usa.
 
 ---
 
@@ -220,8 +225,9 @@ functions/api/inversiones.js      el historial de inversiones (bloque 7)
 functions/api/val/                el panel: auth, logout, estado, histórico,
                                   eventos, ganancia, aportaciones + guardia
 
+docs/                             por qué es así. Empieza por docs/00-INDICE.md
 pruebas/                          la suite. `./pruebas/correr.sh`
-migraciones/001-limpieza.sql      aparcada, ver el brief
+migraciones/001-limpieza.sql      aparcada, ver docs/99
 nuc/                              lo que corre en el servidor doméstico
 _headers _routes.json             caché y enrutado de Functions
 ```
@@ -336,8 +342,9 @@ Build settings: **sin** comando de build, *output directory* = `/`.
 
 `_routes.json` decide **dónde corre el runtime de Functions**. Los `exclude`
 —`/val/v2/paneles/*`, `/pruebas/*`…— no impiden que esos ficheros se sirvan como
-estáticos; solo evitan invocar Functions ahí. Ver la sección de trampas del
-brief.
+estáticos; solo evitan invocar Functions ahí. `docs/`, `nuc/` y `migraciones/`
+ni siquiera están en `include`, así que Functions nunca corre ahí — y aun así se
+descargan. Ver las trampas del documento 08.
 
 `_headers` pone `no-cache` a `/val/v2/*` y a `/val`: son módulos ES que se
 importan por ruta fija, y quedarse con una copia vieja de uno mientras se sirve
