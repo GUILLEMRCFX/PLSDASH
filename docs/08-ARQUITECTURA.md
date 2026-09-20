@@ -83,8 +83,11 @@ Bajo `/api/`, como Cloudflare Pages Functions.
 - `/api/inversiones` — historial de inversiones de las wallets
 
 **Tras el guardia de sesión (`/api/val/*`):**
-`auth`, `logout`, `estado`, `historico`, `ganancia`, `eventos`, `aportaciones`,
-`ajustes`
+`auth`, `logout`, `estado`, `historico`, `ganancia`, `eventos`, `aportaciones`
+
+⚠ Aquí figuraba también `ajustes`, y **ya no existe**: se retiró con el precio
+de entrada editable, que pasó a ser una constante del código. La tabla `ajustes`
+sí sigue en D1, huérfana, esperando a la migración aparcada.
 
 🟢 **DECIDED** · La cookie de sesión es `Path=/`, así que cubre todo el panel sin
 configuración extra.

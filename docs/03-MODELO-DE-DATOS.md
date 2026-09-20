@@ -4,6 +4,7 @@
 
 **Versión:** 1.0 · 15 de septiembre de 2026
 **Verificado contra D1 de producción ese mismo día.**
+**Revisado contra el código el 20-sep-2026** — ver las notas ⚠ de las secciones 3 y 4.
 
 **Depende de:** 01 Constitución · 02 Modelo de barridos
 **Alimenta a:** 06 El panel · 08 Arquitectura
@@ -95,8 +96,15 @@ panel valora todo lo ganado al precio de hoy, no al de cada día. Con el PLS
 moviéndose un 47 % en cinco días, eso es una distorsión real. **Lo pasado es
 irrecuperable.**
 
-**No borrar esa columna:** la nombra `functions/api/val/ganancia.js` en su
-INSERT. Borrarla deja el endpoint en error 500 y el panel sin ganancias.
+**No borrar esa columna**, pero por el motivo bueno: **es el destino del
+arreglo pendiente**, el bloqueo nº 1 de la parte 5 del documento 27. Borrarla
+sería cerrar la puerta a rellenarla.
+
+⚠ **Aquí ponía otra razón y era falsa:** «la nombra `ganancia.js` en su INSERT,
+borrarla deja el endpoint en 500». Comprobado el 20-sep-2026 — el INSERT real
+es `(indice_retirada, ts, validador, cantidad, bloque, es_bloque)` y **no la
+nombra**. Borrarla no rompería nada hoy. Lo que rompería es la posibilidad de
+arreglarlo.
 
 ### `eventos` — 291 filas
 
@@ -104,8 +112,18 @@ INSERT. Borrarla deja el endpoint en error 500 y el panel sin ganancias.
 |---|---|
 | Todas | ✅ vivas |
 
-**Tipos escritos realmente:** `activacion`, `barrido`, `bloque`, y una
-`recuperacion` histórica.
+**Tipos que el sistema escribe**, a 20-sep-2026:
+
+| Quién | Tipos |
+|---|---|
+| `push.py` | `activacion`, `recuperacion`, `caida`, `aviso`, `slash`, `reinicio`, `desync`, `resync` |
+| `/api/val/ganancia` | `barrido`, `bloque` |
+
+⚠ La versión anterior de este documento listaba solo `activacion`, `barrido`,
+`bloque` y una `recuperacion` histórica. Eso era una **foto de lo que había en
+la tabla** el 15-sep, no de lo que el sistema puede escribir — y las dos cosas
+se leían igual. Los `aviso` de validador esperando, por ejemplo, son
+posteriores.
 
 ⚠️ **Dato histórico mal etiquetado:** el evento del 18-ago-2026 dice
 «Validadores recuperados» cuando fue la **activación del 109876**. `push.py`
@@ -134,8 +152,8 @@ desde `snapshots` y `barridos`.
 |---|---|
 | `fecha` (PK), `salud`, `disco_pct` | ✅ vivas |
 | `minutos_caido` | ✅ **viva desde sep-2026** — 7 minutos registrados |
-| `ganado_acum` | ❌ **roto** |
-| `ganado_dia` | ❌ **roto** — 24 de 38 valen 0 |
+| `ganado_acum` | ❌ **roto** · ya no se escribe desde el 20-sep-2026 |
+| `ganado_dia` | ❌ **roto** — 24 de 38 valen 0 · ya no se escribe |
 | `bloques` | ❌ **muerta** — suma 0 con 87 bloques reales |
 | `apr_medio` | ❌ dejó de escribirse — 11 de 38 |
 
@@ -143,6 +161,15 @@ desde `snapshots` y `barridos`.
 `validadores.ganado_total`, que es el excedente **sin barrer**. Cae en picado con
 cada barrido, así que el «acumulado» sube y baja. Y como `ganado_dia` se calcula
 como `max(0, diferencia)`, sale 0 los días en que el acumulado bajó.
+
+🟢 **DECIDED · 20-sep-2026 · `push.py` ha DEJADO DE ESCRIBIR las dos.** No se
+arreglan: no las lee nadie —los paneles recomponen los días con `diarioReal()`,
+que es la cuenta buena— y seguir fabricando cada día un número que sabemos falso
+es el principio P1 en silencio. Que no se enseñe no lo hace menos falso, lo hace
+menos visible. Es el mismo camino que ya siguieron `apr_medio` y `bloques`.
+
+**Las filas viejas se quedan como están:** son historia, mala pero historia, y
+esta tabla dice lo que valen.
 
 ### `validador_diario` — 422 filas, 12 validadores
 
@@ -191,7 +218,7 @@ wallet y por flujo**, más `barridos_siembra_completa` y `eventos_hasta_ts`.
 - `snapshots.pls_hora`, `snapshots.apr`
 
 **No borrar aunque parezca muerto:**
-- `barridos.precio_pls` — la nombra `ganancia.js`
+- `barridos.precio_pls` — es el destino del arreglo pendiente, no porque nadie la nombre (no la nombra nadie)
 - `validador_diario` — archivo irreemplazable
 - `daily.minutos_caido` — resucitada
 

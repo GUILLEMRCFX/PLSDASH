@@ -28,8 +28,17 @@ Lo que un validador tiene por encima de sus 32.000.000 PLS de depósito. Es lo q
 el protocolo barre. **Vuelve a cero cada ciclo.**
 
 **Depósito**
-Los 32.000.000 PLS que bloquea un validador. Sale siempre de
-`stake_total / total`, nunca escrito.
+Los 32.000.000 PLS que bloquea un validador. El panel lo obtiene de
+`stake_total / total`, y **el recolector lo lee del spec de la cadena**
+(`/eth/v1/config/spec`, clave `MAX_EFFECTIVE_BALANCE`; `MIN_ACTIVATION_BALANCE`
+si algún día la cadena pasa a Electra).
+
+⚠ **Corregido el 20-sep-2026.** Aquí ponía «sale siempre de `stake_total /
+total`, nunca escrito», y era falso: `collector.py` tenía
+`STAKE_POR_VALIDADOR = 32_000_000` y componía `stake_total` multiplicándolo,
+así que la división devolvía **exactamente la constante**. La derivación no
+compraba nada. Hoy sí sale de la cadena, con la constante degradada a
+respaldo — y cuando actúa el respaldo, se dice por stderr.
 
 **Índice de validador**
 El número que la cadena asigna a un validador al activarlo. ⚠️ **No es

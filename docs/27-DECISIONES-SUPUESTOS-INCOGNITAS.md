@@ -34,12 +34,14 @@
 | **Índice único con `COALESCE`** | ago-2026 | `validador` es NULL en los barridos y en SQLite los NULL no son iguales entre sí. Un UNIQUE normal solo habría protegido los bloques. |
 | **`validador_diario` no se borra** | sep-2026 | Sin lector, pero es el único histórico por validador y día. Irreversible. |
 | **El depósito de un validador esperando no se suma al capital** | sep-2026 | Un keystore no demuestra depósito. Sumarlo envenenaría el APR y el titular. |
+| **El depósito se lee del spec de la cadena** | 20-sep-2026 | `/eth/v1/config/spec` → `MAX_EFFECTIVE_BALANCE`, o `MIN_ACTIVATION_BALANCE` post-Electra. Antes era una constante de 32M en `collector.py`, y este registro afirmaba que salía de `stake_total / total`: falso, porque `stake_total` se componía multiplicando esa constante. Queda un respaldo con comprobación de rango que caza Electra a ciegas y los fallos de unidades. |
+| **NO se lee de `effective_balance`** | 20-sep-2026 | No es el depósito, es el stake que cuenta para el consenso: baja con las penalizaciones, así que el depósito de referencia encogería justo el día que algo va mal. Además está cuantizado con histéresis y vale 0 mientras el validador está `pending_initialized`. |
 
 ### Producto
 
 | Decisión | Cuándo | Por qué |
 |---|---|---|
-| **Cinco pestañas + esfera propia** | sep-2026 | Reparto equilibrado: de 454–2.252 px a 887–1.242 px a 390 px. |
+| **Cinco pestañas, incluida la Esfera** | sep-2026 | Reparto equilibrado: de 454–2.252 px a 887–1.242 px a 390 px. Son cinco en total —Resumen, Ganancias, Validadores, Nodo, Esfera—, no cinco más una. |
 | **La esfera no es navegación** | ago-2026 | En 390 px, elegir un validador girando una esfera es peor que tocar una fila. |
 | **Malla Voronoi, no geodésica** | ago-2026 | La geodésica hace muaré y deja costura en el ecuador. Y una malla irregular dice «red». |
 | **Sin bloom** | ago-2026 | Con el resplandor dentro de cada primitiva, el postprocesado lo aplica dos veces: negro a gris. |
@@ -191,3 +193,4 @@ Si guiar cuenta como operar, la pestaña no se hace. Si no, se hace.
 | Fecha | Cambio |
 |---|---|
 | 15-sep-2026 | Versión 1.0. Consolidadas las preguntas abiertas de los documentos 01 a 05. |
+| 20-sep-2026 | Auditoría del código contra los documentos. Trece decisiones superadas y de interfaz que faltaban. Corregido el depósito —estaba escrito a fuego y aquí decía que no— y el recuento de pestañas. |

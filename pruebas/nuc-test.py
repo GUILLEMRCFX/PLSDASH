@@ -177,9 +177,19 @@ def beacon_con(pubkeys, estado="active_ongoing"):
         for i, pk in enumerate(pubkeys)]}
 
 
-def con_claves(locales, respuesta):
+SPEC_HOY = {"data": {
+    "MAX_EFFECTIVE_BALANCE": "32000000000000000",
+    "EFFECTIVE_BALANCE_INCREMENT": "1000000000000000",
+    "EJECTION_BALANCE": "16000000000000000",
+}}
+
+
+def con_claves(locales, respuesta, spec=SPEC_HOY):
     collector._pubkeys_locales = lambda: locales
-    collector.get_json = lambda url: respuesta
+    # El spec y los validadores son dos URL distintas: si el doble contestara
+    # lo mismo a las dos, la prueba estaria midiendo otra cosa.
+    collector.get_json = lambda url: (spec if url.endswith(collector.SPEC) else respuesta)
+    collector.deposito_pls(forzar=True)
     return collector.leer_validadores()
 
 
@@ -221,6 +231,72 @@ try:
                           {"sincronizado": True, "disco_usado_pct": 50}), "ok")
 finally:
     collector._pubkeys_locales, collector.get_json = guardado
+
+print("\n=== 4 bis. EL DEPOSITO SALE DEL SPEC, NO DE UNA CONSTANTE ===")
+# ⚠ Tres documentos afirmaban que el deposito salia de `stake_total / total` y
+#   que por eso aguantaria un cambio del protocolo. Era falso: `stake_total`
+#   se componia multiplicando una constante, asi que la division devolvia
+#   exactamente la constante. Ahora sale del spec de la cadena.
+
+guardado2 = (collector.get_json, collector._deposito)
+
+
+def con_spec(data):
+    collector.get_json = lambda url: ({"data": data} if data is not None else None)
+    return collector.deposito_pls(forzar=True)
+
+
+try:
+    ok("el spec de hoy da 32M", con_spec(SPEC_HOY["data"]), 32_000_000)
+
+    # Post-Electra el deposito cambia de nombre. Si algun dia aparece, manda.
+    #
+    # ⚠ EL 40M NO ES CAPRICHO. Con un 32M aqui, esta prueba pasaba tanto si se
+    #   preferia la clave buena como si no: invirtiendo el orden, el
+    #   MAX_EFFECTIVE de 2.048M caia fuera de rango, se iba al respaldo — que
+    #   tambien vale 32M— y el aserto seguia verde POR EL MOTIVO EQUIVOCADO.
+    #   Con un valor distinto del respaldo, solo pasa si de verdad se prefiere
+    #   `MIN_ACTIVATION_BALANCE`. Comprobado invirtiendo el orden a proposito.
+    ok("si aparece MIN_ACTIVATION_BALANCE, manda esa",
+       con_spec({"MIN_ACTIVATION_BALANCE": "40000000000000000",
+                 "MAX_EFFECTIVE_BALANCE": "2048000000000000000"}), 40_000_000)
+
+    # ⚠ LAS DOS TRAMPAS QUE EL RANGO TIENE QUE CAZAR, y las dos llegarian solas
+    #   y en silencio si no estuviera.
+    #   1) Un fork tipo Electra sin renombrar: 2.048M donde hay 32M.
+    ok("Electra a ciegas cae al respaldo",
+       con_spec({"MAX_EFFECTIVE_BALANCE": "2048000000000000000"}), 32_000_000)
+    okque("y no se cuela la cifra de Electra",
+          con_spec({"MAX_EFFECTIVE_BALANCE": "2048000000000000000"}) != 2_048_000_000)
+    #   2) Un fallo de unidades: leer gwei como si fueran PLS.
+    ok("un deposito en gwei sin dividir cae al respaldo",
+       con_spec({"MAX_EFFECTIVE_BALANCE": "32000000000000000000000000"}), 32_000_000)
+    #   Y dividir de mas tambien: 0,032 PLS no es un deposito.
+    ok("dividir de mas tambien cae", con_spec({"MAX_EFFECTIVE_BALANCE": "32000000"}), 32_000_000)
+
+    ok("basura en el campo cae al respaldo",
+       con_spec({"MAX_EFFECTIVE_BALANCE": "treinta y dos"}), 32_000_000)
+    ok("sin spec, respaldo", con_spec(None), 32_000_000)
+    ok("spec vacio, respaldo", con_spec({}), 32_000_000)
+
+    # Un deposito distinto pero verosimil SI se acepta: es el caso para el que
+    # existe todo esto. Si esta prueba se pusiera verde con la constante vieja,
+    # el cambio entero no serviria de nada.
+    ok("un deposito distinto y verosimil se acepta",
+       con_spec({"MAX_EFFECTIVE_BALANCE": "64000000000000000"}), 64_000_000)
+finally:
+    collector.get_json, collector._deposito = guardado2
+
+# Y que llega hasta el estado publicado, que es lo que de verdad importa.
+guardado3 = (collector._pubkeys_locales, collector.get_json, collector._deposito)
+try:
+    v = con_claves(PK[:2], beacon_con(PK[:2]),
+                   {"data": {"MAX_EFFECTIVE_BALANCE": "64000000000000000"}})
+    ok("el stake publicado usa el deposito del spec", v["stake_total"], 2 * 64_000_000)
+    okque("y el deposito derivado sigue siendo exacto",
+          v["stake_total"] / v["total"] == 64_000_000, str(v["stake_total"] / v["total"]))
+finally:
+    collector._pubkeys_locales, collector.get_json, collector._deposito = guardado3
 
 print("\n=== 5. DESDE CUANDO ESPERA, Y SIN CONTARLO DOS VECES ===")
 
