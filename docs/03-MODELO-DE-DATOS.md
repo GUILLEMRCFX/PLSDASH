@@ -56,7 +56,7 @@ regenera en tres minutos. Si D1 se pierde, el histórico no vuelve.
 
 ## 3. Esquema real de D1
 
-Nueve tablas. Volumen a 15 de septiembre de 2026.
+Nueve tablas. Volumen a 15 de septiembre de 2026, salvo donde se diga otra cosa.
 
 ### `snapshots` — 910 filas, desde el 8 de agosto
 
@@ -68,7 +68,7 @@ Foto horaria. Una fila por hora en punto.
 | `disco_pct`, `disco_libre_gb`, `temp_cpu`, `ram_pct` | ✅ vivas |
 | `peers`, `sincronizado`, `epoch`, `salud` | ✅ vivas |
 | `temp_nvme` | ✅ viva — 908 de 910 |
-| `precio_pls` | ✅ viva desde el 16-ago — 703 de 910 |
+| `precio_pls` | ✅ viva desde el 16-ago — 843 con precio al 21-sep |
 | `pls_hora` | ⚠️ **NULL a propósito** desde el 19-ago — 257 antiguas |
 | `apr` | ⚠️ **NULL a propósito** desde el 19-ago — 257 antiguas |
 | `barrido_acum` | ❌ **muerta** — 0 de 910 |
@@ -80,7 +80,7 @@ intentar «arreglarlo»: el panel las calcula bien por su cuenta.
 
 ⚠️ **Trampa:** `snapshots.ganado` es el excedente **sin barrer**, no el total.
 
-### `barridos` — 1.218 filas, 3.413.912 PLS
+### `barridos` — 1.434 filas, 4.079.066 PLS  *(medido el 21-sep-2026)*
 
 **La fuente de verdad de las ganancias.**
 
@@ -89,11 +89,27 @@ intentar «arreglarlo»: el panel las calcula bien por su cuenta.
 | `indice_retirada` (PK), `ts`, `validador`, `cantidad` | ✅ vivas |
 | `es_bloque` | ✅ viva — 87 marcados |
 | `bloque` | ✅ viva |
-| `precio_pls` | 🟡 **se rellena desde el 21-sep-2026** — los 1.218 anteriores se quedan vacíos |
+| `precio_pls` | ✅ **1.154 de 1.434** — sellada hacia delante y hacia atrás el 21-sep-2026 |
 
 🟢 **RESUELTO 21-sep-2026 · hacia delante.** `/api/val/ganancia` sella cada barrido nuevo con el precio que `snapshots` registró en su misma hora (±90 min). No es una estimación: es una lectura que este proyecto ya tenía guardada. Si no hay ninguna cerca, se queda a NULL — un hueco es la respuesta correcta.
 
-🟡 **Lo pasado sigue abierto, y NO es irrecuperable.** `snapshots.precio_pls` existe desde el 16-ago, así que buena parte de los 1.218 barridos anteriores se podría sellar con un precio real. No se ha hecho: reescribir el pasado es una decisión del propietario, y el sellado lleva una ventana de 7 días que se lo impide al código.
+🟢 **Y EL PASADO TAMBIÉN, el mismo día.** Se dio por hecho durante semanas que
+los barridos antiguos no tenían arreglo. Era falso: `snapshots.precio_pls`
+llevaba 843 lecturas reales guardadas desde el 16-ago. La migración
+`002-sellar-precio-pasado.sql` emparejó cada barrido con la suya. Medido contra
+producción:
+
+| | |
+|---|---|
+| barridos totales | 1.434 |
+| sellados | **1.154 (80,5 %)** |
+| sin precio | 280 — todos anteriores al primer snapshot con precio |
+| con precio verificable contra un snapshot real | **1.154 de 1.154** |
+| PLS con precio | 3.270.569 de 4.079.066 |
+| valor al cobrarlo | 39,74 $ |
+
+Los 280 no son un fallo: son de antes de que existiera el dato. Ésos sí se
+quedan vacíos para siempre.
 
 El panel enseña las dos cifras por separado y no las mezcla: «≈ X $» es todo lo
 generado al precio de **hoy**, y «Valor al cobrarlo» solo suma los barridos

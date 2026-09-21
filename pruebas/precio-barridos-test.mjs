@@ -17,6 +17,7 @@
  *   node --import ./pruebas/resolver.mjs pruebas/precio-barridos-test.mjs
  */
 import { DatabaseSync } from 'node:sqlite';
+import { readFileSync } from 'node:fs';
 import {
   precioMasCercano, TOLERANCIA_PRECIO_S, VENTANA_SELLADO_S,
 } from '../functions/api/val/ganancia.js';
@@ -169,6 +170,98 @@ console.log('\n=== 5. LAS CONSULTAS, CONTRA SQLITE DE VERDAD ===');
   ).all(desde);
   ok('la segunda pasada solo ve al que no se pudo sellar',
      otra.map(p => p.indice_retirada), [4]);
+}
+
+console.log('\n=== 6. LA MIGRACIÓN DEL PASADO DA LO MISMO QUE LA FUNCIÓN ===');
+{
+  /* ⚠ ÉSTA ES LA COMPROBACIÓN QUE JUSTIFICA EJECUTAR LA MIGRACIÓN CONTRA
+     PRODUCCIÓN. `migraciones/002-sellar-precio-pasado.sql` sella los barridos
+     antiguos en SQL puro, porque se ejecuta con `wrangler` y ahí no hay JS. O
+     sea que hay DOS implementaciones de «el precio más cercano», y dos
+     implementaciones divergen.
+
+     Así que no se comparan a ojo: se ejecuta EL FICHERO DE VERDAD contra un
+     SQLite real, se calcula lo mismo con `precioMasCercano()`, y se exige que
+     coincidan fila por fila sobre un histórico generado con la forma del real
+     —snapshots horarios con huecos, barridos cada ~40 min—.
+
+     Y la forma del SQL no es un capricho: SQLite NO admite una columna de la
+     consulta de fuera en el `ORDER BY` de una subconsulta —sí en el `WHERE`—,
+     así que `ORDER BY ABS(s.ts - b.ts)` no compila. De ahí el anterior y el
+     posterior por separado. */
+  const sql = readFileSync(new URL('../migraciones/002-sellar-precio-pasado.sql', import.meta.url), 'utf8');
+
+  const db = new DatabaseSync(':memory:');
+  db.exec('CREATE TABLE barridos (indice_retirada INTEGER PRIMARY KEY, ts INTEGER, precio_pls REAL)');
+  db.exec('CREATE TABLE snapshots (ts INTEGER PRIMARY KEY, precio_pls REAL)');
+
+  // Un histórico con la forma del real: snapshots cada hora, con tres huecos
+  // —el NUC apagado— y algunos sin precio. Barridos cada ~40 min, desfasados a
+  // propósito para que caigan en todas las posiciones dentro de la hora.
+  const base = 1786900000;
+  const snaps = [];
+  for (let i = 0; i < 400; i++) {
+    /* ⚠ EL HUECO DE CUATRO HORAS NO ES ADORNO. Con huecos de una o dos horas,
+       el snapshot más cercano sigue cayendo dentro de los 90 min y la
+       tolerancia no decide nada: comprobado, rompiendo el límite a propósito
+       la prueba seguía verde. Con cuatro horas seguidas sin snapshot, los
+       barridos de en medio quedan a más de 90 min de los dos lados y la
+       tolerancia SÍ decide. */
+    if (i >= 50 && i <= 53) continue;                              // hueco de 4 h
+    if (i === 123) continue;                                       // hueco de 1 h
+    const p = i % 37 === 0 ? null : 0.00001 + (i % 97) * 1e-7;     // alguno sin precio
+    snaps.push({ ts: base + i * 3600, precio_pls: p });
+  }
+  const ins = db.prepare('INSERT INTO snapshots (ts, precio_pls) VALUES (?,?)');
+  for (const s of snaps) ins.run(s.ts, s.precio_pls);
+
+  const barridos = [];
+  for (let i = 0; i < 600; i++) {
+    // Arranca ANTES del primer snapshot a propósito: los primeros no se pueden
+    // sellar, igual que los 280 reales anteriores al 16-ago.
+    barridos.push({ id: i + 1, ts: base - 40000 + Math.round(i * 2430.7) });
+  }
+  /* ⚠ Y EMPATES EXACTOS, que con el paso de 2.430,7 s no salen nunca solos:
+     barridos justo en el minuto 30 de la hora, a la misma distancia del
+     snapshot de antes y del de después. Sin ellos, el `CASE` del desempate no
+     se ejecuta jamás y se puede invertir sin que nada se ponga rojo —
+     comprobado—. Con ellos, invertirlo pone esta sección en rojo. */
+  for (let k = 0; k < 20; k++) {
+    barridos.push({ id: 1000 + k, ts: base + (200 + k) * 3600 + 1800 });
+  }
+  const ib = db.prepare('INSERT INTO barridos (indice_retirada, ts, precio_pls) VALUES (?,?,NULL)');
+  for (const b of barridos) ib.run(b.id, b.ts);
+
+  const cambios = Number(db.prepare(sql).run().changes);
+
+  // Lo mismo, con la función de producción.
+  const conPrecio = snaps.filter(s => s.precio_pls != null);
+  const esperado = new Map();
+  for (const b of barridos) {
+    const p = precioMasCercano(b.ts, conPrecio);
+    if (p != null) esperado.set(b.id, p);
+  }
+
+  okQue('la migración sella un número razonable, no cero ni todo',
+    cambios > 400 && cambios < barridos.length, String(cambios));
+  ok('sella exactamente los que dice la función', cambios, esperado.size);
+
+  const real = db.prepare('SELECT indice_retirada AS id, precio_pls AS p FROM barridos ORDER BY 1').all();
+  let iguales = 0, distintos = [];
+  for (const f of real) {
+    const e = esperado.has(f.id) ? esperado.get(f.id) : null;
+    if (f.p === e) iguales++;
+    else distintos.push({ id: f.id, sql: f.p, js: e });
+  }
+  ok('y coinciden fila por fila, todas', iguales, barridos.length);
+  okQue('sin una sola discrepancia', distintos.length === 0,
+    JSON.stringify(distintos.slice(0, 3)));
+
+  // Los de antes del primer snapshot se quedan vacíos, como los 280 reales.
+  const vacios = real.filter(f => f.p == null).length;
+  okQue('los anteriores al primer precio se quedan vacíos', vacios > 0, String(vacios));
+
+  ok('y la migración es idempotente', Number(db.prepare(sql).run().changes), 0);
 }
 
 console.log('\n' + '='.repeat(52));
