@@ -127,7 +127,7 @@
 | T2 | 🔵 **¿Por qué el explorador no responde desde el navegador?** Sí desde el servidor. | Bajo — hay solución, falta la causa |
 | T3 | 🔵 **¿Qué límites reales tiene DexScreener?** Nunca consultados. | Bajo — mitigado por caché |
 | T4 | 🔵 **¿Cómo se bloquea de verdad `nuc/`, `migraciones/` y `pruebas/`?** `_routes.json` no sirve. | Medio — ver documento 09 |
-| T5 | 🔴 **¿Hay copia de seguridad de D1?** No consta ninguna. | **Alto** — es lo único que no se regenera |
+| T5 | 🟢 **Resuelto el 21-sep-2026: Time Travel de D1**, 30 días, sin construir nada. Se aceptan sus dos límites: vive en la misma cuenta y son 30 días. Ver documento 07. 🔴 **El ensayo de restauración sigue pendiente.** | Bajo, salvo el ensayo |
 | T6 | 🔵 ¿Se arregla `daily` o se retira? Nadie la lee, la causa está localizada. | Bajo |
 
 ### De datos
@@ -173,18 +173,23 @@ DESCUBRE cuando alguien abre el panel, que pueden ser horas después de que la
 cadena lo hiciera. Sellarlo con el precio de ese momento habría sido
 inventarse un precio retroactivo, igual de falso que inventárselo hacia atrás.
 
-**Queda una decisión pendiente:** los 1.218 barridos anteriores. No son
-irrecuperables —`snapshots.precio_pls` existe desde el 16-ago y podría sellar
-buena parte con un precio real, no estimado—, pero reescribir el pasado es una
-decisión del propietario y el código no la toma solo.
+**Y el pasado también**, el mismo día y por decisión explícita del propietario:
+la migración `002` selló **1.154 de 1.434** barridos con precios reales que ya
+estaban en `snapshots`. Los 280 restantes son anteriores al primer snapshot con
+precio y ésos sí se quedan vacíos. Comprobado contra producción: los 1.154
+precios coinciden con un snapshot real a menos de 90 minutos.
 
-### 🔴 2 · Copia de seguridad de D1 — T5
+### 🟡 2 · Copia de seguridad de D1 — T5, decidida y sin ensayar
 
-**Por qué bloquea:** es el único dato irreemplazable del proyecto. 1.218
-barridos, 910 snapshots, 291 eventos y 422 filas de histórico por validador. Si
-se pierde, no vuelve.
+**Decidido el 21-sep-2026:** Time Travel de D1. 30 días de recuperación
+punto-a-punto, ya activo, cero coste, nada que construir. Sus dos límites se
+aceptan a sabiendas: vive en la misma cuenta de Cloudflare y caduca a los 30
+días.
 
-**Coste:** bajo. Una exportación periódica.
+🔴 **Lo que sigue abierto es el ENSAYO.** Una copia que nunca se ha probado a
+restaurar no es una copia. El procedimiento está en el documento 07, sección 4,
+con un ensayo diseñado para no poder salir mal —restaurar al instante actual—.
+No se ha ejecutado.
 
 ### 🟡 3 · El principio P9 y la pestaña de ampliar — P1
 
