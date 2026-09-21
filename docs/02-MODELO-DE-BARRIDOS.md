@@ -172,6 +172,36 @@ APR y el titular.
 
 ---
 
+## 8 bis. De dónde sale el tamaño del depósito
+
+🟢 **DECIDED** · Del **spec de la cadena**: `/eth/v1/config/spec`, clave
+`MAX_EFFECTIVE_BALANCE` —o `MIN_ACTIVATION_BALANCE` si algún día la cadena pasa
+a Electra, que es como se llama allí—. Los valores van en gwei. Verificado
+contra el nodo el 20-sep-2026: `32000000000000000` gwei = 32.000.000 PLS, y
+`MIN_ACTIVATION_BALANCE` no existe, o sea que hoy es pre-Electra.
+
+⚠ **Este documento decía otra cosa, y estaba mal.** Afirmaba que el depósito
+salía de `stake_total / total` «y por eso aguantaría un cambio del protocolo».
+No aguantaba nada: `collector.py` componía `stake_total` multiplicando una
+constante de 32.000.000, así que la división devolvía la constante. El día que
+el protocolo cambiara el depósito, todo lo derivado habría mentido igual.
+
+🟢 **DECIDED** · **NO se lee de `effective_balance`.** Es la tentación obvia y
+es peor: no es el depósito, es el stake que cuenta para el consenso. Baja con
+las penalizaciones —el depósito de referencia encogería justo el día que algo
+va mal, que es el peor momento posible para un fallo silencioso—, está
+cuantizado con histéresis, y vale 0 mientras el validador está
+`pending_initialized`.
+
+🟢 **DECIDED** · **Queda una constante de respaldo** (`DEPOSITO_RESPALDO`) para
+cuando el spec no responda, con una **comprobación de rango** (1M–100M PLS)
+que tiene que cazar dos cosas concretas: un fork tipo Electra leído a ciegas
+—2.048M donde hay 32M— y un fallo de unidades —gwei sin dividir, 32.000
+billones—. Las dos llegarían solas y en silencio. Cuando el respaldo actúa, se
+dice por stderr.
+
+---
+
 ## 9. Tiempos reales de una ampliación
 
 Medidos en las dos ampliaciones hechas:

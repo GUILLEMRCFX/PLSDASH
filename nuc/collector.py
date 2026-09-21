@@ -46,7 +46,103 @@ def _corta(pubkey):
     """`0x8f3a…b12c9d` — la pubkey como se puede leer de un vistazo."""
     return pubkey[:8] + "…" + pubkey[-6:]
 
-STAKE_POR_VALIDADOR = 32_000_000                  # PLS
+# ----------------------------------------------------------------------
+# El tamaño del depósito
+# ----------------------------------------------------------------------
+#
+# ⚠ ESTO ERA UN NUMERO ESCRITO A FUEGO, y tres documentos afirmaban que no.
+#   Decian que el deposito sale de `stake_total / total` y que por eso el panel
+#   aguantaria un cambio del protocolo. Pero `stake_total` se componia aqui
+#   multiplicando esta constante por el numero de validadores, asi que la
+#   division devolvia EXACTAMENTE la constante, siempre. La derivacion no
+#   compraba nada: el dia que el protocolo cambiara el deposito, todo lo
+#   derivado mentiria igual de rapido.
+#
+# Ahora sale del spec de la propia cadena, que es el unico sitio donde ese
+# parametro es un hecho y no una suposicion.
+#
+# ⚠ Y NO de `effective_balance`, que es la otra tentacion y es peor: no es el
+#   deposito, es el stake que cuenta para el consenso. Baja con las
+#   penalizaciones —o sea que el deposito de referencia encogeria justo el dia
+#   que algo va mal—, esta cuantizado con histeresis, y vale 0 mientras el
+#   validador esta `pending_initialized`.
+
+SPEC = "/eth/v1/config/spec"
+
+# Respaldo si el spec no responde o trae algo que no cuadra. Sigue siendo un
+# numero escrito, pero ahora es lo que es: una red, no la fuente.
+DEPOSITO_RESPALDO = 32_000_000                    # PLS
+
+# Rango verosimil para un deposito, en PLS. Tiene que cazar dos cosas
+# concretas, y por eso es estrecho y no generoso:
+#
+#   · UN FORK TIPO ELECTRA. Alli el deposito pasa a llamarse
+#     `MIN_ACTIVATION_BALANCE` y `MAX_EFFECTIVE_BALANCE` se va a 64 veces mas
+#     —2.048M donde hay 32M—. Leer la clave vieja a ciegas daria esa cifra, y
+#     llegaria sola y en silencio. Cae fuera del rango: respaldo.
+#   · UN FALLO DE UNIDADES. El spec va en GWEI: 32e15 gwei son 32M PLS. Quien
+#     olvide dividir entre 1e9 obtiene 3,2e16, un deposito de 32.000 billones.
+#     Tambien cae fuera. Y quien divida de mas —entre 1e18— saca 0,032, que
+#     cae por abajo.
+DEPOSITO_MIN = 1_000_000
+DEPOSITO_MAX = 100_000_000
+
+GWEI = 1_000_000_000
+
+_deposito = None                                  # memoria dentro de la corrida
+
+
+def deposito_pls(forzar=False):
+    """El deposito de un validador, en PLS, leido del spec de la cadena.
+
+    Se prefiere `MIN_ACTIVATION_BALANCE` cuando existe —es como se llama el
+    deposito a partir de Electra— y si no, `MAX_EFFECTIVE_BALANCE`, que es lo
+    que hay hoy en PulseChain. Comprobado a 20-sep-2026 contra el nodo:
+
+        MAX_EFFECTIVE_BALANCE      32000000000000000 gwei  → 32.000.000 PLS
+        EFFECTIVE_BALANCE_INCREMENT 1000000000000000 gwei  →  1.000.000 PLS
+        EJECTION_BALANCE           16000000000000000 gwei  → 16.000.000 PLS
+
+    y NO existe `MIN_ACTIVATION_BALANCE`, o sea que la cadena es pre-Electra.
+
+    Cualquier cosa que no cuadre cae al respaldo Y SE DICE por stderr: un
+    deposito equivocado envenena el APR, el objetivo del panel y el aviso de
+    «ya tienes para uno entero», asi que no puede cambiar en silencio.
+    """
+    global _deposito
+    if _deposito is not None and not forzar:
+        return _deposito
+
+    _deposito = DEPOSITO_RESPALDO
+    data = (get_json(f"{BEACON}{SPEC}") or {}).get("data") or {}
+
+    for clave in ("MIN_ACTIVATION_BALANCE", "MAX_EFFECTIVE_BALANCE"):
+        if clave not in data:
+            continue
+        try:
+            pls = int(data[clave]) / GWEI
+        except (TypeError, ValueError):
+            print(f"[aviso] {clave} no es un numero: {data[clave]!r}", file=sys.stderr)
+            continue
+        if not (DEPOSITO_MIN <= pls <= DEPOSITO_MAX):
+            print(f"[aviso] {clave} da {pls:,.0f} PLS, fuera del rango verosimil "
+                  f"({DEPOSITO_MIN:,}-{DEPOSITO_MAX:,}). Se usa el respaldo de "
+                  f"{DEPOSITO_RESPALDO:,}. Si el protocolo ha cambiado de verdad, "
+                  f"hay que revisar el rango A MANO.", file=sys.stderr)
+            break
+        _deposito = pls
+        return _deposito
+
+    if not data:
+        print(f"[aviso] el spec de la cadena no responde o no trae el deposito; "
+              f"se usa el respaldo ({DEPOSITO_RESPALDO:,} PLS)", file=sys.stderr)
+    return _deposito
+
+
+# ----------------------------------------------------------------------
+# Parámetros de la cadena
+# ----------------------------------------------------------------------
+
 GENESIS_TIME = 1683785555                         # de /eth/v1/beacon/genesis
 SLOTS_POR_EPOCH = 32
 SEGUNDOS_POR_SLOT = 10
@@ -211,10 +307,14 @@ def leer_validadores():
     en_cadena = set()
 
     ahora_utc = datetime.now(timezone.utc)
+    # UNA lectura por corrida, no una por validador: `deposito_pls()` se
+    # acuerda, pero pedirlo dentro del bucle dejaria escrito que puede cambiar
+    # a mitad de una foto del estado, y no puede.
+    deposito = deposito_pls()
 
     for v in data["data"]:
         balance = int(v["balance"]) / 1e9          # gwei → PLS
-        ganado = balance - STAKE_POR_VALIDADOR
+        ganado = balance - deposito
         estado = v["status"]
         info = v["validator"]
         act_epoch = int(info["activation_epoch"])
@@ -307,7 +407,7 @@ def leer_validadores():
     #   `ganado_total = balance_total - stake_total` se iria 32M por debajo,
     #   envenenando el APR, el reparto del saldo y el titular. Ver el bloque de
     #   los tres estados en la cabecera.
-    stake_total = STAKE_POR_VALIDADOR * en_cadena_total
+    stake_total = deposito * en_cadena_total
     ganado_total = total_balance - stake_total
 
     # Puede no haber NINGUNA activacion real: los primeros minutos tras el
