@@ -65,6 +65,29 @@ export function panelGanancias(datos) {
     dolares = '<span class="c-sub alerta">Sin precio de PLS: no se convierte a dólares.</span>';
   }
 
+  /* ── Lo que valía AL COBRARLO ───────────────────────────────────────────
+     Es otra cifra que «≈ X $», y confundirlas es fácil: aquella multiplica
+     todo lo generado por el precio de HOY; ésta suma cada barrido por el
+     precio que había cuando se cobró, leído de `snapshots`.
+
+     ⚠ SOLO SE ENSEÑA SI SE PUEDE DECIR SOBRE CUÁNTO. Los 1.218 barridos
+       anteriores al 21-sep-2026 no tienen precio y no lo tendrán: el precio
+       de una hora pasada no lo sirve ninguna API. Enseñar la suma sin decir
+       que es parcial la convertiría en «lo que has ganado en dólares», que
+       sería falso por defecto y cada vez menos falso — o sea, indetectable.
+
+     Con cero barridos sellados no se enseña nada. Una línea que dice
+     «0 $ de 0 barridos» no informa, ocupa. */
+  const val = datos?.ganancia?.valorado;
+  const cobrado = val && val.con_precio > 0
+    ? `<p class="c-sub">Valor al cobrarlo: <b>${fmt(val.usd, 2)} $</b>`
+      + ` · sobre ${fmt(val.con_precio)} de ${fmt(val.barridos)} barridos`
+      + (val.con_precio < val.barridos
+          ? '. Los anteriores no tienen precio guardado y no se puede reconstruir.'
+          : '.')
+      + '</p>'
+    : '';
+
   // De dónde sale el total. Sin esto, una cifra que incluye barridos es
   // indistinguible de una que no, y ese error ya fue invisible una vez.
   const procedencia = acum
@@ -92,6 +115,7 @@ export function panelGanancias(datos) {
       </div>
 
       ${procedencia ? `<p class="c-sub">${escapar(procedencia)}</p>` : ''}
+      ${cobrado}
 
       <!-- La forma del mes. Ni la tabla del ritmo —que da medias— ni la sierra
            del ciclo —que enseña ocho horas— contestan si esto es estable. -->

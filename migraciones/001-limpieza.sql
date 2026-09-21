@@ -19,11 +19,20 @@ ALTER TABLE snapshots DROP COLUMN barrido_acum;
 ALTER TABLE snapshots DROP COLUMN ganado_real;
 
 -- ── barridos ─────────────────────────────────────────────────────────────────
--- 0 de 484 filas. `functions/api/val/ganancia.js` SÍ la nombraba, insertando
--- NULL a propósito; ese INSERT se corrige en el mismo PR.
--- Consecuencia asumida: valorar cada barrido al precio de su día deja de ser
--- posible para los 484 barridos ya registrados. No hay forma de recuperarlo.
-ALTER TABLE barridos DROP COLUMN precio_pls;
+-- ⚠⚠ RETIRADO EL 21-SEP-2026. NO VOLVER A AÑADIRLO. ⚠⚠
+--
+-- Aquí había un `ALTER TABLE barridos DROP COLUMN precio_pls;`, escrito el
+-- 23-ago cuando la columna llevaba 484 filas vacías y nadie la escribía.
+--
+-- Esta migración nunca llegó a ejecutarse, y menos mal: desde el 21-sep
+-- `functions/api/val/ganancia.js` SÍ rellena esa columna, sellando cada
+-- barrido con el precio que `snapshots` registró en esa misma hora. Ejecutar
+-- el borrado ahora tiraría el único dato del proyecto que no se puede
+-- reconstruir, y además dejaría el endpoint en 500.
+--
+-- La lección, que vale para el resto del fichero: **una migración aparcada
+-- envejece contra el código**. Antes de ejecutar este fichero, comprobar UNA
+-- POR UNA que cada columna sigue muerta hoy, no el día que se escribió.
 
 -- ── daily ────────────────────────────────────────────────────────────────────
 -- Suma 0 en las 15 filas. Los bloques de verdad están marcados uno a uno en

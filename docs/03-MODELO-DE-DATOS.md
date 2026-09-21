@@ -89,16 +89,26 @@ intentar «arreglarlo»: el panel las calcula bien por su cuenta.
 | `indice_retirada` (PK), `ts`, `validador`, `cantidad` | ✅ vivas |
 | `es_bloque` | ✅ viva — 87 marcados |
 | `bloque` | ✅ viva |
-| `precio_pls` | ❌ **vacía** — 0 de 1.218 |
+| `precio_pls` | 🟡 **se rellena desde el 21-sep-2026** — los 1.218 anteriores se quedan vacíos |
 
-🔴 **UNKNOWN** · `barridos.precio_pls` sigue sin rellenarse. Consecuencia: el
-panel valora todo lo ganado al precio de hoy, no al de cada día. Con el PLS
-moviéndose un 47 % en cinco días, eso es una distorsión real. **Lo pasado es
-irrecuperable.**
+🟢 **RESUELTO 21-sep-2026 · hacia delante.** `/api/val/ganancia` sella cada barrido nuevo con el precio que `snapshots` registró en su misma hora (±90 min). No es una estimación: es una lectura que este proyecto ya tenía guardada. Si no hay ninguna cerca, se queda a NULL — un hueco es la respuesta correcta.
 
-**No borrar esa columna**, pero por el motivo bueno: **es el destino del
-arreglo pendiente**, el bloqueo nº 1 de la parte 5 del documento 27. Borrarla
-sería cerrar la puerta a rellenarla.
+🟡 **Lo pasado sigue abierto, y NO es irrecuperable.** `snapshots.precio_pls` existe desde el 16-ago, así que buena parte de los 1.218 barridos anteriores se podría sellar con un precio real. No se ha hecho: reescribir el pasado es una decisión del propietario, y el sellado lleva una ventana de 7 días que se lo impide al código.
+
+El panel enseña las dos cifras por separado y no las mezcla: «≈ X $» es todo lo
+generado al precio de **hoy**, y «Valor al cobrarlo» solo suma los barridos
+sellados y dice **sobre cuántos de cuántos**. Con el PLS moviéndose un 47 % en
+cinco días, presentar una como la otra sería una distorsión real.
+
+**No borrar esa columna**, y ahora por el motivo evidente: **se está
+rellenando**. Hasta el 21-sep el motivo bueno era que fuese el destino del
+arreglo pendiente.
+
+⚠ **Y la migración aparcada la borraba.** `migraciones/001-limpieza.sql` llevaba
+un `DROP COLUMN precio_pls` escrito el 23-ago, cuando la columna estaba muerta.
+Se ha retirado esa línea el 21-sep. La lección es del fichero entero: **una
+migración aparcada envejece contra el código**, y antes de ejecutarla hay que
+comprobar una por una que cada columna sigue muerta hoy.
 
 ⚠ **Aquí ponía otra razón y era falsa:** «la nombra `ganancia.js` en su INSERT,
 borrarla deja el endpoint en 500». Comprobado el 20-sep-2026 — el INSERT real
