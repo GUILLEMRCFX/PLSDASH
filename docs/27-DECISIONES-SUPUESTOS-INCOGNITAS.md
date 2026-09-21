@@ -66,7 +66,7 @@
 
 | Decisión | Cuándo | Por qué |
 |---|---|---|
-| **Nada de números vivos escritos a fuego** | sep-2026 | El v1 tenía `const V11 = 32_000_000`. El depósito sale de `stake_total / total` y el objetivo de `total + 1`. La detección de depósitos en Inversiones busca la **forma**, no la cifra. Un hecho cerrado del pasado sí puede ser constante: el precio del sacrificio ocurrió una vez. |
+| **Nada de números vivos escritos a fuego** | sep-2026 | El v1 tenía `const V11 = 32_000_000`. El objetivo sale de `total + 1` y el depósito del spec de la cadena (ver la decisión de arriba). La detección de depósitos en Inversiones busca la **forma**, no la cifra. Un hecho cerrado del pasado sí puede ser constante: el precio del sacrificio ocurrió una vez. |
 | **El color nunca viaja solo** | ago-2026 | Verde y naranja se distinguen mal bajo deuteranopía: todo estado lleva su palabra al lado. |
 | **La esfera es decoración con dato** | ago-2026 | El mismo dato está en la tabla de Validadores, que sí se puede leer y recorrer con teclado. |
 
@@ -134,7 +134,7 @@
 
 | # | Incógnita | Impacto |
 |---|---|---|
-| D1 | 🔴 **`barridos.precio_pls` sigue vacío**, 0 de 1.218. Todo se valora al precio de hoy. | **Alto y creciente** — cada día perdido es irrecuperable |
+| D1 | 🟢 **`barridos.precio_pls` se rellena desde el 21-sep-2026**, con el precio que `snapshots` registró en la misma hora. Deja de empeorar. Queda abierto si se sella también el pasado —se puede, `snapshots` llega hasta el 16-ago— o se da por perdido. | Bajo ya: la hemorragia está cortada |
 | D2 | 🔴 **La efectividad real de atestación no se puede calcular.** Ni un dato en toda la base. | Medio — hoy se evita mostrarla |
 | D3 | 🔵 El evento del 18-ago dice «Validadores recuperados» y fue una activación. | Bajo — cosmético |
 | D4 | 🔵 El desglose base/suerte usa todo el histórico. ¿Ventana móvil? | Bajo |
@@ -160,16 +160,23 @@
 
 **De todo lo anterior, tres cosas deciden el rumbo. El resto puede esperar.**
 
-### 🔴 1 · `barridos.precio_pls` — D1
+*(A 21-sep-2026 la primera está resuelta; quedan dos.)*
 
-**Por qué bloquea:** es la única incógnita que **empeora cada día**. Cada barrido
-que pasa sin precio no se puede reconstruir nunca. Ya cometimos este error con
-`snapshots.precio_pls` y lo arreglamos; aquí seguimos sin arreglarlo.
+### ✅ 1 · `barridos.precio_pls` — RESUELTO el 21-sep-2026
 
-**Qué desbloquea:** el valor real de lo ganado, la cifra fiscal, y cualquier
-comparación honesta entre lo que ganaste y lo que vale hoy.
+Era la única incógnita que **empeoraba cada día**. Ya no: `/api/val/ganancia`
+sella cada barrido nuevo con el precio que `snapshots` registró en su misma
+hora, con 90 minutos de tolerancia y un hueco honesto cuando no hay ninguno.
 
-**Coste:** una línea al insertar.
+**No fue «una línea al insertar»**, y conviene saber por qué: un barrido se
+DESCUBRE cuando alguien abre el panel, que pueden ser horas después de que la
+cadena lo hiciera. Sellarlo con el precio de ese momento habría sido
+inventarse un precio retroactivo, igual de falso que inventárselo hacia atrás.
+
+**Queda una decisión pendiente:** los 1.218 barridos anteriores. No son
+irrecuperables —`snapshots.precio_pls` existe desde el 16-ago y podría sellar
+buena parte con un precio real, no estimado—, pero reescribir el pasado es una
+decisión del propietario y el código no la toma solo.
 
 ### 🔴 2 · Copia de seguridad de D1 — T5
 

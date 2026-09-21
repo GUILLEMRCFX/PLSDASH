@@ -246,14 +246,18 @@ async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas, propios
  * INSERT OR IGNORE: el índice de retirada es la clave primaria, así que
  * reprocesar un tramo no duplica nada.
  *
- * ⚠ Aquí se nombraba `precio_pls` y se insertaba NULL. La columna se ha
- *   borrado: llevaba 484 filas a NULL y nadie la leía, y seguir nombrándola
- *   habría dejado este INSERT apuntando a una columna que ya no existe — o sea
- *   `/api/val/ganancia` en 500 y el panel entero sin ganancias.
+ * ⚠ `precio_pls` NO se nombra aquí, y no es porque la columna no exista.
  *
- *   Si algún día se quiere valorar cada barrido al precio de su día, la columna
- *   vuelve Y se rellena en el mismo cambio. Lo que no vuelve es una columna
- *   vacía esperando a alguien.
+ *   El comentario que había aquí decía que «la columna se ha borrado». Era
+ *   falso: lo que se escribió fue la migración que la borraría, y esa
+ *   migración lleva aparcada desde el 25-ago sin ejecutarse. La columna sigue
+ *   en D1 — el documento 03 la verificó contra producción el 15-sep— y desde
+ *   el 21-sep-2026 se RELLENA, con el repaso `sellarPrecios()` de más arriba.
+ *
+ *   Se sigue sin nombrar en el INSERT a propósito: un barrido puede
+ *   descubrirse antes de que exista el snapshot de su hora, y con
+ *   `INSERT OR IGNORE` esa fila no se volvería a tocar jamás. El repaso la
+ *   sella cuando el dato está.
  */
 async function guardar(db, nuevas) {
   if (!nuevas.length) return 0;
@@ -273,6 +277,154 @@ async function guardar(db, nuevas) {
     escritas += res.reduce((acc, r) => acc + (r.meta?.changes || 0), 0);
   }
   return escritas;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   EL PRECIO DE CADA BARRIDO
+
+   `barridos.precio_pls` llevaba 1.218 filas a cero desde siempre, y era el
+   único agujero del proyecto que EMPEORA CADA DÍA: el precio de una hora
+   pasada no lo sirve ninguna API, así que cada barrido que se registra sin él
+   queda sin valor para siempre. Es el bloqueo nº 1 del documento 27.
+
+   ## De dónde sale el precio, y por qué NO del momento de registrarlo
+
+   La tentación es sellar con el precio de ahora, como hacen las aportaciones.
+   Pero una aportación se apunta cuando ocurre, y un barrido se DESCUBRE
+   cuando alguien abre el panel — que pueden ser horas o días después de que
+   la cadena lo hiciera. Sellar con el precio de ahora sería inventarse un
+   precio retroactivo, igual de falso que inventárselo hacia atrás.
+
+   Así que sale de `snapshots.precio_pls`: el precio que ESTE MISMO PROYECTO
+   registró, cada hora, desde el 16-ago-2026. No es una estimación ni una
+   reconstrucción — es una lectura que ya estaba guardada. Se toma la más
+   cercana en el tiempo al barrido, y solo si cae dentro de la tolerancia.
+
+   ⚠ Y si no hay ninguna cerca, se queda a NULL. Un hueco es la respuesta
+     correcta cuando no se sabe; el panel lo distingue y lo dice.
+
+   ## Por qué es un repaso y no parte del INSERT
+
+   Un barrido puede descubrirse ANTES de que exista el snapshot de su hora
+   —la cadena va por delante del cron—, y con `INSERT OR IGNORE` esa fila no
+   se vuelve a tocar nunca: el precio se perdería justo en los barridos más
+   recientes, que son los que más importan. Como repaso idempotente, la fila
+   se sella en cuanto el snapshot aparece.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Los snapshots son horarios, así que el más cercano a un instante cualquiera
+   está a ≤30 min. Se dan 90 para que un snapshot perdido —el NUC apagado una
+   hora— no deje sin precio a los barridos de alrededor. Más allá de eso, el
+   precio de PLS se ha movido lo bastante como para que la cifra deje de ser
+   la de aquel momento: PLS hizo un 47 % en cinco días. */
+export const TOLERANCIA_PRECIO_S = 90 * 60;
+
+/* Solo se sellan los barridos RECIENTES. No es una limitación técnica: es la
+   diferencia entre rellenar lo que va llegando y reescribir el pasado, y la
+   segunda es una decisión del propietario, no de este código. Ver la nota de
+   abajo sobre los 1.218 antiguos. */
+export const VENTANA_SELLADO_S = 7 * 86400;
+
+/**
+ * El precio registrado más cercano a un instante, o `null` si no hay ninguno
+ * dentro de la tolerancia.
+ *
+ * ⚠ ESTO ESTUVO ESCRITO EN SQL Y ERA UNA TRAMPA. La versión correlada
+ *   —`... WHERE s.ts BETWEEN barridos.ts - ? ...`— **SQLite la rechaza**: no
+ *   deja cualificar la tabla del UPDATE dentro de la subconsulta del SET, ni
+ *   por nombre ni por alias.
+ *
+ *   Y la versión sin cualificar, que sí compila, hace algo peor que fallar:
+ *   `snapshots` TAMBIÉN tiene una columna `ts`, así que `ts` ahí dentro se
+ *   resuelve a `s.ts` y la condición queda `s.ts BETWEEN s.ts-tol AND
+ *   s.ts+tol` — siempre cierta— y el orden `ABS(s.ts - ts)` sale cero para
+ *   todos. Devuelve un precio cualquiera del rango entero y parece funcionar.
+ *   Lo cazó la prueba, comprobando que se coge el MÁS CERCANO y no uno
+ *   cualquiera.
+ *
+ *   Así que la elección se hace aquí, en JavaScript, donde se puede leer y
+ *   probar. Las consultas quedan en dos lecturas y unas pocas escrituras por
+ *   clave primaria, sin correlación ninguna.
+ *
+ * @param {number} ts          instante del barrido
+ * @param {Array}  snapshots   `{ts, precio_pls}`, los que tengan precio
+ * @returns {number|null}
+ */
+export function precioMasCercano(ts, snapshots = [], tolerancia = TOLERANCIA_PRECIO_S) {
+  let mejor = null, mejorDist = Infinity;
+  for (const s of snapshots) {
+    const st = Number(s.ts);
+    const p = Number(s.precio_pls);
+    if (!Number.isFinite(st) || !Number.isFinite(p) || p <= 0) continue;
+    const d = Math.abs(st - ts);
+    // `<` y no `<=`: ante un empate exacto gana el primero, y las filas vienen
+    // ordenadas por `ts`, así que el desempate es el más antiguo. Da igual
+    // cuál, pero tiene que ser SIEMPRE el mismo o dos pasadas discreparían.
+    if (d <= tolerancia && d < mejorDist) { mejor = p; mejorDist = d; }
+  }
+  return mejor;
+}
+
+/** Cuántos barridos han quedado sellados en esta pasada. */
+async function sellarPrecios(db, ahoraS) {
+  const desde = ahoraS - VENTANA_SELLADO_S;
+
+  const { results: pendientes = [] } = await db.prepare(
+    'SELECT indice_retirada, ts FROM barridos'
+    + ' WHERE precio_pls IS NULL AND ts >= ? ORDER BY ts'
+  ).bind(desde).all();
+  if (!pendientes.length) return 0;
+
+  // Solo la franja que puede servir: de los snapshots (910 filas) se traen
+  // los que caen alrededor de los barridos pendientes, no la tabla entera.
+  const min = Number(pendientes[0].ts) - TOLERANCIA_PRECIO_S;
+  const max = Number(pendientes[pendientes.length - 1].ts) + TOLERANCIA_PRECIO_S;
+  const { results: snaps = [] } = await db.prepare(
+    'SELECT ts, precio_pls FROM snapshots'
+    + ' WHERE precio_pls IS NOT NULL AND ts BETWEEN ? AND ? ORDER BY ts'
+  ).bind(min, max).all();
+  if (!snaps.length) return 0;
+
+  const stmt = db.prepare('UPDATE barridos SET precio_pls = ? WHERE indice_retirada = ?');
+  const lote = [];
+  for (const b of pendientes) {
+    const p = precioMasCercano(Number(b.ts), snaps);
+    // Sin precio cerca NO se escribe nada: un hueco es la respuesta correcta
+    // cuando no se sabe, y además así el recuento significa algo.
+    if (p != null) lote.push(stmt.bind(p, b.indice_retirada));
+  }
+  if (!lote.length) return 0;
+
+  let sellados = 0;
+  for (let i = 0; i < lote.length; i += TAM_LOTE) {
+    const res = await db.batch(lote.slice(i, i + TAM_LOTE));
+    sellados += res.reduce((a, r) => a + (r.meta?.changes || 0), 0);
+  }
+  return sellados;
+}
+
+/**
+ * Cuánto de lo barrido tiene precio de verdad, y cuánto valía al cobrarlo.
+ *
+ * Son dos cifras distintas y el panel tiene que poder decirlo: «lo que vale
+ * hoy» sale de multiplicar todo por el precio de ahora, y «lo que valía al
+ * cobrarlo» solo se puede calcular sobre los barridos sellados.
+ */
+async function valorado(db) {
+  const f = await db.prepare(
+    'SELECT COUNT(*) AS todos,'
+    + ' SUM(CASE WHEN precio_pls IS NOT NULL THEN 1 ELSE 0 END) AS con_precio,'
+    + ' SUM(CASE WHEN precio_pls IS NOT NULL THEN cantidad ELSE 0 END) AS pls,'
+    + ' SUM(CASE WHEN precio_pls IS NOT NULL THEN cantidad * precio_pls ELSE 0 END) AS usd'
+    + ' FROM barridos'
+  ).first();
+  if (!f) return null;
+  return {
+    barridos: Number(f.todos) || 0,
+    con_precio: Number(f.con_precio) || 0,
+    pls: Number(f.pls) || 0,
+    usd: Number(f.usd) || 0,
+  };
 }
 
 // Un evento se identifica por (ts, tipo, validador). `ON CONFLICT DO NOTHING`
@@ -461,6 +613,19 @@ export async function onRequestGet({ env }) {
     try { saldo = await saldoWallet(); } catch { /* dato de adorno, no crítico */ }
   }
 
+  /* El sellado del precio y su recuento. Los dos en su propio `try`: si la
+     columna `precio_pls` no estuviera —la migración aparcada la borraba, ver
+     `migraciones/001-limpieza.sql`— esto fallaría y se llevaría por delante
+     TODAS las ganancias del panel. Que falle esta parte no puede tumbar el
+     conjunto (principio P8). */
+  let sellados = 0, precios = null;
+  try {
+    sellados = await sellarPrecios(db, Math.floor(Date.now() / 1000));
+    precios = await valorado(db);
+  } catch (e) {
+    console.error('no se pudo sellar el precio de los barridos:', e);
+  }
+
   const cuerpo = {
     total,
     bloques,
@@ -475,6 +640,11 @@ export async function onRequestGet({ env }) {
     // para poder ver desde fuera con qué conjunto se filtró.
     indices: propios ? [...propios].sort((a, b) => a - b) : (cacheGuardada?.indices ?? []),
     saldo_wallet: saldo,
+    /* Lo que valía al cobrarlo, y sobre cuántos barridos se puede decir. El
+       panel NO puede presentar esto como «el valor de lo ganado» a secas: es
+       el valor de la parte que tiene precio real. */
+    valorado: precios,
+    sellados,
     ciclos: lista.slice(-40),
     nuevas,
     sembrando,
