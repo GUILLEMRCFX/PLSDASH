@@ -226,8 +226,8 @@ Clave/valor. Hoy solo `PRECIO_SACRIFICIO`.
 Estado de los procesos de siembra. Cursores de paginación del explorador **por
 wallet y por flujo**, más `barridos_siembra_completa` y `eventos_hasta_ts`.
 
-⚠️ **Hay cursores de tres wallets**, no dos:
-`0x2378…95d2`, `0x952e…bdc8` y `0xcb37f5…043f`.
+⚠️ **Hay cursores de tres wallets**, no dos. Las direcciones están en los
+nombres de las propias claves de `meta`; aquí no se escriben.
 
 ---
 
@@ -252,8 +252,9 @@ wallet y por flujo**, más `barridos_siembra_completa` y `eventos_hasta_ts`.
 
 ## 5. Preguntas abiertas
 
-- 🔴 **¿Qué es `0xcb37f5e9384ae883a623157f3f101dc9d5a1043f`?** Tiene cursores de
-  siembra en `meta`, así que en algún momento fue una wallet consultada. No está
+- 🔴 **¿Qué es la tercera wallet de `meta`?** (la que no es la de retirada ni la
+  de las aportaciones). Tiene cursores de siembra, así que en algún momento fue
+  una wallet consultada. No está
   documentada en ningún sitio.
 - ¿Se arregla `daily`, o se retira? Nadie la lee y la causa está localizada.
   Arreglarla no da nada nuevo; retirarla deja la tabla sin sentido.

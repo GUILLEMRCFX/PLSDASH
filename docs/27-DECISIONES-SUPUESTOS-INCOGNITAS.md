@@ -123,7 +123,7 @@
 
 | # | Incógnita | Impacto |
 |---|---|---|
-| T1 | 🔴 **¿Qué es la wallet `0xcb37f5…043f`?** Tiene cursores de siembra en `meta` y no está documentada. | Medio — puede estar consumiendo peticiones del explorador por nada |
+| T1 | 🔴 **¿Qué es la tercera wallet de `meta`?** Tiene cursores de siembra y no está documentada. | Medio — puede estar consumiendo peticiones del explorador por nada |
 | T2 | 🔵 **¿Por qué el explorador no responde desde el navegador?** Sí desde el servidor. | Bajo — hay solución, falta la causa |
 | T3 | 🔵 **¿Qué límites reales tiene DexScreener?** Nunca consultados. | Bajo — mitigado por caché |
 | T4 | 🔵 **¿Cómo se bloquea de verdad `nuc/`, `migraciones/` y `pruebas/`?** `_routes.json` no sirve. | Medio — ver documento 09 |
