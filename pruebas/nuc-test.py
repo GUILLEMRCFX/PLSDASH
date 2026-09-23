@@ -376,6 +376,128 @@ ok("un indice ausente no revienta nada", push._idx({"indice": None}), None)
 ok("ni uno que no es un numero", push._idx({"indice": "x"}), None)
 ok("y uno normal se lee", push._idx({"indice": "7"}), 7)
 
+print("\n=== 6. LA DIRECCION DE RETIRADA SALE DE LA CADENA ===")
+# Estuvo escrita a mano en la Function de ganancias y en el explorador. Ahora
+# la publica el recolector leyendo las `withdrawal_credentials`.
+DIR = "952e0311dddce7090d61a275f411a6ddf879bdc8"
+CRED = "0x01" + "00" * 11 + DIR          # la forma exacta que devolvio el nodo
+ok("la credencial real da la direccion", collector.direccion_retirada(CRED), "0x" + DIR)
+ok("en mayusculas tambien", collector.direccion_retirada(CRED.upper().replace("0X", "0x")), "0x" + DIR)
+ok("0x02 tambien lleva direccion", collector.direccion_retirada("0x02" + "00" * 11 + DIR), "0x" + DIR)
+# ⚠ 0x00 es un hash BLS: leer sus ultimos 20 bytes daria una direccion que no
+#   existe, y la Function recorreria una wallet ajena.
+ok("0x00 NO tiene direccion", collector.direccion_retirada("0x00" + "ab" * 31), None)
+ok("sin los once ceros no es una direccion",
+   collector.direccion_retirada("0x01" + "00" * 10 + "01" + DIR), None)
+ok("corta no vale", collector.direccion_retirada("0x01" + DIR), None)
+ok("sin campo, None", collector.direccion_retirada(None), None)
+
+ok("todos iguales: esa", collector._retirada_del_grupo({"0xaa"}, 0), "0xaa")
+ok("dos distintas: ninguna", collector._retirada_del_grupo({"0xaa", "0xbb"}, 0), None)
+ok("una sin direccion basta para no dar ninguna", collector._retirada_del_grupo({"0xaa"}, 1), None)
+ok("sin validadores, ninguna", collector._retirada_del_grupo(set(), 0), None)
+
+
+def beacon_cred(pubkeys, creds, epoch="319720"):
+    r = beacon_con(pubkeys)
+    for v, c in zip(r["data"], creds):
+        v["validator"]["withdrawal_credentials"] = c
+        v["validator"]["activation_epoch"] = epoch
+    return r
+
+
+guardado8 = (collector._pubkeys_locales, collector.get_json, collector._deposito)
+try:
+    v = con_claves(PK, beacon_cred(PK[:11], [CRED] * 11))
+    ok("llega al estado publicado", v["wallet_retirada"], "0x" + DIR)
+    # ⚠ El que espera no tiene credenciales —la cadena no lo conoce— y no puede
+    #   quitarle la direccion al grupo.
+    ok("el que espera no la estropea", v["esperando"], 1)
+    otra = "0x01" + "00" * 11 + "11" * 20
+    ok("un validador con otra wallet la deja en None",
+       con_claves(PK[:3], beacon_cred(PK[:3], [CRED, CRED, otra]))["wallet_retirada"], None)
+    ok("uno con 0x00 tambien",
+       con_claves(PK[:2], beacon_cred(PK[:2], [CRED, "0x00" + "ab" * 31]))["wallet_retirada"], None)
+
+    # La activacion del grupo, en unix: la que estaba escrita como 1786095955.
+    ok("la activacion del grupo sale de la epoch", v["activacion_ts"], 1786095955)
+finally:
+    collector._pubkeys_locales, collector.get_json, collector._deposito = guardado8
+
+print("\n=== 7. LA RED, DEL MISMO SPEC ===")
+guardado9 = (collector.get_json, collector._deposito, collector._spec)
+try:
+    collector.get_json = lambda url: {"data": dict(SPEC_HOY["data"],
+        GENESIS_FORK_VERSION="0x00000369",
+        DEPOSIT_CONTRACT_ADDRESS="0x3693D1c7aF5c4A4b8A0A8e1c4E1D0D0f6f0D1c0F")}
+    collector.deposito_pls(forzar=True)
+    r = collector.red()
+    ok("el deposito", r["deposito"], 32_000_000)
+    ok("la version de fork, normalizada", r["fork_version"], "0x00000369")
+    ok("el contrato, en minusculas", r["contrato_deposito"],
+       "0x3693d1c7af5c4a4b8a0a8e1c4e1d0d0f6f0d1c0f")
+    collector.get_json = lambda url: {"data": dict(SPEC_HOY["data"],
+        GENESIS_FORK_VERSION="0x0369", DEPOSIT_CONTRACT_ADDRESS="no")}
+    collector.deposito_pls(forzar=True)
+    r = collector.red()
+    ok("una version con otra forma no se publica", r["fork_version"], None)
+    ok("ni un contrato que no es una direccion", r["contrato_deposito"], None)
+finally:
+    collector.get_json, collector._deposito, collector._spec = guardado9
+
+print("\n=== 8. EL ENTORNO NO TUMBA AL RECOLECTOR ===")
+import os, tempfile, time as _t
+guardado10 = collector.KEYSTORE_DIR
+try:
+    with tempfile.TemporaryDirectory() as base:
+        claves = os.path.join(base, "validator_keys")
+        os.mkdir(claves)
+        collector.KEYSTORE_DIR = claves
+        e = collector.entorno()
+        ok("sin script de recuperacion, no se ofrece", e["script_recuperacion"], None)
+        ok("sin deposit_data, nada", e["deposit_data_reciente"], None)
+        ok("la carpeta de claves es la configurada", e["dir_claves"], claves)
+        okque("el usuario es el de la maquina", bool(e["usuario"]), str(e["usuario"]))
+
+        open(os.path.join(base, "start_validator.sh"), "w").close()
+        viejo = os.path.join(claves, "deposit_data-1000.json")
+        nuevo = os.path.join(claves, "deposit_data-2000.json")
+        open(viejo, "w").close(); open(nuevo, "w").close()
+        os.utime(viejo, (1000, 1000)); os.utime(nuevo, (2000, 2000))
+        e = collector.entorno()
+        ok("con script, su ruta", e["script_recuperacion"], os.path.join(base, "start_validator.sh"))
+        ok("el deposit_data mas reciente", e["deposit_data_reciente"],
+           {"nombre": "deposit_data-2000.json", "ts": 2000})
+
+        collector.KEYSTORE_DIR = os.path.join(base, "no", "existe")
+        e = collector.entorno()
+        ok("una carpeta que no existe no lanza", e["deposit_data_reciente"], None)
+finally:
+    collector.KEYSTORE_DIR = guardado10
+
+print("\n=== 9. EL EXPLORADOR SE PUEDE IMPORTAR ===")
+# ⚠ No se podia: resolvia los indices AL IMPORTAR con un `BEACON` y un
+#   `requests` que no existian, y lanzaba NameError. `comprobar.py` lo tragaba
+#   y daba el explorador por pendiente para siempre.
+explorador = cargar("explorador")
+okque("importa sin tocar la red", hasattr(explorador, "grupo"))
+okque("y no lleva la wallet escrita", not hasattr(explorador, "WALLET"))
+okque("ni la fecha de activacion", not hasattr(explorador, "ACTIVACION_TS"))
+guardado11 = collector.leer_validadores
+try:
+    collector.leer_validadores = lambda: {
+        "detalle": [{"indice": 7}, {"indice": None}], "wallet_retirada": "0xaa",
+        "activacion_ts": 123}
+    ok("el grupo sale del recolector", explorador.grupo(), ({7}, "0xaa", 123))
+    collector.leer_validadores = lambda: {"detalle": [], "wallet_retirada": None,
+                                          "activacion_ts": 123}
+    try:
+        explorador.grupo(); okque("sin wallet no recorre nada", False)
+    except RuntimeError:
+        okque("sin wallet no recorre nada", True)
+finally:
+    collector.leer_validadores = guardado11
+
 print("\n" + "=" * 52)
 print(f"FALLAN {fallos} de {pruebas}" if fallos else f"TODO CORRECTO ({pruebas})")
 sys.exit(1 if fallos else 0)

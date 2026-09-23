@@ -45,58 +45,41 @@ import time
 import urllib.parse
 import urllib.request
 
-# Wallet de retirada y receptora de comisiones de los diez validadores.
-WALLET = "0x952E0311DdDCe7090d61a275f411a6ddF879BDc8"
-
-# ATENCIÓN: esta wallet YA SE USÓ con un validador anterior durante cerca de un
-# año. Su saldo y su lista de bloques mezclan aquella etapa con la actual, así
-# que nada de lo que devuelve el explorador sirve sin filtrar.
+# ⚠ NI LA WALLET, NI LOS INDICES, NI LA FECHA DE ACTIVACION SE ESCRIBEN AQUI.
+#   Estuvieron los tres a mano, y los tres los sabe la cadena: `collector.py`
+#   lee la direccion de las `withdrawal_credentials`, los indices resolviendo
+#   las pubkeys de los keystores y la activacion de cada validador. Este
+#   modulo los pide ahi, una vez, al usarlo — no al importarlo.
+#
+#   Y no es solo limpieza: la version anterior hacia la resolucion AL
+#   IMPORTAR, con un `BEACON` y un `requests` que no estaban definidos, asi que
+#   importar este fichero lanzaba NameError. `comprobar.py` lo tragaba con su
+#   `except` y marcaba «el explorador responde» como PENDIENTE para siempre.
+#
+# ATENCIÓN: la wallet de retirada YA SE USÓ con un validador anterior durante
+# cerca de un año. Su saldo y su lista de bloques mezclan aquella etapa con la
+# actual, así que nada de lo que devuelve el explorador sirve sin filtrar.
 #
 # El filtro bueno son los índices de validador, no las fechas: cada retirada
-# trae `validator_index`, que se compara con el conjunto propio. Es exacto y no
-# depende de acertar con la marca de activación.
-# Los índices NO se escriben: no son correlativos. El undécimo validador
-# recibió el 109876 y no el 109559, porque entre un depósito y el siguiente
-# entraron 317 validadores más en la red. Se descubren igual que en
-# collector.py, leyendo los keystores del disco.
-KEYSTORE_DIR = "/blockchain/validator_keys"
+# trae `validator_index`, que se compara con el conjunto propio. La fecha de
+# activación se queda como corte para no recorrer un año de páginas ajenas.
 
 
-def _pubkeys_locales():
-    import glob
-    pk = set()
-    for ruta in glob.glob(KEYSTORE_DIR + "/keystore-*.json"):
-        try:
-            p = json.load(open(ruta)).get("pubkey")
-            if p:
-                pk.add(p if p.startswith("0x") else "0x" + p)
-        except Exception:
-            pass
-    return sorted(pk)
+def grupo():
+    """(índices propios, wallet de retirada, activación) — de la cadena."""
+    import collector
+    v = collector.leer_validadores()
+    if not v:
+        raise RuntimeError("la beacon API no responde")
+    indices = {int(d["indice"]) for d in v["detalle"] if d.get("indice") is not None}
+    wallet = v.get("wallet_retirada")
+    activacion = v.get("activacion_ts")
+    if not wallet:
+        raise RuntimeError("los validadores no comparten una dirección de retirada 0x01")
+    if activacion is None:
+        raise RuntimeError("ningún validador activado todavía")
+    return indices, wallet, activacion
 
-
-def validadores_propios(beacon=BEACON):
-    """Índices propios, resueltos por pubkey contra la beacon API."""
-    ids = ",".join(_pubkeys_locales())
-    if not ids:
-        return set()
-    try:
-        r = requests.get(
-            f"{beacon}/eth/v1/beacon/states/head/validators",
-            params={"id": ids}, timeout=TIMEOUT,
-        )
-        r.raise_for_status()
-        return {int(v["index"]) for v in r.json()["data"]}
-    except Exception as e:
-        print(f"[validadores] no se pudieron resolver: {e}")
-        return set()
-
-
-VALIDADORES = validadores_propios()
-
-# Activación de los diez actuales (evento `activacion` en D1). Se conserva solo
-# como red de seguridad para listados que no traigan índice de validador.
-ACTIVACION_TS = 1786095955
 
 # Cadencia real de los barridos, medida sobre cinco retiradas consecutivas:
 # 8,06 / 8,11 / 8,11 / 8,08 h. No son las ~9 h que sugería el muestreo horario.
@@ -172,7 +155,7 @@ def _ts(marca):
         return None
 
 
-def retiradas(wallet=WALLET, validadores=VALIDADORES):
+def retiradas(wallet=None, validadores=None, activacion_ts=None):
     """Retiradas de consenso de nuestros validadores.
 
     Devuelve (total_pls, [detalle], descartadas).
@@ -189,6 +172,12 @@ def retiradas(wallet=WALLET, validadores=VALIDADORES):
     El filtro por `validator_index` es lo que separa esta etapa de la anterior:
     sin él se sumaría un año de retiradas del validador viejo.
     """
+    if wallet is None or validadores is None or activacion_ts is None:
+        indices, direccion, activacion = grupo()
+        wallet = wallet or direccion
+        validadores = indices if validadores is None else validadores
+        activacion_ts = activacion if activacion_ts is None else activacion_ts
+
     detalle = []
     descartadas = 0
     params = {"items_count": 50}
@@ -205,7 +194,7 @@ def retiradas(wallet=WALLET, validadores=VALIDADORES):
         agotado = False
         for w in items:
             ts = _ts(w.get("timestamp"))
-            if ts is not None and ts < ACTIVACION_TS:
+            if ts is not None and ts < activacion_ts:
                 agotado = True
                 break
 
@@ -251,7 +240,7 @@ def barridos(detalle):
     return sorted(grupos.values(), key=lambda g: g["ts"])
 
 
-def saldo_wallet(wallet=WALLET):
+def saldo_wallet(wallet):
     """Saldo actual de la wallet, en PLS.
 
     Ojo: incluye lo que quedara de la etapa anterior. No es atribuible a los
@@ -261,7 +250,7 @@ def saldo_wallet(wallet=WALLET):
     return _a_pls(datos.get("coin_balance"))
 
 
-def reconciliar(saldo_sin_barrer=0.0, wallet=WALLET):
+def reconciliar(saldo_sin_barrer=0.0):
     """Cuadra la cadena con lo que ve el nodo.
 
     `saldo_sin_barrer` es el `ganado_total` que reporta el beacon: el excedente
@@ -273,7 +262,8 @@ def reconciliar(saldo_sin_barrer=0.0, wallet=WALLET):
     """
     informe = {"ts": int(time.time()), "error": None}
     try:
-        total_retirado, det_ret, ret_previas = retiradas(wallet)
+        indices, wallet, activacion = grupo()
+        total_retirado, det_ret, ret_previas = retiradas(wallet, indices, activacion)
         saldo = saldo_wallet(wallet)
     except Exception as e:
         informe["error"] = f"{type(e).__name__}: {e}"
@@ -304,6 +294,7 @@ def reconciliar(saldo_sin_barrer=0.0, wallet=WALLET):
 
 
 if __name__ == "__main__":
+    INDICES, WALLET, _ = grupo()
     print(f"Consultando el explorador para {WALLET}\n")
     inf = reconciliar()
 
@@ -315,7 +306,7 @@ if __name__ == "__main__":
         return f"{x:,.2f} PLS".replace(",", "@").replace(".", ",").replace("@", ".")
 
     print(f"  Barridos                : {inf['barridos']}")
-    print(f"  Retirado (validadores {min(VALIDADORES)}-{max(VALIDADORES)})")
+    print(f"  Retirado (validadores {min(INDICES)}-{max(INDICES)})")
     print(f"                          : {pls(inf['retirado_consenso'])}")
     print(f"  Excedente sin barrer    : {pls(inf['saldo_sin_barrer'])}")
     print(f"  {'-' * 44}")
