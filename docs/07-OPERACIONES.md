@@ -57,7 +57,8 @@ histórico vale más que ese coste, ahí está la opción.
 > entorno donde se escribió esto, ni ejecutar un restore de prueba. Antes de
 > fiarte el día malo, haz el ensayo de la sección 4 — que es justo para eso.
 
-`DB = validator-dashboard`, id `8631f448-e656-4dca-b8a9-78fb7a8bb06a`.
+Base de datos: `validator-dashboard`. `wrangler` la encuentra por el nombre; el
+id no hace falta.
 
 ### Paso 1 · Mirar qué hay, sin tocar nada
 

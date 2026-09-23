@@ -40,16 +40,16 @@ falsos sin tocar nada más.
 
 ## 1 bis. Dónde vive cada pieza
 
-Los identificadores del despliegue. No son credenciales —las dos que sí lo son,
-`VAL_PIN` y `VAL_SESSION_SECRET`, son *secrets* de Pages y no están en el
-repositorio—, pero sin ellos no se puede tocar nada desde fuera del panel de
-Cloudflare.
+Los nombres del despliegue. Los identificadores numéricos (cuenta, KV, D1) no
+se escriben aquí: se consultan en el panel de Cloudflare o con
+`npx wrangler d1 list` / `npx wrangler kv namespace list`. Las dos credenciales,
+`VAL_PIN` y `VAL_SESSION_SECRET`, son *secrets* de Pages y tampoco están en el
+repositorio.
 
 | Pieza | Dónde |
 |---|---|
-| Cuenta Cloudflare | `43fcbb2325e70c196b56d6759046fa55` |
-| KV `PLSDASH_KV` | `05fb9dd64a104e48ab5f4d2f324efd9d` |
-| D1 `validator-dashboard` | `8631f448-e656-4dca-b8a9-78fb7a8bb06a` (WEUR) |
+| KV | enlazado como `PLSDASH_KV` |
+| D1 | `validator-dashboard`, enlazada como `VALIDATOR_DB` (WEUR) |
 | Proyecto Pages | `plsdash`, repo `GUILLEMRCFX/PLSDASH`, auto-deploy desde `main` |
 | Estado actual del panel | KV, clave `validator:estado` |
 
