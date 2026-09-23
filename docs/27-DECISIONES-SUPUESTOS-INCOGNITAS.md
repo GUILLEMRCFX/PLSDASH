@@ -41,7 +41,12 @@
 
 | Decisión | Cuándo | Por qué |
 |---|---|---|
-| **Cinco pestañas, incluida la Esfera** | sep-2026 | Reparto equilibrado: de 454–2.252 px a 887–1.242 px a 390 px. Son cinco en total —Resumen, Ganancias, Validadores, Nodo, Esfera—, no cinco más una. |
+| **Guiar no es operar (P9)** | 23-sep-2026 | «El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.» Desbloquea la pestaña Ampliar (era la incógnita P1). |
+| **Seis pestañas: Ampliar entra entre Validadores y Nodo** | 23-sep-2026 | Todo lo del siguiente validador en un sitio: lo que falta, la trayectoria y el simulador (venían de Validadores), las aportaciones (de Ganancias), la guía y la comprobación del `deposit_data`. Medido a 390: «Validadores» ocupa 53 px en un botón de 59, cabe sin abreviar. |
+| **El tema, dentro de Nodo** | 23-sep-2026 | Con seis pestañas y el engranaje en la barra, a 390 los botones bajaban a 50 px y «Validadores» no cabía. |
+| **Cada dato personal vive en el nivel más alto posible** | 23-sep-2026 | 1 · de la cadena (dirección de retirada, activación, depósito, versión de fork, contrato); 2 · lo publica el NUC (usuario, carpeta de claves, script de recuperación); 3 · de este navegador (el host del nodo); 4 · nunca (la seed y las contraseñas de los keystores). La wallet y la fecha de activación dejan de estar escritas en el código. |
+| **Manda lo observado sobre lo marcado** | 23-sep-2026 | En la guía, un paso que el estado demuestra hecho cuenta aunque no lo marques; una marca que el estado desmiente no cuenta y se dice. |
+| **El `deposit_data` se comprueba en el navegador, sin la firma** | 23-sep-2026 | Cinco controles: dirección de retirada, que sea uno, la clave contra las tuyas, el importe, la red. La firma exige BLS y la valida el launchpad; la pestaña lo dice en pantalla. El fichero no sale del ordenador. |
 | **La esfera no es navegación** | ago-2026 | En 390 px, elegir un validador girando una esfera es peor que tocar una fila. |
 | **Malla Voronoi, no geodésica** | ago-2026 | La geodésica hace muaré y deja costura en el ecuador. Y una malla irregular dice «red». |
 | **Sin bloom** | ago-2026 | Con el resplandor dentro de cada primitiva, el postprocesado lo aplica dos veces: negro a gris. |
@@ -112,7 +117,8 @@
 | 🟡 **La heurística de bloques acierta** | El desglose base/suerte y el recuento de bloques serían falsos | Contrastar contra el CSV de ValDash |
 | 🟡 **`PRECIO_SACRIFICIO = 0,0001` es correcto** | El «frente a tu entrada» miente por un factor de diez | El propietario lo confirmó contra el gráfico WPLS/DAI. Sin segunda fuente. |
 | 🟡 **Las tres direcciones de stablecoin son correctas** | Las entradas reales caen en «no cuadra» en vez de contar como dólares | Mirar si alguna entrada conocida aparece en descuadres |
-| 🟡 **`plsmenu` mantendrá el mismo orden de pantallas** | La guía de ampliación daría pasos equivocados con el validador ya parado | Revisar tras cada actualización de `tdslaine/install_pulse_node` |
+| 🟡 **`plsmenu` mantendrá el mismo orden de pantallas** | La guía de ampliación daría pasos equivocados con el validador ya parado | Revisar tras cada actualización de `tdslaine/install_pulse_node`. Cada paso de la guía tiene un «no me coincide» que para. 🔴 **Falta anotar contra qué versión se escribió** (`ESCRITA_CONTRA` en `val/v2/paneles/pasos.js`). |
+| 🟡 **El script de recuperación se llama `start_validator.sh` y está en la carpeta de instalación** | La guía no ofrecería el comando que levanta el validador si `plsmenu` falla | El recolector solo lo publica si el fichero EXISTE; si no, la guía lo dice |
 | 🟡 **No hay pagos MEV-Boost en este nodo** | Habría ingresos no contabilizados | No verificado. ValDash tampoco los incluye. |
 
 ---
@@ -143,7 +149,7 @@
 
 | # | Incógnita | Impacto |
 |---|---|---|
-| P1 | **¿Guiar un proceso paso a paso viola el principio P9?** El panel observa, no opera. Dar comandos listos para copiar, ¿es observar? | **Bloquea la pestaña de ampliar** |
+| P1 | ✅ **Resuelta el 23-sep-2026: guiar no es operar.** Ver Parte 1, Producto. | — |
 | P2 | ¿Qué objetivo tiene la web pública ahora que el trabajo está en el panel? | Medio |
 | P3 | ¿Se reconcilia la paleta del Vault con los cinco temas? | Bajo |
 
@@ -160,7 +166,7 @@
 
 **De todo lo anterior, tres cosas deciden el rumbo. El resto puede esperar.**
 
-*(A 21-sep-2026 la primera está resuelta; quedan dos.)*
+*(A 23-sep-2026 están resueltas la primera y la tercera; queda el ensayo de la copia.)*
 
 ### ✅ 1 · `barridos.precio_pls` — RESUELTO el 21-sep-2026
 
@@ -191,12 +197,13 @@ restaurar no es una copia. El procedimiento está en el documento 07, sección 4
 con un ensayo diseñado para no poder salir mal —restaurar al instante actual—.
 No se ha ejecutado.
 
-### 🟡 3 · El principio P9 y la pestaña de ampliar — P1
+### ✅ 3 · El principio P9 y la pestaña de ampliar — RESUELTO el 23-sep-2026
 
-**Por qué bloquea:** la siguiente función grande del panel depende de responderlo.
-Si guiar cuenta como operar, la pestaña no se hace. Si no, se hace.
+Guiar no es operar. La línea, escrita tal cual:
 
-**Es una decisión, no una investigación.**
+> El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.
+
+La pestaña Ampliar está construida sobre ella.
 
 ---
 
@@ -206,3 +213,4 @@ Si guiar cuenta como operar, la pestaña no se hace. Si no, se hace.
 |---|---|
 | 15-sep-2026 | Versión 1.0. Consolidadas las preguntas abiertas de los documentos 01 a 05. |
 | 20-sep-2026 | Auditoría del código contra los documentos. Trece decisiones superadas y de interfaz que faltaban. Corregido el depósito —estaba escrito a fuego y aquí decía que no— y el recuento de pestañas. |
+| 23-sep-2026 | P9 decidido y P1 cerrada. Seis pestañas, el tema en Nodo, los cuatro niveles de dato personal, «manda lo observado» y la comprobación del `deposit_data`. |

@@ -21,7 +21,7 @@
 import {
   gananciaAcumulada, ultimaHora, generadoHoy,
 } from '/val/compartido/ganancias.js';
-import { ACTIVACION_TS } from '../datos.js';
+import { activacionTs } from '../datos.js';
 import { fmt, fmtEdad, escapar } from './formato.js';
 import { htmlTreintaDias } from './treinta-dias.js';
 
@@ -46,7 +46,7 @@ export function panelGanancias(datos) {
       </section>`;
   }
 
-  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
+  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: activacionTs(estado) });
   const hora = ultimaHora(serie);
   const hoy = generadoHoy(serie);
 

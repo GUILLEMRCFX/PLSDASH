@@ -47,10 +47,27 @@ de dinero, swap, o descuadre.
 |---|---|---|
 | **KV** (`PLSDASH_KV`) | El estado actual completo | Cada 3 min |
 | **D1** (`validator-dashboard`) | Histórico y fuente de verdad | Horaria / por suceso |
-| **localStorage** | Preferencias del navegador: tema, wallets, HIDE DUST | — |
+| **localStorage** | Preferencias del navegador: tema, wallets, HIDE DUST; y en Ampliar, el host del nodo y las marcas de los dos pasos que no se observan | — |
 
 🟢 **DECIDED** · **KV es lo de ahora, D1 es lo de siempre.** Si KV se pierde, se
 regenera en tres minutos. Si D1 se pierde, el histórico no vuelve.
+
+### Lo que añade el estado desde el 23-sep-2026
+
+Para la pestaña Ampliar, y para que la wallet y la activación dejen de estar
+escritas en el código. Todo lo publica `collector.py`:
+
+| Campo | De dónde | Para qué |
+|---|---|---|
+| `validadores.wallet_retirada` | Las `withdrawal_credentials` 0x01 de los validadores, si TODOS comparten dirección; si no, `null` | La Function de ganancias recorre esa wallet; la guía la da a copiar y el verificador compara contra ella |
+| `validadores.activacion_ts` | La epoch de activación más antigua del grupo (1786095955 hoy) | El corte que deja fuera las retiradas del validador anterior que usó la misma wallet |
+| `red.deposito`, `red.fork_version`, `red.contrato_deposito` | `/eth/v1/config/spec`, la misma lectura que el depósito | El verificador del `deposit_data` y el paso de depositar |
+| `entorno.usuario`, `entorno.dir_claves`, `entorno.script_recuperacion`, `entorno.plsmenu`, `entorno.deposit_data_reciente` | La propia máquina. La carpeta de claves se puede cambiar con `PLSDASH_CLAVES`; el script solo se publica si existe | Los comandos de la guía, sin nada personal escrito en el panel |
+
+⚠ **Orden de despliegue:** `/api/val/ganancia` ya no sabe la wallet por sí sola.
+Hasta que el NUC corra el `collector.py` nuevo, la lee de su propia caché; con la
+caché vacía no recorre el explorador y sirve lo guardado marcado como obsoleto.
+Por eso el recolector se sube al NUC ANTES de fusionar.
 
 ---
 

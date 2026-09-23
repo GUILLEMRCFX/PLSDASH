@@ -40,7 +40,7 @@
  */
 
 import { gananciaAcumulada, aprValidadorHora } from '/val/compartido/ganancias.js';
-import { ACTIVACION_TS, saludGlobal } from '../datos.js';
+import { activacionTs, saludGlobal } from '../datos.js';
 import { fmt, fmtPrecio, fmtCompacto, escapar } from './formato.js';
 import { tablaRitmo } from './ritmo.js';
 import { desglosarSaldo } from './aportaciones.js';
@@ -105,7 +105,7 @@ export function panelResumen(datos) {
   const alerta = salud.tono !== 'ok';
   const v = estado?.validadores || {};
 
-  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
+  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: activacionTs(estado) });
   const hayPrecio = precio && precio.disponible !== false && precio.precio > 0;
 
   // El APR ponderado por validador-hora. Ver la nota larga en el módulo

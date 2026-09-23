@@ -8,9 +8,13 @@
  *   seguidas repitiendo una cifra.
  *
  *   Ahora aquí viven la CUENTA y el MANDO, y quien los pinta es
- *   `trayectoria.js`, en una sola tarjeta: la barra de lo reunido arriba y el
- *   deslizador debajo. El plazo se calcula UNA vez, en `proyectar()`, así que
- *   ya no pueden divergir ni por redondeo.
+ *   `trayectoria.js`. El plazo se calcula UNA vez, en `proyectar()`, así que
+ *   no pueden divergir ni por redondeo.
+ *
+ *   ⚠ Desde la pestaña Ampliar (23-sep-2026) vuelven a ser dos tarjetas —lo
+ *     reunido con su plazo, y el mando con el suyo—, pero NO repiten cifra:
+ *     con el mando a cero, el plazo del simulador se queda en «—» y remite al
+ *     de arriba. Solo enseña número cuando aportar cambia algo.
  *
  * ## La cuenta, entera
  *
@@ -200,37 +204,34 @@ export function mandoSimulador(aporte) {
     </div>`;
 }
 
-export function textoDetalle(r, ritmo, aporte) {
-  const partes = [];
+/** Días desde ahora → «agosto de 2027». */
+export function haciaFecha(ahoraS, dias) {
+  return new Date((ahoraS + dias * 86400) * 1000)
+    .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+}
 
-  if (aporte > 0 && r.hayPrecio) {
-    partes.push(`
-      <div class="cifra">
-        <span class="c-num">${fmtCompacto(r.plsMes)}<span class="u">PLS</span></span>
-        <span class="c-eti">Es lo que compra al mes</span>
-        <span class="c-sub">al precio de ahora</span>
-      </div>`);
+/** El plazo aportando. Con el mando a cero, nada: sería el de arriba repetido. */
+export function textoPlazoSim(r, aporte, ahoraS) {
+  if (!(aporte > 0) || r?.dias == null) {
+    return `<span class="t-num apagado">—</span>
+        <span class="c-sub">sin aportar, el de arriba</span>`;
   }
+  return `<span class="t-num">${escapar(fmtPlazo(r.dias) || '—')}</span>
+        <span class="c-sub">hacia ${escapar(haciaFecha(ahoraS, r.dias))}</span>`;
+}
 
-  // Lo que de verdad importa: cuánto adelanta respecto a no poner nada.
-  if (aporte > 0 && r.adelanta != null && r.adelanta >= 1) {
-    partes.push(`
-      <div class="cifra">
-        <span class="c-num sim-gana">${escapar(fmtPlazo(r.adelanta) || '—')}</span>
-        <span class="c-eti">Antes que sin aportar</span>
-        <span class="c-sub">frente a ${escapar(fmtPlazo(r.diasBase) || '—')} al ritmo solo</span>
-      </div>`);
+/**
+ * Lo que de verdad importa del simulador: cuánto adelanta respecto a no poner
+ * nada. «Tardas 3 meses» no dice nada sin el «en vez de 11».
+ */
+export function textoAdelanta(r, aporte) {
+  if (aporte > 0 && r?.adelanta != null && r.adelanta >= 1) {
+    return `<span class="t-num sim-gana">−${escapar(fmtPlazo(r.adelanta) || '—')}</span>
+        <span class="c-sub">frente a no aportar${r.hayPrecio
+          ? ` · compra ${escapar(fmtCompacto(r.plsMes))} PLS al mes` : ''}</span>`;
   }
-
-  if (!partes.length) {
-    partes.push(`
-      <div class="cifra">
-        <span class="c-num">${fmt((ritmo?.pls_dia) || 0)}<span class="u">PLS</span></span>
-        <span class="c-eti">Al día, medido</span>
-        <span class="c-sub">${escapar(ritmo?.base || '')}</span>
-      </div>`);
-  }
-  return partes.join('');
+  return `<span class="t-num apagado">—</span>
+        <span class="c-sub">${aporte > 0 ? 'no adelanta ni un día' : 'mueve el mando para ver cuánto adelanta'}</span>`;
 }
 
 /**
@@ -251,7 +252,8 @@ export function engancharSimulador(raiz, datos) {
   if (!mando) return;
   const salida = raiz.querySelector('#simSalida');
   const plazo = raiz.querySelector('#simPlazo');
-  const detalle = raiz.querySelector('#simDetalle');
+  const adelanta = raiz.querySelector('#simAdelanta');
+  if (!plazo || !adelanta) return;
 
   const { estado, serie, snapshots24h, ganancia, precio, ahoraS } = datos;
   const v = estado?.validadores || {};
@@ -274,12 +276,8 @@ export function engancharSimulador(raiz, datos) {
     mando.setAttribute('aria-valuetext',
       aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada');
 
-    const f = new Date((ahoraS + r.dias * 86400) * 1000)
-      .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-    plazo.querySelector('.c-num').textContent = fmtPlazo(r.dias) || '—';
-    plazo.querySelector('.c-eti').textContent = aporte > 0 ? 'Aportando eso' : 'Al ritmo actual';
-    plazo.querySelector('.c-sub').textContent = `hacia ${f} · proyección, no promesa`;
-    detalle.innerHTML = textoDetalle(r, ritmo, aporte);
+    plazo.innerHTML = textoPlazoSim(r, aporte, ahoraS);
+    adelanta.innerHTML = textoAdelanta(r, aporte);
 
     try { localStorage.setItem(CLAVE, String(aporte)); } catch { /* da igual */ }
   };

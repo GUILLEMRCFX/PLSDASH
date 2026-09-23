@@ -67,9 +67,10 @@ export function aplicarGuardado() {
 
 /* ─────────────────────────────────────────────── el selector
 
-   Vive en la BARRA DE PESTAÑAS, a la derecha de «Esfera», y no dentro de una
-   pestaña: el tema se cambia desde cualquier sitio. Antes era un panel al final
-   de Nodo, o sea que para cambiar de tema había que ir primero a Nodo.
+   Vive al final de NODO, en su propia tarjeta. Estuvo en la barra de pestañas,
+   a la derecha de «Esfera», y volvió aquí el 23-sep-2026: con la sexta pestaña
+   (Ampliar), seis pestañas y el engranaje no cabían a 390 sin recortar
+   «Validadores». Es una preferencia que se toca una vez al mes.
 
    ⚠ SE MONTA UNA SOLA VEZ, y no es una optimización: los paneles regeneran su
      HTML entero cada 18 segundos, y el engranaje vive fuera de ese ciclo a
@@ -119,7 +120,7 @@ export function montarTema(caja, { alSalir } = {}) {
   caja.innerHTML = `
     <button type="button" class="tm-abrir" id="tmAbrir"
             aria-expanded="false" aria-haspopup="true"
-            aria-label="${rotulo(puesto)}">${ENGRANAJE}<span class="pt-eti">Tema</span></button>
+            aria-label="${rotulo(puesto)}">${ENGRANAJE}<span class="pt-eti">${puesto.nombre}</span></button>
     <div class="tm-lista" id="tmLista" role="menu" aria-labelledby="tmAbrir" hidden>
       ${opciones}${alSalir ? `
       <button type="button" class="tm-op tm-salir" role="menuitem" id="tmSalir"
@@ -186,6 +187,10 @@ export function montarTema(caja, { alSalir } = {}) {
       // Al sitio, sin regenerar nada: ver el aviso de arriba.
       const t = TEMAS.find(x => x.id === id) || TEMAS[0];
       abrir.setAttribute('aria-label', rotulo(t));
+      // El botón dice el tema puesto: desde que vive en Nodo es un botón con
+      // nombre, no un icono suelto en la barra.
+      const eti = abrir.querySelector('.pt-eti');
+      if (eti) eti.textContent = t.nombre;
       /* `[data-tema]` y no `.tm-op` a secas: «Cerrar sesión» comparte la clase
          para heredar el aspecto, pero es un `menuitem` y no un
          `menuitemradio` — ponerle `aria-checked` lo convertiría en una opción
