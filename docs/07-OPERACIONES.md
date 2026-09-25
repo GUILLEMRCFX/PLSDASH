@@ -215,3 +215,31 @@ agotado por una siembra demasiado larga.
   que la pregunta se cae sola. Con un volcado por cron sí haría falta.
 - Los 280 barridos anteriores al 16-ago no tienen precio y no lo tendrán:
   son anteriores al primer snapshot con precio guardado.
+
+---
+
+## 7. Qué publica Cloudflare Pages
+
+Desde el 25-sep-2026, **solo `public/`**. En el panel de Cloudflare:
+*Workers & Pages → plsdash → Settings → Build → Build configuration* (en paneles
+antiguos, *Settings → Builds & deployments*):
+
+| Ajuste | Valor |
+|---|---|
+| Build command | vacío |
+| Build output directory | `public` |
+| Root directory | vacío (la raíz del repositorio: ahí está `functions/`) |
+
+⚠ **El ajuste vale para todo el proyecto, producción incluida.** Si alguna vez
+se cambia, hay que hacerlo pegado al PR que mueve los ficheros: con el ajuste
+en `public` y un `main` sin esa carpeta, la siguiente construcción de producción
+sale vacía. Vuelta atrás: poner el valor anterior y, en *Deployments*,
+**Rollback** al último despliegue bueno.
+
+Comprobación después de cualquier cambio aquí:
+
+```bash
+curl -sI https://plsdash.com/docs/00-INDICE.md | head -1   # 404
+curl -sI https://plsdash.com/val/v2/ | head -1             # 200
+curl -s  https://plsdash.com/api/precio | head -c 80       # JSON
+```

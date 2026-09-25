@@ -106,6 +106,5 @@ construye— están en el documento 27, que manda sobre esta lista.
 | **La migración `001-limpieza.sql` está APARCADA** | no ejecutarla sin avisar. Lleva su propio orden obligatorio: fusionar, desplegar, comprobar, y solo entonces ejecutar — al revés deja `/api/val/ganancia` en 500 |
 | **La tabla `ajustes` quedó huérfana** en D1 al retirar el precio de entrada editable | borrarla es una migración, y la migración está aparcada |
 | **Gráfica de recompensas** | aplazada de mutuo acuerdo |
-| **Bloquear de verdad `nuc/`, `migraciones/`, `pruebas/` y ahora `docs/`** | `_routes.json` no lo hace; falta averiguar cuál es la forma correcta en Pages. Incógnita T4 del documento 27 |
 | **Pruebas perdidas y no reconstruidas** | las que dependían de una fixture grande con datos reales de D1: `paneles-test`, `paneles34`, `paneles5678`, `pestanas`, `carga-test`, `nav-test`, y las de la portada `frontend`, `logos`, `polvo`, `iphone`. De `esfera-test` se recuperó la calibración en `esfera-calibracion-test.mjs`. Anotadas en `pruebas/README.md` |
 | **`vault-test` intermitente** | falló una vez de siete en la comprobación del fogonazo y no se ha podido reproducir. Lleva volcado de estado al fallar para saber de qué lado está |

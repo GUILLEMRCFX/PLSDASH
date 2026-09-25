@@ -185,8 +185,7 @@ hace en su nombre.
 > El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.
 
 Es la frase que para un botón de «ejecutar por SSH» el día que alguien lo
-proponga. La pestaña Ampliar es la primera que la aplica: da comandos para
-copiar y marca los pasos por lo que ve en el estado, no por lo que se le dice.
+proponga.
 
 **Cómo se ve:** cualquier función que escriba en el NUC o en la cadena, o que
 abra una conexión desde el panel hacia cualquier sitio que no sea su propia

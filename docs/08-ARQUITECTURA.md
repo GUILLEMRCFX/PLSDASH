@@ -197,12 +197,16 @@ mínimo siga viéndose va en la GEOMETRÍA, no en el mapeo del dato: puesto en e
 mapeo se comía el 28 % de la escala antes de empezar.
 
 ⚠️ **`_routes.json` no controla qué se sirve como estático.** Decide dónde corre
-el runtime de Functions, nada más. Lo demuestra el propio repositorio:
-`/val/v2/paneles/*` está en `exclude` y el navegador lo descarga en cada carga.
-Igual `pruebas/`, `nuc/`, `migraciones/` y `docs/`: son descargables. No hay
-credenciales en ellos —el NUC las lee de su `.env`, y las IP y la parte de
-seguridad se quedan fuera del repositorio a propósito— pero conviene saberlo
-antes de mover nada más ahí dentro. Ver incógnita T4 del documento 27.
+el runtime de Functions, nada más: `/val/v2/paneles/*` está en `exclude` y el
+navegador lo descarga en cada carga. Lo que decide qué se descarga es la
+carpeta que publica Pages, y desde el 25-sep-2026 es `public/`. Hasta entonces
+se publicaba la raíz y `pruebas/`, `nuc/`, `migraciones/` y `docs/` se podían
+descargar.
+
+⚠️ **Una Function que devuelva 404 NO lo arregla, y se miró.** Corre antes que
+el estático, sí, pero en el plan gratuito, al agotarse la cuota diaria de
+Functions, Pages sirve los estáticos igual («fail open»): la protección
+desaparece justo entonces. Y `_redirects` no admite un 404.
 
 ⚠️ **La regla del navegador para `[hidden]` es
 `[hidden]:not([hidden="until-found"])`**: dos atributos, así que le gana a una

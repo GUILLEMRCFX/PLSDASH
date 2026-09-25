@@ -41,14 +41,11 @@
 
 | Decisión | Cuándo | Por qué |
 |---|---|---|
-| **Guiar no es operar (P9)** | 23-sep-2026 | «El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.» Desbloquea la pestaña Ampliar (era la incógnita P1). |
-| **Seis pestañas: Ampliar entra entre Validadores y Nodo** | 23-sep-2026 | Todo lo del siguiente validador en un sitio: lo que falta, la trayectoria y el simulador (venían de Validadores), las aportaciones (de Ganancias), la guía y la comprobación del `deposit_data`. Medido a 390: «Validadores» ocupa 53 px en un botón de 59, cabe sin abreviar. |
+| **Cinco pestañas, incluida la Esfera** | sep-2026 | Reparto equilibrado: de 454–2.252 px a 887–1.242 px a 390 px. Son cinco en total —Resumen, Ganancias, Validadores, Nodo, Esfera—, no cinco más una. |
+| **Guiar no es operar (P9)** | 23-sep-2026 | «El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.» Cerró la incógnita P1. Sigue siendo cierta aunque la pestaña que la aplicaba se retirara. |
 | **El Resumen es el patrimonio** | 25-sep-2026 | La cifra grande era «Total generado» (~45 $) y los ~4.300 $ del stake no salían en ningún sitio. Ahora: franja de salud arriba —encima del dinero a propósito—, patrimonio en dólares con los PLS debajo, tres filas que lo suman y hacen de selector, y lo generado aparte porque no suma. El ritmo y el precio quedan debajo, en pequeño. |
 | **Una sola cifra protagonista por pestaña** | 25-sep-2026 | Había muchos números del mismo peso compitiendo. |
-| **El tema, dentro de Nodo** | 23-sep-2026 | Con seis pestañas y el engranaje en la barra, a 390 los botones bajaban a 50 px y «Validadores» no cabía. |
-| **Cada dato personal vive en el nivel más alto posible** | 23-sep-2026 | 1 · de la cadena (dirección de retirada, activación, depósito, versión de fork, contrato); 2 · lo publica el NUC (usuario, carpeta de claves, script de recuperación); 3 · de este navegador (el host del nodo); 4 · nunca (la seed y las contraseñas de los keystores). La wallet y la fecha de activación dejan de estar escritas en el código. |
-| **Manda lo observado sobre lo marcado** | 23-sep-2026 | En la guía, un paso que el estado demuestra hecho cuenta aunque no lo marques; una marca que el estado desmiente no cuenta y se dice. |
-| **El `deposit_data` se comprueba en el navegador, sin la firma** | 23-sep-2026 | Cinco controles: dirección de retirada, que sea uno, la clave contra las tuyas, el importe, la red. La firma exige BLS y la valida el launchpad; la pestaña lo dice en pantalla. El fichero no sale del ordenador. |
+| **La wallet de retirada y la activación, de la cadena** | 23-sep-2026 | El recolector las lee de las `withdrawal_credentials` y de la epoch de activación; dejan de estar escritas en `ganancia.js`, `explorador.py` y `datos.js`. Es lo que se queda de la regla de los cuatro niveles de dato personal, que nació con la pestaña Ampliar. |
 | **La esfera no es navegación** | ago-2026 | En 390 px, elegir un validador girando una esfera es peor que tocar una fila. |
 | **Malla Voronoi, no geodésica** | ago-2026 | La geodésica hace muaré y deja costura en el ecuador. Y una malla irregular dice «red». |
 | **Sin bloom** | ago-2026 | Con el resplandor dentro de cada primitiva, el postprocesado lo aplica dos veces: negro a gris. |
@@ -106,6 +103,7 @@
 | **Animación de pulso / latido ECG** | Rechazada por poco profesional. El pulso de datos de hoy es otra cosa: dice si el NUC reporta. | ago-2026 |
 | **Deslizador del simulador en euros** | El v1 dividía euros entre un precio en dólares, o sea daba por hecho que 1 € = 1 $. Hacerlo bien exige un tipo de cambio real: otra fuente que se cae y hay que vigilar. | sep-2026 |
 | **Bloqueo por intentos de PIN fallidos** | Decisión explícita del propietario: el panel no está enlazado y es de solo lectura. Lo cubre una regla de Cloudflare sobre `/api/val/auth`, fuera del repositorio. **El PIN de 4 dígitos se queda como está.** | sep-2026 |
+| **Pestaña Ampliar** —la guía de seis pasos para añadir un validador, la comprobación del `deposit_data` en el navegador, el host del nodo en el navegador, la sexta pestaña y el tema dentro de Nodo— | **El propietario la probó y no le convenció.** Estuvo del 23 al 25-sep-2026 (PR #68). La trayectoria y el simulador volvieron a Validadores, las aportaciones a Ganancias, el tema a la barra y las pestañas a cinco. Se quedó lo que valía sin ella: la wallet y la activación leídas de la cadena, el arreglo de `explorador.py` y el del repintado que borraba lo escrito. | 25-sep-2026 |
 
 ---
 
@@ -119,8 +117,6 @@
 | 🟡 **La heurística de bloques acierta** | El desglose base/suerte y el recuento de bloques serían falsos | Contrastar contra el CSV de ValDash |
 | 🟡 **`PRECIO_SACRIFICIO = 0,0001` es correcto** | El «frente a tu entrada» miente por un factor de diez | El propietario lo confirmó contra el gráfico WPLS/DAI. Sin segunda fuente. |
 | 🟡 **Las tres direcciones de stablecoin son correctas** | Las entradas reales caen en «no cuadra» en vez de contar como dólares | Mirar si alguna entrada conocida aparece en descuadres |
-| 🟡 **`plsmenu` mantendrá el mismo orden de pantallas** | La guía de ampliación daría pasos equivocados con el validador ya parado | Revisar tras cada actualización de `tdslaine/install_pulse_node`. Cada paso de la guía tiene un «no me coincide» que para. 🔴 **Falta anotar contra qué versión se escribió** (`ESCRITA_CONTRA` en `val/v2/paneles/pasos.js`). |
-| 🟡 **El script de recuperación se llama `start_validator.sh` y está en la carpeta de instalación** | La guía no ofrecería el comando que levanta el validador si `plsmenu` falla | El recolector solo lo publica si el fichero EXISTE; si no, la guía lo dice |
 | 🟡 **No hay pagos MEV-Boost en este nodo** | Habría ingresos no contabilizados | No verificado. ValDash tampoco los incluye. |
 
 ---
@@ -134,7 +130,7 @@
 | T1 | 🔴 **¿Qué es la tercera wallet de `meta`?** Tiene cursores de siembra y no está documentada. | Medio — puede estar consumiendo peticiones del explorador por nada |
 | T2 | 🔵 **¿Por qué el explorador no responde desde el navegador?** Sí desde el servidor. | Bajo — hay solución, falta la causa |
 | T3 | 🔵 **¿Qué límites reales tiene DexScreener?** Nunca consultados. | Bajo — mitigado por caché |
-| T4 | 🔵 **¿Cómo se bloquea de verdad `nuc/`, `migraciones/` y `pruebas/`?** `_routes.json` no sirve. | Medio — ver documento 09 |
+| T4 | ✅ **Resuelta el 25-sep-2026: publicar solo `public/`.** Una Function con 404 fallaba abierta al agotarse la cuota; `_redirects` no admite 404. Ver documento 08. Antes: «¿Cómo se bloquea de verdad `nuc/`, `migraciones/` y `pruebas/`?» | Medio — ver documento 09 |
 | T5 | 🟢 **Resuelto el 21-sep-2026: Time Travel de D1**, 30 días, sin construir nada. Se aceptan sus dos límites: vive en la misma cuenta y son 30 días. Ver documento 07. 🔴 **El ensayo de restauración sigue pendiente.** | Bajo, salvo el ensayo |
 | T6 | 🔵 ¿Se arregla `daily` o se retira? Nadie la lee, la causa está localizada. | Bajo |
 
@@ -199,13 +195,14 @@ restaurar no es una copia. El procedimiento está en el documento 07, sección 4
 con un ensayo diseñado para no poder salir mal —restaurar al instante actual—.
 No se ha ejecutado.
 
-### ✅ 3 · El principio P9 y la pestaña de ampliar — RESUELTO el 23-sep-2026
+### ✅ 3 · El principio P9 — RESUELTO el 23-sep-2026
 
 Guiar no es operar. La línea, escrita tal cual:
 
 > El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.
 
-La pestaña Ampliar está construida sobre ella.
+La pestaña Ampliar se construyó sobre ella y se retiró el 25-sep-2026 (ver la
+Parte 2); la frase se queda porque sigue siendo cierta.
 
 ---
 
@@ -217,3 +214,4 @@ La pestaña Ampliar está construida sobre ella.
 | 20-sep-2026 | Auditoría del código contra los documentos. Trece decisiones superadas y de interfaz que faltaban. Corregido el depósito —estaba escrito a fuego y aquí decía que no— y el recuento de pestañas. |
 | 23-sep-2026 | P9 decidido y P1 cerrada. Seis pestañas, el tema en Nodo, los cuatro niveles de dato personal, «manda lo observado» y la comprobación del `deposit_data`. |
 | 25-sep-2026 | El Resumen pasa a ser el patrimonio; una cifra protagonista por pestaña. |
+| 25-sep-2026 | La pestaña Ampliar pasa a decisiones superadas: el propietario la probó y no le convenció. Vuelven las cinco pestañas. |

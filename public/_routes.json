@@ -12,7 +12,6 @@
     "/val/v2/escena/*",
     "/val/v2/paneles/*",
     "/val/v2/fuentes/*",
-    "/val/compartido/*",
-    "/pruebas/*"
+    "/val/compartido/*"
   ]
 }

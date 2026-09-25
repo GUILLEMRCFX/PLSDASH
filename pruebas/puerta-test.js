@@ -133,8 +133,6 @@ const ESTADO = {
        v1 navegaba a «/» igual y la cookie se quedaba: parecía que salías. */
     const { p } = await abrir({ sesion: true, logoutOk: false });
     await hasta(() => p.$('.panel'), 25000);
-    // El engranaje vive al final de Nodo desde la sexta pestaña.
-    await p.click('#t-nodo');
     await p.click('#tmAbrir');
     await hasta(() => p.$('#tmSalir'), 5000);
     await p.click('#tmSalir');
@@ -146,8 +144,6 @@ const ESTADO = {
   {
     const { p } = await abrir({ sesion: true, logoutOk: true });
     await hasta(() => p.$('.panel'), 25000);
-    // El engranaje vive al final de Nodo desde la sexta pestaña.
-    await p.click('#t-nodo');
     await p.click('#tmAbrir');
     await hasta(() => p.$('#tmSalir'), 5000);
     await p.click('#tmSalir');
