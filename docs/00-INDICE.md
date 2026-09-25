@@ -31,12 +31,9 @@ es el manual de trabajo.
 
 ## Dos avisos
 
-⚠ **`docs/` se sirve públicamente.** `_routes.json` decide dónde corre el
-runtime de Functions, no qué ficheros se descargan: igual que `nuc/`,
-`migraciones/` y `pruebas/`, esta carpeta es accesible desde fuera. Estos
-documentos no llevan nada sensible —las IP y la parte de seguridad se quedan
-fuera del repositorio a propósito—, pero tenlo en cuenta antes de mover más
-cosas aquí dentro. Es la incógnita T4 del documento 27.
+⚠ **`docs/` ya no se publica** desde el 25-sep-2026: Pages publica solo
+`public/`. Pero el repositorio sigue siendo público en GitHub, y el historial
+también: las IP y la parte de seguridad se siguen quedando fuera a propósito.
 
 ⚠ **Si el código contradice a un documento, gana el código** para saber qué pasa
 hoy — y entonces el documento se corrige, no se deja. La jerarquía entre

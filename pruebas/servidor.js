@@ -14,7 +14,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const RAIZ = path.join(__dirname, '..');
+// Solo `public/`, como Pages desde el 25-sep-2026: lo que no está ahí no se
+// publica, y aquí tampoco se sirve.
+const RAIZ = path.join(__dirname, '..', 'public');
 const PUERTO = Number(process.env.PUERTO || 8899);
 
 const TIPOS = {

@@ -22,7 +22,7 @@
  *
  *   node pruebas/rutas-test.mjs
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
 
 const RAIZ = new URL('..', import.meta.url).pathname;
@@ -162,9 +162,9 @@ console.log('\n=== LO QUE SE PIDE ===');
    un comentario no lo está PIDIENDO, y contarlo mantendría vivo un endpoint
    muerto solo porque otro fichero habla de él. */
 const clientes = [
-  join(RAIZ, 'index.html'),
-  join(RAIZ, 'vault.js'),
-  ...buscar(join(RAIZ, 'val'), ['.js', '.html'], ['vendor']),
+  join(RAIZ, 'public/index.html'),
+  join(RAIZ, 'public/vault.js'),
+  ...buscar(join(RAIZ, 'public/val'), ['.js', '.html'], ['vendor']),
 ];
 const piden = new Map();
 for (const f of clientes) {
@@ -207,6 +207,25 @@ console.log('\n=== LOS DOS QUE YA SE BORRARON POR ERROR ===');
 for (const u of ['/api/val/logout', '/api/val/auth']) {
   ok(`${u} lo pide alguien`, piden.has(u),
     'nadie lo pide: si es de verdad, quítalo; si no, algo se ha roto');
+}
+
+console.log('\n=== SOLO SE PUBLICA public/ ===');
+/* Desde el 25-sep-2026 Pages publica `public/` y nada más. Antes publicaba la
+   raíz, y `docs/`, `nuc/`, `pruebas/` y `migraciones/` se descargaban desde
+   plsdash.com. Esto impide que algo de eso vuelva a colarse dentro. */
+{
+  const WEB = join(RAIZ, 'public');
+  const todo = buscar(WEB, ['.md', '.py', '.sql', '.sh', '.mjs', '.env', '.txt']);
+  ok('en public/ no hay documentos, scripts ni SQL', todo.length === 0,
+    todo.map(f => relative(RAIZ, f)).join(', '));
+  for (const d of ['docs', 'nuc', 'pruebas', 'migraciones', 'functions']) {
+    ok(`${d}/ no está dentro de public/`, !existsSync(join(WEB, d)));
+  }
+  for (const f of ['_routes.json', '_headers', 'index.html', '404.html']) {
+    ok(`${f} está en public/`, existsSync(join(WEB, f)));
+    ok(`${f} no está en la raíz, donde ya no se lee`, !existsSync(join(RAIZ, f)));
+  }
+  ok('functions/ sigue en la raíz, donde la busca Pages', existsSync(join(RAIZ, 'functions/api')));
 }
 
 console.log('\n' + '='.repeat(52));

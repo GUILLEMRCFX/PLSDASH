@@ -60,7 +60,7 @@ console.log('\n=== 2. EL PANEL ===');
 }
 
 console.log('\n=== 3. YA NO ESTÁN ESCRITAS ===');
-for (const f of ['functions/api/val/ganancia.js', 'nuc/explorador.py', 'val/v2/datos.js']) {
+for (const f of ['functions/api/val/ganancia.js', 'nuc/explorador.py', 'public/val/v2/datos.js']) {
   const t = leer(f);
   okQue(`${f}: sin la wallet`, !/952e0311/i.test(t));
   okQue(`${f}: sin la activación como constante`, !/(ACTIVACION_TS\s*=|=\s*1786095955)/.test(t));

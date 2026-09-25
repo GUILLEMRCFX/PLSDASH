@@ -205,19 +205,21 @@ wallet de retirada, o sea el dinero que de verdad ha llegado.
 ## Estructura
 
 ```
-index.html                        la portada entera (HTML + CSS + JS)
-vault.js                          el Easter egg de la tarjeta
-404.html                          rescate de rutas: guarda el camino y va a /
+public/                           LO ÚNICO QUE SE PUBLICA. Todo lo demás no sale
+public/index.html                 la portada entera (HTML + CSS + JS)
+public/vault.js                   el Easter egg de la tarjeta
+public/404.html                   rescate de rutas: guarda el camino y va a /
+public/_headers _routes.json      caché y enrutado de Functions
 
-val/index.html                    redirección a /val/v2/  (aquí vivía el v1)
-val/compartido/ganancias.js       la lógica de ganancias. La importan 11 módulos
-val/v2/index.html                 el panel: marcado, pestañas y arranque
-val/v2/puerta.js  puerta.css      el PIN y el cierre de sesión
-val/v2/datos.js                   la única capa que habla con la red
-val/v2/paneles/                   un módulo por panel + estilo.css + tema + nav
-val/v2/carga/                     la pantalla de carga (esfera naciendo)
-val/v2/escena/                    la esfera en WebGL
-val/v2/vendor/three.module.js     three.js, sin tocar
+public/val/index.html             redirección a /val/v2/  (aquí vivía el v1)
+public/val/compartido/ganancias.js  la lógica de ganancias
+public/val/v2/index.html          el panel: marcado, pestañas y arranque
+public/val/v2/puerta.js  puerta.css  el PIN y el cierre de sesión
+public/val/v2/datos.js            la única capa que habla con la red
+public/val/v2/paneles/            un módulo por panel + estilo.css + tema + nav
+public/val/v2/carga/              la pantalla de carga (esfera naciendo)
+public/val/v2/escena/             la esfera en WebGL
+public/val/v2/vendor/three.module.js  three.js, sin tocar
 
 functions/api/portfolio/[code].js GET/PUT del portfolio en KV
 functions/api/precio.js           el precio de PLS, para todos
@@ -229,7 +231,6 @@ docs/                             por qué es así. Empieza por docs/00-INDICE.m
 pruebas/                          la suite. `./pruebas/correr.sh`
 migraciones/001-limpieza.sql      aparcada, ver docs/99
 nuc/                              lo que corre en el servidor doméstico
-_headers _routes.json             caché y enrutado de Functions
 ```
 
 ## Stack
@@ -336,15 +337,19 @@ ejecutar nada: sin sesión, los datos no llegan a leerse.
 | `PLSDASH_KV` | KV namespace |
 | `VALIDATOR_DB` | D1 `validator-dashboard` |
 
-Build settings: **sin** comando de build, *output directory* = `/`.
+Build settings: **sin** comando de build, *build output directory* = `public`.
+`functions/` se queda en la raíz del repositorio, que es donde Pages la busca.
+
+Desde el 25-sep-2026 solo se publica `public/`: `docs/`, `nuc/`, `pruebas/` y
+`migraciones/` ya no llegan a Cloudflare. Antes se publicaba la raíz entera y
+todo eso se podía descargar desde `plsdash.com`.
 
 ### `_routes.json` y `_headers`
 
-`_routes.json` decide **dónde corre el runtime de Functions**. Los `exclude`
-—`/val/v2/paneles/*`, `/pruebas/*`…— no impiden que esos ficheros se sirvan como
-estáticos; solo evitan invocar Functions ahí. `docs/`, `nuc/` y `migraciones/`
-ni siquiera están en `include`, así que Functions nunca corre ahí — y aun así se
-descargan. Ver las trampas del documento 08.
+`_routes.json` decide **dónde corre el runtime de Functions**, no qué se
+descarga: los `exclude` —`/val/v2/paneles/*`…— solo evitan invocar Functions
+ahí. Para que algo NO se descargue, no puede estar en `public/`. Ver las
+trampas del documento 08.
 
 `_headers` pone `no-cache` a `/val/v2/*` y a `/val`: son módulos ES que se
 importan por ruta fija, y quedarse con una copia vieja de uno mientras se sirve

@@ -50,8 +50,8 @@ function buscarConstante(raiz) {
       if (/(PRECIO_)?SACRIFICIO\s*=/.test(src)) salida.push(relative(raiz, r));
     }
   };
-  mirar(join(raiz, 'val'));
-  mirar(join(raiz, 'index.html').replace(/\/index\.html$/, '')); // la raíz, solo sus ficheros
+  mirar(join(raiz, 'public/val'));
+  mirar(join(raiz, 'public/index.html').replace(/\/index\.html$/, '')); // la raíz web, solo sus ficheros
   return [...new Set(salida)];
 }
 
@@ -83,13 +83,13 @@ ok('vale 0,0001', SACRIFICIO, 0.0001);
     'también aparece en: ' + otro.join(', '));
 }
 {
-  const fuente = readFileSync(RAIZ + 'val/v2/paneles/precio-simulado.js', 'utf8')
+  const fuente = readFileSync(RAIZ + 'public/val/v2/paneles/precio-simulado.js', 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   // El ajuste editable se retiró entero. Que no vuelva por la puerta de atrás.
   ok('no queda lectura de ajustes', /ajustes\?\.precio_entrada/.test(fuente), false);
   ok('ni petición al endpoint', /api\/val\/ajustes/.test(fuente), false);
   ok('ni formulario', /psForm|ps-guardar/.test(fuente), false);
-  const datos = readFileSync(RAIZ + 'val/v2/datos.js', 'utf8');
+  const datos = readFileSync(RAIZ + 'public/val/v2/datos.js', 'utf8');
   ok('y el cargador ya no lo pide', /ajustes/.test(datos), false);
 }
 

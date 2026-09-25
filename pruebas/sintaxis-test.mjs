@@ -52,10 +52,10 @@ try {
   console.log('\n=== MÓDULOS ===');
   // `vendor` fuera: three.js no es nuestro y tarda un segundo largo en parsear.
   const modulos = [
-    ...buscar(join(RAIZ, 'val/v2'), '.js', ['vendor']),
-    ...buscar(join(RAIZ, 'val/compartido'), '.js'),
+    ...buscar(join(RAIZ, 'public/val/v2'), '.js', ['vendor']),
+    ...buscar(join(RAIZ, 'public/val/compartido'), '.js'),
     ...buscar(join(RAIZ, 'functions'), '.js'),
-    join(RAIZ, 'vault.js'),
+    join(RAIZ, 'public/vault.js'),
   ];
   for (const ruta of modulos) {
     const copia = join(tmp, 'x.mjs');
@@ -88,7 +88,7 @@ try {
     return { abre, cierra };
   };
 
-  const hojas = buscar(join(RAIZ, 'val'), '.css', ['vendor']);
+  const hojas = buscar(join(RAIZ, 'public/val'), '.css', ['vendor']);
   for (const ruta of hojas) {
     const { abre, cierra } = cuentaLlaves(readFileSync(ruta, 'utf8'));
     ok(`${relative(RAIZ, ruta)} cuadra de llaves`, abre === cierra, `${abre} abren, ${cierra} cierran`);

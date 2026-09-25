@@ -130,7 +130,7 @@
 | T1 | 🔴 **¿Qué es la tercera wallet de `meta`?** Tiene cursores de siembra y no está documentada. | Medio — puede estar consumiendo peticiones del explorador por nada |
 | T2 | 🔵 **¿Por qué el explorador no responde desde el navegador?** Sí desde el servidor. | Bajo — hay solución, falta la causa |
 | T3 | 🔵 **¿Qué límites reales tiene DexScreener?** Nunca consultados. | Bajo — mitigado por caché |
-| T4 | 🔵 **¿Cómo se bloquea de verdad `nuc/`, `migraciones/` y `pruebas/`?** `_routes.json` no sirve. | Medio — ver documento 09 |
+| T4 | ✅ **Resuelta el 25-sep-2026: publicar solo `public/`.** Una Function con 404 fallaba abierta al agotarse la cuota; `_redirects` no admite 404. Ver documento 08. Antes: «¿Cómo se bloquea de verdad `nuc/`, `migraciones/` y `pruebas/`?» | Medio — ver documento 09 |
 | T5 | 🟢 **Resuelto el 21-sep-2026: Time Travel de D1**, 30 días, sin construir nada. Se aceptan sus dos límites: vive en la misma cuenta y son 30 días. Ver documento 07. 🔴 **El ensayo de restauración sigue pendiente.** | Bajo, salvo el ensayo |
 | T6 | 🔵 ¿Se arregla `daily` o se retira? Nadie la lee, la causa está localizada. | Bajo |
 
