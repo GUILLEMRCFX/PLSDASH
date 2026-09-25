@@ -26,7 +26,7 @@ SIN_NAVEGADOR=(
   "pruebas/doce-test.mjs"
   "pruebas/esfera-calibracion-test.mjs"
   "pruebas/precio-barridos-test.mjs"
-  "pruebas/ampliar-test.mjs"
+  "pruebas/cadena-test.mjs"
   "pruebas/resumen-test.mjs"
 )
 CON_NAVEGADOR=(
@@ -35,7 +35,7 @@ CON_NAVEGADOR=(
   "pruebas/invest-vista-test.js"
   "pruebas/vault-test.js"
   "pruebas/zoom-test.js"
-  "pruebas/ampliar-vista-test.js"
+  "pruebas/repintado-test.js"
 )
 
 # El servidor solo hace falta para las de navegador, pero levantarlo siempre
