@@ -24,8 +24,22 @@
 
 const API = '/api/val';
 
-/** Unix ts de la activación de los validadores. Mismo valor que usa /val/. */
-export const ACTIVACION_TS = 1786095955;
+/**
+ * Unix ts de la activación del grupo: la más antigua de las reales.
+ *
+ * Estuvo escrita aquí como `1786095955`, y en otros dos sitios. La cadena la
+ * sabe —es la epoch de activación de cada validador— y el recolector la
+ * publica, así que sale del estado. Sin ella devuelve null, y quien la usa
+ * tiene que decir que no lo sabe en vez de dar por buena una fecha.
+ */
+export function activacionTs(estado) {
+  const v = estado?.validadores || {};
+  const grupo = Number(v.activacion_ts);
+  if (Number.isFinite(grupo) && grupo > 0) return grupo;
+  const ts = (v.detalle || []).map(d => Number(d?.activacion_ts))
+    .filter(t => Number.isFinite(t) && t > 0);
+  return ts.length ? Math.min(...ts) : null;
+}
 
 async function pedir(url) {
   const r = await fetch(url, { credentials: 'same-origin' });

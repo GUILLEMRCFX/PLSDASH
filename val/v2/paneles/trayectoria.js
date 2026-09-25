@@ -36,16 +36,22 @@
  * cero daban el mismo objetivo, el mismo plazo y la misma fecha. Repetir una
  * cifra en dos tarjetas contiguas no es redundancia útil, es ruido.
  *
- * Ahora es una sola: la barra de lo reunido, el deslizador debajo y el plazo
- * que sale de los dos. El plazo se calcula UNA vez, en `proyectar()`, así que
- * ya no pueden divergir ni por redondeo — que era el riesgo de tenerlo escrito
- * dos veces.
+ * El plazo se calcula UNA vez, en `proyectar()`, así que ya no pueden divergir
+ * ni por redondeo — que era el riesgo de tenerlo escrito dos veces.
+ *
+ * ## Desde el 23-sep-2026 vive en Ampliar, y con otra forma
+ *
+ * Arriba y sin tarjeta, la cifra protagonista de la pestaña: lo que falta.
+ * Debajo, lo reunido con el plazo SOLO con lo que genera el nodo, que no se
+ * mueve. Y aparte el mando, cuyo plazo solo aparece cuando aportar cambia algo
+ * —con el mando a cero sería el de arriba repetido—. Una cifra grande por
+ * pestaña; las demás, claramente secundarias.
  */
 
 import { gananciaAcumulada, ritmoDiario } from '/val/compartido/ganancias.js';
-import { ACTIVACION_TS } from '../datos.js';
+import { activacionTs } from '../datos.js';
 import { desglosarSaldo } from './aportaciones.js';
-import { aporteGuardado, proyectar, mandoSimulador, textoDetalle, fmtPlazo } from './simulador.js';
+import { aporteGuardado, proyectar, mandoSimulador, textoAdelanta, textoPlazoSim, fmtPlazo, haciaFecha } from './simulador.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
 
 /**
@@ -72,7 +78,7 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
 
   const titulo = tituloObjetivo(estado);
   const deposito = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : null;
-  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
+  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: activacionTs(estado) });
 
   // Preferencia: el saldo de la wallet. Si no hay, lo generado, y se avisa.
   const deWallet = ganancia && ganancia.saldo_wallet != null;
@@ -80,9 +86,9 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
 
   if (!deposito || reunido == null) {
     return `
-      <section class="panel" aria-labelledby="pt-t">
-        <header class="p-cab"><h2 id="pt-t">${escapar(titulo)}</h2></header>
-        <p class="vacio">Faltan datos para calcular la trayectoria.</p>
+      <section class="heroe" aria-labelledby="pt-t">
+        <h2 class="h-eti" id="pt-t">${escapar(titulo)}</h2>
+        <p class="h-sub">Faltan datos para saber cuánto falta.</p>
       </section>`;
   }
 
@@ -111,12 +117,6 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
     precio: hayPrecio ? Number(precio.precio) : null,
     aporteMes: aporte,
   });
-  const dias = r?.dias ?? null;
-  const plazo = fmtPlazo(dias);
-  const fecha = dias != null
-    ? new Date((ahoraS + dias * 86400) * 1000)
-        .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-    : null;
 
   /* ── La barra, partida en dos: lo ganado y lo aportado ──────────────────
      ⚠ NO se descuenta lo aportado del progreso, y esa fue una decisión, no un
@@ -125,17 +125,12 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
        estás, que es la mentira contraria pero mentira igual.
 
        Lo que sí engañaba era no poder ver cuánto del avance has comprado y
-       cuánto has ganado. Así que se separa: el tramo cian es lo generado
-       validando, el naranja lo que has puesto tú.
-
-     El PLAZO sigue saliendo de lo que falta al ritmo medido, que es correcto:
-     si aportas, faltará menos y el plazo se acortará — pero por haber puesto
-     dinero, no por ganar más rápido, y ahora la barra lo enseña. */
+       cuánto has ganado. Así que se separa: el tramo del color del dato es lo
+       generado validando, el de acento lo que has puesto tú. */
   /* ⚠ Y solo se parte cuando la cuenta CUADRA. Si ha salido PLS de la wallet
      —`restoVisible`— no hay forma de saber si lo que salió era ganado o
      aportado: cualquier reparto sería una convención inventada con pinta de
-     dato. En ese caso la barra se deja entera y el pie dice el total aportado
-     sin fingir que se sabe cuánto de ello sigue ahí. */
+     dato. En ese caso la barra se deja entera y el pie lo dice. */
   const desglose = deWallet ? desglosarSaldo(datos) : null;
   const cuadra = desglose && desglose.hayRegistro && !desglose.restoVisible;
   const aportado = cuadra ? Math.min(Number(desglose.aportado) || 0, reunido) : 0;
@@ -147,70 +142,62 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
       + `<i class="a-aportado" style="width:${pctAportado.toFixed(2)}%"></i>`
     : `<i class="a-ganado" style="width:${pct.toFixed(2)}%"></i>`;
 
-  const pieBarra = aportado > 0
-    ? `${fmtCompacto(reunido - aportado)} generados · ${fmtCompacto(aportado)} aportados`
-    : desglose && desglose.hayRegistro
-      ? `saldo de la wallet · ${fmtCompacto(desglose.aportado)} aportados en total`
-      : (deWallet ? 'saldo de la wallet' : 'lo generado');
+  const leyenda = desglose && desglose.hayRegistro
+    ? (cuadra
+      ? '<span class="t-ley g">generado</span><span class="t-ley a">aportado</span>'
+      : `<span>saldo de la wallet · ${escapar(fmtCompacto(desglose.aportado))} aportados en total</span>`)
+    : `<span>${deWallet ? 'saldo de la wallet' : 'lo generado'}</span>`;
+
+  /* El plazo SOLO con lo que genera el nodo va aquí, fijo: es el dato. El del
+     simulador va en su tarjeta y se mueve con el dedo. Son dos cifras distintas
+     a propósito: «cuánto tardaría sin hacer nada» no puede cambiar porque
+     muevas un deslizador. */
+  const base = proyectar({ falta, plsDia: ritmo?.pls_dia, precio: null, aporteMes: 0 });
+  const diasBase = base?.dias ?? null;
+  const cuandoBase = diasBase != null ? haciaFecha(ahoraS, diasBase) : null;
 
   return `
-    <section class="panel" aria-labelledby="pt-t">
-      <header class="p-cab">
-        <h2 id="pt-t">${escapar(titulo)}</h2>
-        <span class="p-marca">${fmt(pct, 1)} %</span>
-      </header>
-
+    <section class="heroe" aria-labelledby="pt-t">
+      <h2 class="h-eti" id="pt-t">${escapar(titulo)}</h2>
       ${yaEsta ? `
-      <div class="cifra">
-        <span class="c-num sim-gana">${fmt(Math.floor(reunido / deposito))}<span class="u">${
-          Math.floor(reunido / deposito) === 1 ? 'validador' : 'validadores'}</span></span>
-        <span class="c-eti">Ya lo tienes reunido</span>
-        <span class="c-sub">${fmt(reunido)} PLS en la wallet · el depósito son ${
-          fmtCompacto(deposito)} PLS${
-          reunido - deposito > 0 ? ` · sobran ${fmtCompacto(reunido - deposito)}` : ''}</span>
-      </div>` : `
-      <div class="cifra">
-        <span class="c-num">${fmt(falta)}<span class="u">PLS</span></span>
-        <span class="c-eti">Faltan para el depósito</span>
-        ${hayPrecio
-          ? `<span class="c-sub">≈ ${fmt(falta * precio.precio, 2)} $</span>`
-          : '<span class="c-sub alerta">Sin precio de PLS: no se convierte a dólares.</span>'}
-      </div>`}
+      <p class="h-num bien">Ya lo tienes</p>
+      <p class="h-sub">${fmt(reunido)} PLS en la wallet · el depósito son ${
+        fmtCompacto(deposito)} PLS${
+        reunido - deposito > 0 ? ` · sobran ${fmtCompacto(reunido - deposito)}` : ''}</p>` : `
+      <p class="h-num">${fmt(falta)}<span class="u">PLS</span></p>
+      <p class="h-sub">faltan para el depósito${hayPrecio
+        ? ` · ≈ ${fmt(falta * precio.precio, 2)} $`
+        : ' · <span class="alerta">sin precio de PLS, no se pasa a dólares</span>'}</p>`}
+    </section>
 
+    <section class="panel t-reunido" aria-label="Lo reunido">
       <div class="avance" role="presentation">
         <div class="a-barra">${barra}</div>
-        <div class="a-pie">
-          <span class="mono">${fmtCompacto(reunido)} de ${fmtCompacto(deposito)}&nbsp;PLS</span>
-          <span>${escapar(pieBarra)}</span>
+        <div class="a-pie t-pie">
+          <span class="mono">${fmtCompacto(reunido)} de ${fmtCompacto(deposito)}</span>
+          ${leyenda}
         </div>
       </div>
-
-      <!-- El deslizador entre la barra y el plazo: cuánto llevas, qué pondrías,
-           cuánto tardarías. Ese es el orden en que se lee. -->
-      ${mandoSimulador(aporte)}
-
       ${yaEsta ? `
-      <p class="c-sub">Cuando lo deposites, este panel vuelve a contar hacia el
-        siguiente: el objetivo sale de <code>stake_total / total</code>, así que
-        se mueve solo.</p>
-      ` : plazo ? `
-      <div class="cifra" id="simPlazo">
-        <span class="c-num">${escapar(plazo)}</span>
-        <span class="c-eti">${aporte > 0 ? 'Aportando eso' : 'Al ritmo actual'}</span>
-        <span class="c-sub">hacia ${escapar(fecha)} · proyección, no promesa</span>
-      </div>
-
-      <div class="rejilla sim-detalle" id="simDetalle">
-        ${textoDetalle(r, ritmo, aporte)}
-      </div>
-
-      <p class="c-sub">
-        Sobre lo que falta al ritmo medido —${escapar(ritmo?.base || 'sin base')}—
-        más lo que compra la aportación al precio de ahora.
-        ${r.hayPrecio ? '' : '<span class="alerta">Sin precio de PLS: la aportación no se puede convertir y solo cuenta el ritmo.</span>'}
-      </p>
-      ` : '<p class="c-sub">Sin ritmo medible para estimar el plazo.</p>'}
-
+      <p class="c-sub">Cuando lo deposites, esto vuelve a contar hacia el siguiente.</p>` : `
+      <div class="t-plazo">
+        <span class="c-eti">Solo con lo que genera el nodo</span>
+        <span class="t-num">${escapar(fmtPlazo(diasBase) || '—')}</span>
+        <span class="c-sub">${cuandoBase
+          ? `hacia ${escapar(cuandoBase)} · proyección, no promesa`
+          : 'sin ritmo medible para estimarlo'}</span>
+      </div>`}
       ${deWallet ? '' : '<p class="c-sub alerta">Sin lectura de la wallet: se usa lo generado, que puede no estar disponible.</p>'}
-    </section>`;
+    </section>
+
+    ${yaEsta || diasBase == null ? '' : `
+    <section class="panel t-sim" aria-label="Si aporto cada mes">
+      ${mandoSimulador(aporte)}
+      <div class="t-dos">
+        <div class="t-plazo" id="simPlazo">${textoPlazoSim(r, aporte, ahoraS)}</div>
+        <div class="t-plazo" id="simAdelanta">${textoAdelanta(r, aporte)}</div>
+      </div>
+      <p class="c-sub t-base">Al ritmo medido —${escapar(ritmo?.base || 'sin base')}— más lo que
+        compra la aportación al precio de ahora.${r?.hayPrecio ? '' : ' <span class="alerta">Sin precio de PLS: la aportación no se puede convertir.</span>'}</p>
+    </section>`}`;
 }

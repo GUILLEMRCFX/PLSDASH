@@ -40,7 +40,7 @@
  */
 
 import { gananciaAcumulada, ritmoDiario } from '/val/compartido/ganancias.js';
-import { ACTIVACION_TS } from '../datos.js';
+import { activacionTs } from '../datos.js';
 import { fmt, fmtPrecio, escapar } from './formato.js';
 
 export const TITULO = 'Si PLS valiera otra cosa';
@@ -145,7 +145,7 @@ export function panelPrecioSimulado(datos) {
       </section>`;
   }
 
-  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
+  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: activacionTs(estado) });
   const ritmo = ritmoDiario({ serie, snapshots24h, plsDiaKV: v.pls_dia, fmt });
 
   const r = valorar({
@@ -255,7 +255,7 @@ export function engancharPrecioSimulado(raiz, datos) {
   const { estado, serie, snapshots24h, ganancia, precio } = datos;
   const v = estado?.validadores || {};
   const real = Number(precio?.precio) || null;
-  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: ACTIVACION_TS });
+  const acum = gananciaAcumulada({ estado, ganancia, serie, activacionTs: activacionTs(estado) });
   const ritmo = ritmoDiario({ serie, snapshots24h, plsDiaKV: v.pls_dia, fmt });
 
   const salida = raiz.querySelector('#psPrecio');

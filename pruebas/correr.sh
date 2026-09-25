@@ -6,6 +6,10 @@
 #
 # Sale con 0 solo si TODO pasa: sirve tal cual para un gancho de pre-push.
 set -uo pipefail
+# Sin .pyc: dos veces ha salido una prueba del NUC con el módulo de antes,
+# porque el .pyc se valida por fecha y tamaño y una edición del mismo tamaño
+# en el mismo segundo pasa por buena.
+export PYTHONDONTWRITEBYTECODE=1
 cd "$(dirname "$0")/.."
 
 FILTRO="${1:-}"
@@ -22,6 +26,7 @@ SIN_NAVEGADOR=(
   "pruebas/doce-test.mjs"
   "pruebas/esfera-calibracion-test.mjs"
   "pruebas/precio-barridos-test.mjs"
+  "pruebas/ampliar-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"
@@ -29,6 +34,7 @@ CON_NAVEGADOR=(
   "pruebas/invest-vista-test.js"
   "pruebas/vault-test.js"
   "pruebas/zoom-test.js"
+  "pruebas/ampliar-vista-test.js"
 )
 
 # El servidor solo hace falta para las de navegador, pero levantarlo siempre

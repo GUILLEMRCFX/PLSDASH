@@ -180,7 +180,17 @@ PLSDASH no arranca contenedores, no para el nodo, no firma transacciones y no
 toca las claves. Puede **guiar** al propietario para que lo haga él, pero no lo
 hace en su nombre.
 
-**Cómo se ve:** cualquier función que escriba en el NUC o en la cadena.
+🟢 **DECIDED** (23-sep-2026) · **Guiar no es operar.** La línea exacta:
+
+> El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.
+
+Es la frase que para un botón de «ejecutar por SSH» el día que alguien lo
+proponga. La pestaña Ampliar es la primera que la aplica: da comandos para
+copiar y marca los pasos por lo que ve en el estado, no por lo que se le dice.
+
+**Cómo se ve:** cualquier función que escriba en el NUC o en la cadena, o que
+abra una conexión desde el panel hacia cualquier sitio que no sea su propia
+API.
 
 ---
 
@@ -233,6 +243,6 @@ documento 27.
   propietario y lo que es genérico (documento 09).
 - ¿Qué pasa con la web pública si el trabajo se concentra en el panel? Hoy se
   mantiene, pero no tiene un objetivo propio escrito.
-- El principio P9 dice que el panel no opera. ¿Guiar un proceso paso a paso,
-  dando comandos listos para copiar, sigue siendo observar? Se ha asumido que sí,
-  pero no está decidido.
+- ~~El principio P9 dice que el panel no opera. ¿Guiar un proceso paso a paso,
+  dando comandos listos para copiar, sigue siendo observar?~~ **Decidido el
+  23-sep-2026: sí.** Ver P9.

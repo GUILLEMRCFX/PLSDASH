@@ -12,6 +12,7 @@ Uso:
 """
 
 import json
+import os
 import sys
 import urllib.request
 import urllib.error
@@ -27,7 +28,11 @@ PROM = "http://localhost:9099"
 
 # Los validadores se descubren solos leyendo los keystores del disco.
 # Antes era una lista fija y el 11o (indice 109876, no 109559) quedo fuera.
-KEYSTORE_DIR = "/blockchain/validator_keys"
+#
+# `/blockchain` es la carpeta que propone el instalador de PulseChain, no una
+# ruta de esta maquina: quien lo instalo en otro sitio lo dice con
+# PLSDASH_CLAVES y todo lo demas —la guia de ampliacion incluida— sale de ahi.
+KEYSTORE_DIR = os.environ.get("PLSDASH_CLAVES", "/blockchain/validator_keys")
 
 def _pubkeys_locales():
     import glob
@@ -90,6 +95,7 @@ DEPOSITO_MAX = 100_000_000
 GWEI = 1_000_000_000
 
 _deposito = None                                  # memoria dentro de la corrida
+_spec = None                                      # el spec entero, de la misma lectura
 
 
 def deposito_pls(forzar=False):
@@ -109,12 +115,13 @@ def deposito_pls(forzar=False):
     deposito equivocado envenena el APR, el objetivo del panel y el aviso de
     «ya tienes para uno entero», asi que no puede cambiar en silencio.
     """
-    global _deposito
+    global _deposito, _spec
     if _deposito is not None and not forzar:
         return _deposito
 
     _deposito = DEPOSITO_RESPALDO
     data = (get_json(f"{BEACON}{SPEC}") or {}).get("data") or {}
+    _spec = data
 
     for clave in ("MIN_ACTIVATION_BALANCE", "MAX_EFFECTIVE_BALANCE"):
         if clave not in data:
@@ -137,6 +144,137 @@ def deposito_pls(forzar=False):
         print(f"[aviso] el spec de la cadena no responde o no trae el deposito; "
               f"se usa el respaldo ({DEPOSITO_RESPALDO:,} PLS)", file=sys.stderr)
     return _deposito
+
+
+# ----------------------------------------------------------------------
+# La red, tal y como la describe su propio spec
+# ----------------------------------------------------------------------
+#
+# Lo que la guia de ampliacion necesita para comprobar un `deposit_data` sin
+# tener nada escrito: el deposito, la version de fork con la que se firma el
+# deposito y el contrato al que va. Salen de la MISMA lectura del spec que el
+# deposito —`deposito_pls()` la guarda—, asi que no cuestan ni una peticion.
+#
+# Se valida la FORMA y no el valor: un valor escrito aqui seria justo lo que
+# este bloque existe para evitar. Lo que no tenga forma de lo que dice ser se
+# publica como None, y el panel dice «no se puede comprobar» en vez de
+# comparar contra basura.
+
+def _hex(valor, bytes_):
+    """'0x' + exactamente `bytes_` bytes en hexadecimal, en minusculas; o None."""
+    if not isinstance(valor, str):
+        return None
+    v = valor.lower()
+    if not v.startswith("0x") or len(v) != 2 + 2 * bytes_:
+        return None
+    try:
+        int(v[2:], 16)
+    except ValueError:
+        return None
+    return v
+
+
+def red():
+    """Deposito, version de fork del genesis y contrato de deposito."""
+    deposito = deposito_pls()
+    spec = _spec or {}
+    return {
+        "deposito": deposito,
+        # Es la que va dentro del `deposit_data` como `fork_version`: una clave
+        # generada para otra red trae otra, y el deposito se perderia.
+        "fork_version": _hex(spec.get("GENESIS_FORK_VERSION"), 4),
+        "contrato_deposito": _hex(spec.get("DEPOSIT_CONTRACT_ADDRESS"), 20),
+    }
+
+
+# ----------------------------------------------------------------------
+# La direccion de retirada, leida de la cadena
+# ----------------------------------------------------------------------
+#
+# Estuvo escrita a mano en dos sitios —la Function de ganancias y el
+# explorador— y ninguno de los dos tenia por que saberla: cada validador la
+# lleva en sus `withdrawal_credentials`. Con credenciales de tipo 0x01 (o
+# 0x02) son 32 bytes: el prefijo, once ceros y los veinte de la direccion.
+# Comprobado el 23-sep-2026 contra el nodo:
+#
+#     0x01 0000000000000000000000 952e0311dddce7090d61a275f411a6ddf879bdc8
+#
+# Con 0x00 NO hay direccion: es un hash de una clave BLS, y lo que haya ahi
+# no se puede leer como una wallet. Se publica None.
+
+def direccion_retirada(cred):
+    """`0x…` de 20 bytes en minusculas, o None si esas credenciales no la llevan."""
+    c = _hex(cred, 32)
+    if c is None or c[2:4] not in ("01", "02") or c[4:26] != "0" * 22:
+        return None
+    return "0x" + c[26:]
+
+
+def _retirada_del_grupo(direcciones, sin_direccion):
+    """Una sola direccion si TODOS la comparten; None en cualquier otro caso.
+
+    ⚠ NO SE ELIGE LA MAS FRECUENTE. Si un validador retira a otra wallet, la
+      Function de ganancias contaria solo los barridos de la mayoria y el panel
+      diria menos de lo ganado sin avisar. Mejor que se note: sin direccion
+      unica, el panel lo dice.
+    """
+    if sin_direccion or len(direcciones) != 1:
+        return None
+    return next(iter(direcciones))
+
+
+# ----------------------------------------------------------------------
+# Lo que la maquina sabe de si misma
+# ----------------------------------------------------------------------
+#
+# Para la guia de ampliacion: con que usuario se entra, donde estan las
+# claves y si estan las dos herramientas que la guia va a nombrar. Nada de
+# esto se escribe en el panel —lo haria valido solo para esta maquina—, asi
+# que lo publica quien lo sabe.
+#
+# ⚠ NI UNA LLAMADA A LA RED Y NADA QUE PUEDA LANZAR: esto no puede tumbar al
+#   recolector por una carpeta que no existe.
+
+def _ejecutable(nombre):
+    import shutil
+    # cron arranca con un PATH minimo y `plsmenu` vive en /usr/local/bin.
+    ruta = os.environ.get("PATH", "") + ":/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin"
+    return shutil.which(nombre, path=ruta) is not None
+
+
+def entorno():
+    base = os.path.dirname(KEYSTORE_DIR.rstrip("/")) or "/"
+    try:
+        import getpass
+        usuario = getpass.getuser()
+    except Exception:
+        usuario = None
+
+    # El script que vuelve a levantar el validador si `plsmenu` lo para y algo
+    # falla antes de volver a crearlo. Se publica la ruta solo si EXISTE: la
+    # guia no puede dar a copiar un comando que no va a funcionar.
+    recuperacion = os.path.join(base, "start_validator.sh")
+
+    # El `deposit_data` mas reciente de la carpeta de claves: es el que hay
+    # que bajarse para comprobarlo. Solo el nombre y la fecha; el contenido no
+    # sale de aqui.
+    reciente = None
+    try:
+        import glob
+        ficheros = glob.glob(os.path.join(KEYSTORE_DIR, "deposit_data-*.json"))
+        if ficheros:
+            f = max(ficheros, key=os.path.getmtime)
+            reciente = {"nombre": os.path.basename(f), "ts": int(os.path.getmtime(f))}
+    except OSError:
+        pass
+
+    return {
+        "usuario": usuario,
+        "dir_claves": KEYSTORE_DIR,
+        "script_recuperacion": recuperacion if os.path.isfile(recuperacion) else None,
+        "plsmenu": _ejecutable("plsmenu"),
+        "deposit_data_reciente": reciente,
+    }
 
 
 # ----------------------------------------------------------------------
@@ -305,6 +443,8 @@ def leer_validadores():
     slashed = 0
     activation_epoch_min = None
     en_cadena = set()
+    retiradas = set()
+    sin_direccion = 0
 
     ahora_utc = datetime.now(timezone.utc)
     # UNA lectura por corrida, no una por validador: `deposito_pls()` se
@@ -339,6 +479,11 @@ def leer_validadores():
 
         total_balance += balance
         en_cadena.add(str(info["pubkey"]).lower())
+        dir_ret = direccion_retirada(info.get("withdrawal_credentials"))
+        if dir_ret is None:
+            sin_direccion += 1
+        else:
+            retiradas.add(dir_ret)
         validadores.append({
             "indice": int(v["index"]),
             "pubkey": info["pubkey"],
@@ -442,7 +587,13 @@ def leer_validadores():
         "stake_total": stake_total,
         "ganado_total": round(ganado_total, 4),
         "activacion_utc": None if activacion is None else activacion.isoformat(),
+        # El mismo instante en unix. Es el corte que usa la Function de
+        # ganancias para no contar las retiradas del validador que uso esta
+        # wallet antes: estuvo escrito a mano en tres sitios.
+        "activacion_ts": None if activacion is None else int(activacion.timestamp()),
         "horas_activo": None if horas_activo is None else round(horas_activo, 2),
+        # De la cadena, no de configuracion. Ver `direccion_retirada()`.
+        "wallet_retirada": _retirada_del_grupo(retiradas, sin_direccion),
         "pls_hora": pls_hora,
         "pls_dia": None,
         "apr_pct": apr,
@@ -575,6 +726,19 @@ def recolectar():
 
     salud = salud_de(vals, nodo)
 
+    # Cada uno en su `try`: son para la guia de ampliacion, y que fallen no
+    # puede dejar al panel sin estado.
+    try:
+        la_red = red()
+    except Exception as e:
+        print(f"[aviso] no se pudo componer la red: {e}", file=sys.stderr)
+        la_red = None
+    try:
+        el_entorno = entorno()
+    except Exception as e:
+        print(f"[aviso] no se pudo leer el entorno: {e}", file=sys.stderr)
+        el_entorno = None
+
     return {
         "version": 1,
         "generado": ahora.isoformat(),
@@ -582,6 +746,8 @@ def recolectar():
         "salud": salud,
         "validadores": vals,
         "nodo": nodo,
+        "red": la_red,
+        "entorno": el_entorno,
     }
 
 

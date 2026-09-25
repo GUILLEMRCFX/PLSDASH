@@ -984,31 +984,9 @@
                 opacity .2s ease-out, margin-top .3s ease-out;
   }
 
-  /* El engranaje, sexto hueco de la píldora: si se quedara arriba, la barra de
-     arriba sería una fila entera para un solo botón.
-
-     ⚠ Y CON SU ETIQUETA, como los otros cinco. Sin ella era un botón de otra
-       forma en la misma fila: su icono se centraba en los 48px (centro a 31)
-       mientras los de las pestañas quedaban a 25, porque esos llevan la
-       etiqueta debajo. Seis pulgadas de diferencia se ven, y se veían. Con la
-       etiqueta los seis huecos son idénticos y se alinean solos en los dos
-       estados, sin un solo número que ajustar. */
-  .barra .tm { display: flex; align-items: stretch; }
-  .tm-abrir {
-    display: flex; flex-direction: column; align-items: center;
-    justify-content: center; gap: 3px;
-    border-radius: 14px; min-height: 48px; min-width: 52px;
-    padding: 7px 4px 6px;
-    /* El mismo cuerpo que las pestañas. El engranaje NO cuelga de `.pestanas`,
-       así que su etiqueta no heredaba los 9,5px y salía más alta: eso empujaba
-       su icono 2px por encima del de los demás. */
-    font: 500 9.5px/1 var(--texto);
-  }
-  .tm-abrir svg { width: 22px; height: 22px; display: block;
-    transition: width .3s cubic-bezier(.34, 1.56, .64, 1),
-                height .3s cubic-bezier(.34, 1.56, .64, 1); }
-  :root[data-nav="contraida"] .tm-abrir { padding: 7px 4px; }
-  :root[data-nav="contraida"] .tm-abrir svg { width: 19px; height: 19px; }
+  /* El engranaje ya no vive aquí: desde la sexta pestaña (Ampliar, 23-sep-2026)
+     está dentro de Nodo, al final. Seis pestañas y el engranaje no cabían a
+     390 sin recortar «Validadores». */
 
   /* ── contraída ─────────────────────────────────────────────────────────── */
   :root[data-nav="contraida"] .barra {
@@ -1035,7 +1013,6 @@
    también — allí es un botón redondo con su dibujo y ya está. */
 @media (min-width: 820px) {
   .pt-ico { display: none; }
-  .tm-abrir .pt-eti { display: none; }
 }
 
 /* Sin movimiento: la barra no se contrae nunca. Lo decide `nav.js`, que no
@@ -1045,7 +1022,6 @@
   :root[data-nav="contraida"] .barra { left: 12px; right: 12px; padding: 6px; }
   :root[data-nav="contraida"] .pt-eti { max-height: 14px; max-width: 7em; opacity: 1; margin-top: 0; }
   :root[data-nav="contraida"] .pt-ico svg { width: 22px; height: 22px; }
-  :root[data-nav="contraida"] .tm-abrir svg { width: 22px; height: 22px; }
 }
 
 .pestanas button[aria-selected="true"] {
@@ -1437,14 +1413,6 @@
 .tm-abrir[aria-expanded="true"] { color: var(--dato); background: var(--dato-tinte); }
 .tm-abrir svg { display: block; transition: transform .25s; }
 
-/* ⚠ Va AQUÍ y no en la media query de la barra, que está antes en el fichero:
-   allí la sobrescribía la regla de arriba por orden de aparición y el engranaje
-   se quedaba en 42px. Comprobado midiéndolo, no leyéndolo.
-   38 de ancho sigue siendo tocable porque el alto no baja de 42, y los 4px que
-   suelta valen una letra de «Validadores». */
-@media (max-width: 460px) {
-  .tm-abrir { width: 38px; }
-}
 .tm-abrir[aria-expanded="true"] svg { transform: rotate(60deg); }
 
 .tm-lista {
@@ -1779,3 +1747,267 @@ details[open] > .ap-abrir::before { transform: rotate(45deg); }
 }
 .listo-t { font: 600 14px/1.3 var(--texto); color: var(--bien); }
 .listo-s { font: 400 11.5px/1.4 var(--texto); color: var(--apagado); }
+
+
+/* ═══════════════════════════════════════════════ pestaña Ampliar
+
+   UNA cifra protagonista por pestaña: aquí, lo que falta para el depósito. Va
+   arriba y SIN tarjeta, que es lo que la separa de todo lo demás a primera
+   vista. Lo demás son tarjetas de siempre, con cifras de 22px como mucho. */
+
+.visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* El blanco de la cifra grande, teñido del tema: en «Núcleo» es casi blanco con
+   un punto de cian, en «Ámbar» con un punto de ámbar. El color del dato a
+   pleno en 48px cansaba y se comía el resto de la pantalla. */
+:root { --heroe: color-mix(in srgb, var(--dato) 22%, #f4f7fa); }
+
+.heroe { display: flex; flex-direction: column; gap: 6px; padding: 8px 4px 2px; }
+.heroe p { margin: 0; }
+.h-eti {
+  margin: 0; font: 600 11px/1.2 var(--texto);
+  letter-spacing: .16em; text-transform: uppercase; color: var(--apagado);
+}
+.h-num {
+  font: 700 48px/1 var(--cifra); letter-spacing: -.03em;
+  color: var(--heroe); font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.h-num .u { font: 500 16px/1 var(--cifra); color: var(--apagado); margin-left: 6px; letter-spacing: 0; }
+.h-num.bien { color: var(--bien); }
+.h-sub { font: 400 13px/1.45 var(--texto); color: var(--dato-suave); }
+.h-sub .alerta, .alerta { color: var(--acento); }
+/* En ancho, dos columnas y no las tres que da la rejilla de siempre: la guía
+   en una de 340px era una tira de dos pantallas de alto. Arriba lo que falta,
+   debajo lo reunido junto al simulador, las aportaciones a lo ancho, y la guía
+   al lado del fichero, que es con lo que se usa. */
+@media (min-width: 820px) {
+  #v-ampliar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .heroe, #v-ampliar .ap-panel { grid-column: 1 / -1; }
+  .h-num { font-size: 56px; }
+}
+
+/* Lo reunido: la barra, su pie y el plazo sin aportar. */
+.t-pie { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.t-pie > .mono { flex: 1 1 auto; letter-spacing: 0; font-size: 12px; color: var(--apagado); }
+.t-ley { font-size: 12px; letter-spacing: 0; }
+.t-ley::before { content: '● '; }
+.t-ley.g { color: var(--dato-suave); }
+.t-ley.g::before { color: var(--dato); }
+.t-ley.a { color: var(--dato-suave); }
+.t-ley.a::before { color: var(--acento); }
+
+.t-plazo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.t-reunido .t-plazo { border-top: 1px solid var(--borde); padding-top: 12px; }
+.t-num {
+  font: 600 22px/1.15 var(--cifra); color: var(--dato-suave);
+  font-variant-numeric: tabular-nums;
+}
+.t-num.apagado { color: var(--apagado); }
+.t-num.sim-gana { color: var(--bien); }
+.t-plazo .c-sub { font-size: 12px; color: var(--apagado); }
+.t-dos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.t-base { font-size: 12px; color: var(--apagado); }
+
+/* Las aportaciones, plegadas en una fila: el resumen a la izquierda y el botón
+   a la derecha. El botón ES el «summary» del «details». */
+.ap-panel { padding-top: 14px; padding-bottom: 14px; }
+.ap-panel .ap-desp { margin-top: 0; }
+.ap-cabeza {
+  display: flex; align-items: center; gap: 12px;
+  list-style: none; cursor: pointer;
+}
+.ap-cabeza::-webkit-details-marker { display: none; }
+.ap-resumen { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.ap-titulo {
+  margin: 0; font: 600 11px/1.2 var(--texto);
+  letter-spacing: .14em; text-transform: uppercase; color: var(--apagado);
+}
+.ap-linea { font: 400 14px/1.35 var(--texto); color: var(--dato-suave); }
+.ap-dolar { font: 400 12px/1.35 var(--texto); color: var(--apagado); }
+.ap-boton {
+  flex: none; display: inline-flex; align-items: center;
+  min-height: 44px; padding: 0 16px; border-radius: 22px;
+  border: 1px solid var(--borde-vivo); background: var(--dato-tinte);
+  color: var(--dato); font: 500 13px/1 var(--texto);
+}
+.ap-cabeza:hover .ap-boton { border-color: var(--dato); }
+.ap-cabeza:focus-visible { outline: none; }
+.ap-cabeza:focus-visible .ap-boton { box-shadow: 0 0 0 2px var(--dato); }
+details[open] > .ap-cabeza { margin-bottom: 14px; }
+
+/* ─────────────────────────────────────── la guía */
+
+.g-cuenta { font: 400 12px/1.2 var(--texto); color: var(--apagado); }
+.g-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.g-paso { display: flex; flex-direction: column; }
+.g-cabeza {
+  display: flex; align-items: flex-start; gap: 12px; width: 100%;
+  background: none; border: 0; padding: 6px 0; margin: 0;
+  text-align: left; cursor: pointer; color: inherit; font: inherit;
+  min-height: 40px;
+}
+.g-cabeza:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--dato); border-radius: 8px; }
+.g-num {
+  flex: none; width: 26px; height: 26px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  font: 600 13px/1 var(--cifra); box-sizing: border-box;
+  border: 1px solid var(--borde-vivo); color: var(--apagado);
+}
+.g-paso.toca .g-num { background: var(--dato); border-color: var(--dato); color: var(--fondo); font-weight: 700; }
+.g-paso.hecho .g-num { border-color: var(--bien-vivo); color: var(--bien); }
+.g-tit { display: flex; flex-direction: column; gap: 2px; padding-top: 3px; min-width: 0; }
+.g-nombre { font: 400 14px/1.3 var(--texto); color: var(--dato-suave); }
+.g-paso.toca .g-nombre, .g-paso.abierto .g-nombre { font-weight: 500; font-size: 15px; color: var(--heroe); }
+.g-paso.luego .g-nombre { color: var(--apagado); }
+.g-res { font: 400 12px/1.4 var(--texto); color: var(--apagado); }
+
+.g-cuerpo {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 2px 0 12px 38px; min-width: 0;
+}
+.g-texto { font: 400 13px/1.55 var(--texto); color: var(--dato-suave); }
+.g-nota { display: block; font: 400 12px/1.45 var(--texto); color: var(--apagado); }
+.g-nota.alerta { color: var(--acento); }
+.g-hueco { color: var(--acento); }
+
+.g-cmd {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 8px 8px 12px; border-radius: 10px;
+  background: color-mix(in srgb, var(--fondo) 85%, transparent);
+  border: 1px solid var(--borde);
+}
+.g-cmd code {
+  /* Corta por las barras de la ruta —el marcado lleva un «wbr» tras cada una—
+     y solo parte una palabra si no hay más remedio. */
+  flex: 1 1 auto; min-width: 0; overflow-wrap: break-word;
+  font: 12.5px/1.5 var(--tecnico); color: var(--heroe);
+}
+.g-copiar {
+  flex: none; width: 40px; height: 40px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; background: none; color: var(--dato); cursor: pointer;
+}
+.g-copiar:hover { background: var(--dato-tinte); }
+.g-copiar:disabled { color: var(--apagado); opacity: .45; cursor: default; background: none; }
+.g-copiar.copiado { color: var(--bien); }
+
+.g-host { display: flex; flex-direction: column; gap: 5px; }
+.g-host > span:first-child { font: 500 12px/1.3 var(--texto); color: var(--apagado); }
+.g-host input {
+  font: 400 14px/1.2 var(--tecnico); color: var(--heroe);
+  background: color-mix(in srgb, var(--fondo) 85%, transparent);
+  border: 1px solid var(--borde); border-radius: 9px; padding: 10px 12px;
+  min-height: 42px; box-sizing: border-box; width: 100%;
+}
+.g-host input:focus { outline: none; border-color: var(--borde-vivo); }
+/* 16px en táctil: por debajo, Safari amplía la página al enfocar. */
+@media (pointer: coarse) { .g-host input { font-size: 16px; } }
+
+.g-datos { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.g-datos > div { display: grid; grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr); gap: 2px 12px; }
+.g-datos dt { font: 400 12px/1.5 var(--texto); color: var(--apagado); }
+.g-datos dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.g-datos dd .mono { font-size: 13px; color: var(--heroe); overflow-wrap: anywhere; }
+
+.g-trampa {
+  display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px;
+  background: var(--acento-velo); border: 1px solid var(--acento-marco);
+  color: var(--acento);
+}
+.g-trampa svg { flex: none; margin-top: 2px; }
+.g-trampa p { font: 400 12.5px/1.5 var(--texto); color: color-mix(in srgb, var(--acento) 55%, #fff); }
+.g-trampa .g-cuando { color: var(--acento); font-weight: 500; }
+.g-grande { font: 700 34px/1.1 var(--cifra) !important; color: var(--acento) !important; margin: 2px 0 !important; }
+
+.g-bloqueo, .g-deberias { font: 400 12.5px/1.5 var(--texto); color: var(--apagado); }
+.g-bloqueo { color: var(--acento); }
+.g-deberias b { font-weight: 500; color: var(--dato-suave); }
+.g-observa { font: 400 12px/1.45 var(--texto); color: var(--apagado); }
+.g-observa.hecho { color: var(--bien); }
+.g-vigila { font: 400 12.5px/1.5 var(--texto); }
+.g-vigila.bien { color: var(--bien); }
+.g-vigila.mal { color: var(--acento); }
+
+.g-marca {
+  display: flex; align-items: center; gap: 10px; text-align: left;
+  min-height: 44px; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--borde-vivo); background: none;
+  font: 400 13px/1.35 var(--texto); color: var(--dato-suave); cursor: pointer;
+}
+.g-marca:disabled { cursor: default; }
+.g-caja {
+  flex: none; width: 18px; height: 18px; border-radius: 5px;
+  border: 1px solid var(--borde-vivo); display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--fondo);
+}
+.g-marca.si { border-color: var(--bien-vivo); }
+.g-marca.si .g-caja { background: var(--bien); border-color: var(--bien); }
+
+.g-link {
+  align-self: flex-start; background: none; border: 0; padding: 6px 0;
+  font: 400 12.5px/1.3 var(--texto); color: var(--apagado);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+  min-height: 32px;
+}
+.g-link:hover { color: var(--dato-suave); }
+.g-para {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--acento-marco);
+}
+.g-para p { font: 400 12.5px/1.5 var(--texto); color: var(--dato-suave); }
+.g-para b { color: var(--acento); }
+.g-p9 {
+  border-top: 1px solid var(--borde); padding-top: 12px;
+  font: 400 12px/1.5 var(--texto); color: var(--apagado);
+}
+
+/* ─────────────────────────────────────── el deposit_data */
+
+.d-zona { display: flex; flex-direction: column; gap: 12px; }
+.d-soltar {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  text-align: center; padding: 18px 16px; border-radius: 16px;
+  border: 1.5px dashed var(--borde-vivo); color: var(--dato);
+  cursor: pointer; background: color-mix(in srgb, var(--fondo) 60%, transparent);
+  transition: border-color .15s, background .15s;
+}
+.d-soltar:hover, .d-soltar.encima { border-color: var(--dato); background: var(--dato-raya); }
+.d-soltar:focus-within { border-color: var(--dato); }
+.d-tit { font: 500 14px/1.3 var(--texto); color: var(--heroe); overflow-wrap: anywhere; }
+.d-sub { font: 400 12px/1.45 var(--texto); color: var(--apagado); }
+.d-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.d-control { display: flex; gap: 10px; align-items: flex-start; }
+.d-control > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.d-control b { font: 500 13px/1.35 var(--texto); color: var(--dato-suave); }
+.d-det { font: 400 12px/1.45 var(--texto); color: var(--apagado); overflow-wrap: anywhere; }
+.d-ico {
+  flex: none; width: 22px; height: 22px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font: 700 12px/1 var(--texto); margin-top: 1px;
+}
+.d-control.bien .d-ico { background: var(--bien-velo); color: var(--bien); }
+.d-control.mal .d-ico { background: var(--acento-tinte); color: var(--acento); }
+.d-control.mal b { color: var(--acento); }
+.d-control.aviso .d-ico { background: var(--acento-velo); color: var(--acento); }
+.d-control.sin_dato .d-ico { background: var(--dato-raya); color: var(--apagado); }
+.d-veredicto { margin: 0; font: 500 13px/1.4 var(--texto); }
+.d-veredicto.bien { color: var(--bien); }
+.d-veredicto.mal { color: var(--acento); }
+.d-firma { margin: 0; font: 400 12px/1.5 var(--texto); color: var(--apagado); text-align: center; }
+.d-firma b { color: var(--dato-suave); font-weight: 500; }
+.d-zona.con-resultado .d-firma { text-align: left; }
+
+/* ─────────────────────────────────────── el tema, dentro de Nodo */
+
+.p-tema .p-cab { align-items: center; }
+.p-tema .tm-abrir {
+  width: auto; min-height: 42px; gap: 8px; padding: 0 12px;
+  border: 1px solid var(--borde); border-radius: 10px;
+  font: 500 13px/1 var(--texto); flex-direction: row;
+}
+.p-tema .tm-abrir .pt-eti { display: inline; max-width: none; max-height: none; opacity: 1; margin: 0; }
+.p-tema .tm-abrir svg { width: 18px; height: 18px; }

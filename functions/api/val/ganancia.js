@@ -26,7 +26,11 @@
  * para no llamar al explorador en cada carga del panel.
  */
 
-const WALLET = '0x952E0311DdDCe7090d61a275f411a6ddF879BDc8';
+/* ⚠ LA WALLET NO SE ESCRIBE AQUÍ, NI LA FECHA DE ACTIVACIÓN. Estuvieron las dos
+   a mano, y las dos las sabe la cadena: el recolector publica la dirección de
+   retirada —la leen las `withdrawal_credentials` de los validadores— y la
+   activación de cada uno. Salen del estado igual que los índices; ver
+   `grupoDesde()`. */
 const API = 'https://api.scan.pulsechain.com/api/v2';
 
 // Los índices propios NO se escriben aquí.
@@ -40,7 +44,7 @@ const API = 'https://api.scan.pulsechain.com/api/v2';
 // Ahora el conjunto sale del estado real que publica el recolector, con la
 // caché de esta misma respuesta como respaldo. Filtrar sigue haciendo falta:
 // esta wallet la usó otro validador durante un año, y aunque el corte por
-// `ACTIVACION_TS` deja fuera casi todo lo suyo, una retirada de salida podría
+// activación deja fuera casi todo lo suyo, una retirada de salida podría
 // caer del lado nuevo y colarse como si fuera nuestra.
 const CLAVE_ESTADO = 'validator:estado';
 
@@ -54,11 +58,13 @@ const WEI = 1e18;
 // El recolector escribe cada 3 min; recontar más a menudo no aporta nada.
 const FRESCURA_MS = 5 * 60 * 1000;
 
-// Activación de los diez validadores actuales. Todo lo anterior pertenece al
+// El corte por activación sigue haciendo falta: todo lo anterior pertenece al
 // validador que usó esta misma wallet durante casi un año, y son miles de
-// retiradas: sin este corte, una tabla vacía dispara un recorrido que termina
-// en 524 (timeout de Cloudflare) sin llegar a escribir nada.
-const ACTIVACION_TS = 1786095955;
+// retiradas. Sin él, una tabla vacía dispara un recorrido que termina en 524
+// (timeout de Cloudflare) sin llegar a escribir nada. Lo que cambia es de
+// dónde sale: de la activación más antigua del grupo, que publica el
+// recolector. Hasta el 23-sep-2026 era el número 1786095955 escrito aquí, y es
+// exactamente lo que da la epoch 319720 de los primeros diez.
 
 // Páginas por fase y pasada. Cada llamada hace como mucho NOVEDADES + SIEMBRA,
 // así que el peor caso son 6 peticiones al explorador. En marcha normal es una.
@@ -186,8 +192,8 @@ async function porValidador(db) {
 }
 
 /** Saldo actual de la wallet: el dinero que de verdad ha llegado. */
-async function saldoWallet() {
-  const datos = await pedir(`/addresses/${WALLET}`, null);
+async function saldoWallet(wallet) {
+  const datos = await pedir(`/addresses/${wallet}`, null);
   const bruto = datos?.coin_balance;
   return bruto != null ? Number(bruto) / WEI : null;
 }
@@ -202,14 +208,14 @@ async function saldoWallet() {
  * Devuelve lo encontrado y el motivo de la parada, que es lo que dice si la
  * siembra ha terminado o si hay que seguir en la próxima llamada.
  */
-async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas, propios }) {
+async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas, propios, wallet, activacionTs }) {
   const encontradas = [];
   let params = { items_count: 50 };
   if (arrancarEn != null) params.index = arrancarEn;
 
   let motivo = 'presupuesto';
   for (let pagina = 0; pagina < maxPaginas; pagina++) {
-    const datos = await pedir(`/addresses/${WALLET}/withdrawals`, params);
+    const datos = await pedir(`/addresses/${wallet}/withdrawals`, params);
     const items = datos.items || [];
     if (!items.length) { motivo = 'fin'; break; }
 
@@ -219,7 +225,7 @@ async function recorrer({ arrancarEn = null, pararEn = null, maxPaginas, propios
       const ts = Math.floor(Date.parse(w.timestamp) / 1000);
 
       // Cruzar la activación significa haber llegado al validador anterior.
-      if (ts < ACTIVACION_TS) { parada = 'activacion'; break; }
+      if (ts < activacionTs) { parada = 'activacion'; break; }
       if (pararEn != null && indice <= pararEn) { parada = 'conocido'; break; }
 
       const validador = Number(w.validator_index);
@@ -489,39 +495,57 @@ export async function registrarEventos(db, ciclosNuevos) {
 }
 
 /**
- * Los índices de nuestros validadores, tal y como estén hoy.
+ * Qué wallet mirar, qué índices son nuestros y desde cuándo contar.
  *
- * Orden de preferencia:
+ * Los tres, con el mismo orden de preferencia:
  *   1. `validator:estado` en KV — lo que acaba de publicar el recolector, que
- *      los descubre leyendo los keystores del disco.
- *   2. Los índices guardados en la caché de esta misma respuesta, por si KV
- *      falla o el recolector lleva un rato callado.
+ *      los lee de la cadena y de los keystores del disco.
+ *   2. Lo guardado en la caché de esta misma respuesta, por si KV falla o el
+ *      recolector lleva un rato callado.
  *
- * Si no hay ninguno de los dos devuelve `null`, y quien llama NO recorre el
- * explorador. Es deliberado: sin saber cuáles son nuestros, la alternativa
- * sería aceptar cualquier retirada a esta wallet, y esta wallet la usó otro
- * validador durante un año. Escribir sus retiradas en `barridos` inflaría el
- * total para siempre y habría que limpiarlo a mano. Una cifra vieja se
- * arregla sola en la siguiente pasada; una tabla contaminada, no.
+ * Cada uno por separado: un recolector anterior al 23-sep-2026 publica índices
+ * y activaciones pero no la wallet, y eso no debe tirar los otros dos.
+ *
+ * Lo que no aparezca en ninguno de los dos sitios vuelve `null`, y quien llama
+ * NO recorre el explorador. Es deliberado: sin saber cuáles son nuestros, la
+ * alternativa sería aceptar cualquier retirada a esta wallet, y esta wallet la
+ * usó otro validador durante un año. Escribir sus retiradas en `barridos`
+ * inflaría el total para siempre y habría que limpiarlo a mano. Una cifra vieja
+ * se arregla sola en la siguiente pasada; una tabla contaminada, no.
  */
-async function indicesPropios(env, cache) {
+export function grupoDesde(estado, cache) {
+  const v = estado?.validadores || {};
+  const detalle = Array.isArray(v.detalle) ? v.detalle : [];
+
+  const deEstado = new Set(detalle.map(d => d?.indice)
+    .filter(i => i != null && i !== '').map(Number).filter(Number.isFinite));
+  const deCache = new Set((Array.isArray(cache?.indices) ? cache.indices : [])
+    .map(Number).filter(Number.isFinite));
+  const indices = deEstado.size ? deEstado : (deCache.size ? deCache : null);
+
+  const esDireccion = w => typeof w === 'string' && /^0x[0-9a-fA-F]{40}$/.test(w);
+  const wallet = esDireccion(v.wallet_retirada) ? v.wallet_retirada.toLowerCase()
+    : esDireccion(cache?.wallet) ? cache.wallet.toLowerCase() : null;
+
+  /* La activación del grupo es la MÁS ANTIGUA de las reales. La de un
+     validador en cola es null y no puede ser el mínimo de nada. */
+  const activaciones = detalle.map(d => Number(d?.activacion_ts))
+    .filter(t => Number.isFinite(t) && t > 0);
+  const deGrupo = Number(v.activacion_ts);
+  const activacionTs = Number.isFinite(deGrupo) && deGrupo > 0 ? deGrupo
+    : activaciones.length ? Math.min(...activaciones)
+    : Number(cache?.activacion_ts) > 0 ? Number(cache.activacion_ts) : null;
+
+  return { indices, wallet, activacionTs };
+}
+
+async function grupoPropio(env, cache) {
+  let estado = null;
   if (env.PLSDASH_KV) {
-    try {
-      const estado = await env.PLSDASH_KV.get(CLAVE_ESTADO, { type: 'json' });
-      const detalle = estado?.validadores?.detalle;
-      if (Array.isArray(detalle) && detalle.length) {
-        const s = new Set(detalle.map(d => Number(d.indice)).filter(Number.isFinite));
-        if (s.size) return s;
-      }
-    } catch { /* se prueba el respaldo */ }
+    try { estado = await env.PLSDASH_KV.get(CLAVE_ESTADO, { type: 'json' }); }
+    catch { /* se prueba el respaldo */ }
   }
-
-  if (Array.isArray(cache?.indices) && cache.indices.length) {
-    const s = new Set(cache.indices.map(Number).filter(Number.isFinite));
-    if (s.size) return s;
-  }
-
-  return null;
+  return grupoDesde(estado, cache);
 }
 
 export async function onRequestGet({ env }) {
@@ -548,18 +572,26 @@ export async function onRequestGet({ env }) {
   let error = null;
   let sembrando = false;
 
-  const propios = await indicesPropios(env, cacheGuardada);
+  const { indices: propios, wallet, activacionTs } = await grupoPropio(env, cacheGuardada);
 
   try {
+    // Sin cualquiera de los tres no se toca el explorador: ver `grupoDesde`.
     if (!propios) {
-      // Sin la lista no se toca el explorador: ver `indicesPropios`.
       throw new Error('no se sabe qué índices son nuestros (KV sin estado y sin caché)');
     }
+    if (!wallet) {
+      throw new Error('no se sabe cuál es la wallet de retirada: el recolector no la publica '
+        + '(¿versión anterior al 23-sep-2026?) o los validadores no comparten una');
+    }
+    if (!activacionTs) {
+      throw new Error('no se sabe desde cuándo contar: ningún validador tiene activación');
+    }
+    const comun = { propios, wallet, activacionTs };
 
     const { tope, suelo } = await extremos(db);
 
     // Fase 1 — novedades. Desde la más reciente hasta alcanzar lo guardado.
-    const nov = await recorrer({ pararEn: tope, maxPaginas: PAGINAS_NOVEDADES, propios });
+    const nov = await recorrer({ pararEn: tope, maxPaginas: PAGINAS_NOVEDADES, ...comun });
     nuevas += await guardar(db, nov.encontradas);
 
     // Fase 2 — siembra hacia atrás, a trozos. La tabla empieza vacía y el
@@ -572,7 +604,7 @@ export async function onRequestGet({ env }) {
         : null);
 
       if (desde != null) {
-        const atras = await recorrer({ arrancarEn: desde, maxPaginas: PAGINAS_SIEMBRA, propios });
+        const atras = await recorrer({ arrancarEn: desde, maxPaginas: PAGINAS_SIEMBRA, ...comun });
         nuevas += await guardar(db, atras.encontradas);
 
         if (atras.motivo === 'activacion' || atras.motivo === 'fin') {
@@ -610,7 +642,7 @@ export async function onRequestGet({ env }) {
 
   let saldo = null;
   if (!error) {
-    try { saldo = await saldoWallet(); } catch { /* dato de adorno, no crítico */ }
+    try { saldo = await saldoWallet(wallet); } catch { /* dato de adorno, no crítico */ }
   }
 
   /* El sellado del precio y su recuento. Los dos en su propio `try`: si la
@@ -639,6 +671,9 @@ export async function onRequestGet({ env }) {
     // Se publican para que la próxima pasada tenga respaldo si KV falla, y
     // para poder ver desde fuera con qué conjunto se filtró.
     indices: propios ? [...propios].sort((a, b) => a - b) : (cacheGuardada?.indices ?? []),
+    // Igual que los índices: respaldo para la próxima pasada si KV falla.
+    wallet: wallet ?? cacheGuardada?.wallet ?? null,
+    activacion_ts: activacionTs ?? cacheGuardada?.activacion_ts ?? null,
     saldo_wallet: saldo,
     /* Lo que valía al cobrarlo, y sobre cuántos barridos se puede decir. El
        panel NO puede presentar esto como «el valor de lo ganado» a secas: es
