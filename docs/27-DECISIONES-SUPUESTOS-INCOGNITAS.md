@@ -43,6 +43,8 @@
 |---|---|---|
 | **Guiar no es operar (P9)** | 23-sep-2026 | «El panel compone texto que tú copias y observa el resultado en los datos que ya publica el NUC. No abre conexiones, no escribe en el NUC, no firma, no sube nada.» Desbloquea la pestaña Ampliar (era la incógnita P1). |
 | **Seis pestañas: Ampliar entra entre Validadores y Nodo** | 23-sep-2026 | Todo lo del siguiente validador en un sitio: lo que falta, la trayectoria y el simulador (venían de Validadores), las aportaciones (de Ganancias), la guía y la comprobación del `deposit_data`. Medido a 390: «Validadores» ocupa 53 px en un botón de 59, cabe sin abreviar. |
+| **El Resumen es el patrimonio** | 25-sep-2026 | La cifra grande era «Total generado» (~45 $) y los ~4.300 $ del stake no salían en ningún sitio. Ahora: franja de salud arriba —encima del dinero a propósito—, patrimonio en dólares con los PLS debajo, tres filas que lo suman y hacen de selector, y lo generado aparte porque no suma. El ritmo y el precio quedan debajo, en pequeño. |
+| **Una sola cifra protagonista por pestaña** | 25-sep-2026 | Había muchos números del mismo peso compitiendo. |
 | **El tema, dentro de Nodo** | 23-sep-2026 | Con seis pestañas y el engranaje en la barra, a 390 los botones bajaban a 50 px y «Validadores» no cabía. |
 | **Cada dato personal vive en el nivel más alto posible** | 23-sep-2026 | 1 · de la cadena (dirección de retirada, activación, depósito, versión de fork, contrato); 2 · lo publica el NUC (usuario, carpeta de claves, script de recuperación); 3 · de este navegador (el host del nodo); 4 · nunca (la seed y las contraseñas de los keystores). La wallet y la fecha de activación dejan de estar escritas en el código. |
 | **Manda lo observado sobre lo marcado** | 23-sep-2026 | En la guía, un paso que el estado demuestra hecho cuenta aunque no lo marques; una marca que el estado desmiente no cuenta y se dice. |
@@ -214,3 +216,4 @@ La pestaña Ampliar está construida sobre ella.
 | 15-sep-2026 | Versión 1.0. Consolidadas las preguntas abiertas de los documentos 01 a 05. |
 | 20-sep-2026 | Auditoría del código contra los documentos. Trece decisiones superadas y de interfaz que faltaban. Corregido el depósito —estaba escrito a fuego y aquí decía que no— y el recuento de pestañas. |
 | 23-sep-2026 | P9 decidido y P1 cerrada. Seis pestañas, el tema en Nodo, los cuatro niveles de dato personal, «manda lo observado» y la comprobación del `deposit_data`. |
+| 25-sep-2026 | El Resumen pasa a ser el patrimonio; una cifra protagonista por pestaña. |

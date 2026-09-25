@@ -101,7 +101,15 @@ La palabra sola no significa nada. Ver los tres términos siguientes.
 
 **Ganancia acumulada**
 Suma de todos los barridos **más** el excedente actual. **Solo sube.** Es lo que
-el panel llama «Total generado».
+el panel llama «Total generado», y en el Resumen «Generado desde el …».
+
+**Patrimonio del nodo**
+Lo que hay ahora: **en staking + en la wallet + sin barrer**. El staking es
+`stake_total` —solo lo que confirma la cadena; un validador esperando no suma—, la
+wallet su saldo leído de la cadena y lo sin barrer `ganado_total`. Es la cifra
+grande del Resumen desde el 25-sep-2026. **No incluye lo generado**: buena parte
+de lo generado ya está dentro de un validador, y sumarlo lo contaría dos veces.
+Si falta una pieza, no cuenta y el panel dice cuál.
 
 **Ritmo**
 PLS por unidad de tiempo, medido sobre días de calendario completos. **Nunca** se

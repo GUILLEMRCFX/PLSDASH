@@ -27,6 +27,7 @@ SIN_NAVEGADOR=(
   "pruebas/esfera-calibracion-test.mjs"
   "pruebas/precio-barridos-test.mjs"
   "pruebas/ampliar-test.mjs"
+  "pruebas/resumen-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"

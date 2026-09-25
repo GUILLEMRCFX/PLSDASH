@@ -316,7 +316,7 @@
   import * as pantallaCarga from './carga/naciendo.js';
   import { escenaDesde } from './escena/estado-escena.js';
   import { cargarTodo } from './datos.js';
-  import { panelResumen, engancharResumen, tictac } from './paneles/resumen.js';
+  import { panelResumen, panelRitmo, engancharResumen, tictac } from './paneles/resumen.js';
   import { panelGanancias } from './paneles/ganancias.js';
   import { panelCiclo, engancharCiclo } from './paneles/ciclo.js';
   import { panelTrayectoria } from './paneles/trayectoria.js';
@@ -407,7 +407,7 @@
      Cada pestaña responde a una pregunta distinta, y ese es el criterio de
      reparto — no «cuántos paneles caben en cada una»:
 
-       Resumen     ¿cuánto llevo y va todo bien?   (sin desplazarse)
+       Resumen     ¿cuánto tengo y va todo bien?   (sin desplazarse)
        Ganancias   ¿de dónde sale y hacia dónde va?
        Validadores ¿cuál de ellos está raro?
        Ampliar     ¿cuánto me falta para otro, y cómo lo añado?
@@ -417,7 +417,7 @@
      Resumen: era lo primero que hay que responder. Ver `paneles/ritmo.js`. */
 
   const PESTANAS = [
-    { id: 'resumen',     paneles: [panelResumen, panelPrecio] },
+    { id: 'resumen',     paneles: [panelResumen, panelRitmo, panelPrecio] },
     { id: 'ganancias',   paneles: [panelGanancias, panelCiclo, panelPrecioSimulado] },
     { id: 'validadores', paneles: [panelValidadores, panelHitos] },
     // Lo del siguiente validador, junto: lo que falta —con la trayectoria y el

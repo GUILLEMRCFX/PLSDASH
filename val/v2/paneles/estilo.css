@@ -1137,44 +1137,12 @@
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 
-/* ─────────────────────────────────────────────── cifra de portada */
-
-/* La cifra que se mira veinte veces al día. Escala con el ancho para llenar
-   la tarjeta sin desbordarla en 390px. */
-.portada { display: flex; flex-direction: column; gap: 8px; }
-.portada .p-num {
-  font: 600 clamp(40px, 11.5vw, 66px)/1 var(--cifra);
-  color: var(--dato);
-  /* Halo tenue: la cifra parece emitir luz en vez de estar impresa, que es lo
-     que la emparenta con la esfera de detrás. No toca el contraste — el halo
-     cae ALREDEDOR del trazo, no encima, y a .22 el fondo que levanta está muy
-     por debajo del propio glifo. Medido leyendo píxeles con la esfera detrás
-     —el método está en la nota de `.panel`, arriba—: la cifra pasa de 11,09:1
-     a 11,04:1 al añadir el halo. Cinco centésimas, dentro del propio ruido de
-     la medida. */
-  text-shadow: 0 0 26px var(--dato-halo);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.02em;
-  background: none; border: 0; padding: 0;
-  text-align: left; cursor: pointer;
-  transition: color .18s;
-}
-.portada .p-num:hover { color: var(--bien); }
-.portada .p-num .u {
-  font-size: .34em; color: var(--apagado); margin-left: .3em; letter-spacing: .06em;
-}
-.portada .p-pie {
-  font: 400 12px/1.4 var(--texto);
-  letter-spacing: .01em; 
-  color: var(--apagado);
-}
-
 /* Con `prefers-reduced-motion` se quitan latidos y entradas. La información
    no depende de ellos: el color y el texto ya la llevan. */
 @media (prefers-reduced-motion: reduce) {
   .pulso .luz, .pulso.tarde .luz { animation: none; }
   .vista.entrando { animation: none; }
-  .panel, .pestanas button, .portada .p-num { transition: none; }
+  .panel, .pestanas button { transition: none; }
 }
 
 /* ─────────────────────────────────────────────── pulso: rótulo */
@@ -1235,8 +1203,6 @@
    respira un poco menos que los demás — 12px de gap en vez de 16, y filas de
    ritmo un punto más bajas. Son 30px, y 30px son la diferencia entre
    contestar sin desplazarse y no contestar. */
-.panel.resumen { gap: 12px; }
-.panel.resumen .rfila { padding: 5px 8px; }
 
 /* ─────────────────────────────────────────────── pestañas: pantallas estrechas
 
@@ -1278,40 +1244,7 @@
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
 
-/* ─────────────────────────────────────────────── resumen en escritorio
-
-   La cuenta de la que sale la densidad de móvil —que quepa sin desplazarse—
-   no existe aquí: en 900px de alto sobran doscientos. Así que el mismo panel
-   respira, la cifra crece hasta donde el ancho da, y las filas del ritmo
-   dejan de ir apretadas. Es el panel que se mira veinte veces al día: si en
-   escritorio hay sitio para que se lea de lejos, se usa. */
-@media (min-width: 1000px) {
-  .panel.resumen { gap: 20px; padding: 22px 22px 24px; }
-  .panel.resumen .portada .p-num { font-size: clamp(56px, 5.4vw, 78px); }
-  .panel.resumen .rfila { padding: 10px 12px; }
-  .panel.resumen .r-pls { font-size: 17px; }
-  .panel.resumen .r-usd { font-size: 13px; }
-}
-
-/* ─────────────────────────────────────────── saldo de la wallet y aportaciones */
-
-/* El saldo, bajo el titular. Es un botón porque conmuta de unidad, no porque
-   navegue: mismo gesto que la cifra grande de arriba y misma unidad. */
-.saldo {
-  display: flex; flex-direction: column; gap: 3px;
-  width: 100%; text-align: left;
-  background: none; border: 0; border-radius: 10px;
-  padding: 10px 0 2px; margin-top: 2px;
-  border-top: 1px solid var(--borde);
-  color: inherit; font-family: var(--texto); cursor: pointer;
-}
-.s-eti { font: 500 12px/1.4 var(--texto); color: var(--apagado); letter-spacing: .01em; }
-.s-num {
-  font: 600 26px/1.1 var(--cifra); color: var(--dato-suave);
-  font-variant-numeric: tabular-nums;
-}
-.s-num .u { font-size: max(11px, .42em); color: var(--apagado); margin-left: .26em; font-weight: 500; }
-.s-desglose { font: 400 12.5px/1.45 var(--texto); color: var(--apagado); }
+/* ─────────────────────────────────────────── aportaciones */
 
 /* El formulario. Tres campos en una fila cuando cabe y apilados cuando no: a
    390px, «Fecha» y «PLS» uno al lado del otro dejaban el botón sin sitio. */
@@ -2011,3 +1944,131 @@ details[open] > .ap-cabeza { margin-bottom: 14px; }
 }
 .p-tema .tm-abrir .pt-eti { display: inline; max-width: none; max-height: none; opacity: 1; margin: 0; }
 .p-tema .tm-abrir svg { width: 18px; height: 18px; }
+
+
+/* ═══════════════════════════════════════════════ Resumen: el patrimonio
+
+   Una franja de salud, la cifra grande, tres filas que la suman y lo generado
+   aparte. Sin tarjeta alrededor: las filas y lo generado llevan la suya, la
+   cifra va a pelo, que es lo que la hace protagonista. */
+
+/* El tercer color de las filas —la wallet—. Los otros dos son los del tema: el
+   dato para el staking y el acento para lo sin barrer. */
+:root { --tercero: #c4b5fd; }
+
+.r-patrimonio { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.r-patrimonio p { margin: 0; }
+
+/* ── la franja de salud ── */
+.franja {
+  padding: 10px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--bien) 7%, var(--fondo));
+  border: 1px solid color-mix(in srgb, var(--bien) 22%, transparent);
+}
+.franja .pulso { gap: 7px; color: var(--dato-suave); }
+.franja .pl-cab { gap: 8px; font-size: 13px; line-height: 1.35; align-items: flex-start; }
+.franja .luz { margin-top: 5px; }
+.f-salud { flex: 1 1 auto; min-width: 0; color: color-mix(in srgb, var(--bien) 55%, #fff); }
+.f-salud b { font-weight: 500; color: color-mix(in srgb, var(--bien) 25%, #fff); }
+.f-dato { flex: none; white-space: nowrap; font-size: 12px; color: var(--apagado); }
+.franja .p-eti { letter-spacing: 0; font-size: 12px; }
+.franja .pl-cab .resto { margin-left: 0; color: var(--heroe); }
+.franja .pl-linea { height: 2px; background: color-mix(in srgb, var(--bien) 18%, transparent); }
+/* Cuando algo va mal, la franja entera se vuelve naranja: tiene que verse desde
+   el otro lado de la habitación, antes que el dinero. */
+.franja.aviso, .franja.critico {
+  background: var(--acento-tinte); border-color: var(--acento-vivo);
+}
+.franja.aviso .f-salud, .franja.critico .f-salud,
+.franja.aviso .f-salud b, .franja.critico .f-salud b { color: var(--acento); }
+.franja.critico { border-width: 2px; }
+.franja.aviso .luz, .franja.critico .luz {
+  background: var(--acento); animation: latido-tarde 1.1s ease-out infinite;
+}
+.franja.aviso .pl-lleno, .franja.critico .pl-lleno { background: var(--acento); }
+
+/* ── la cifra ── */
+/* Alto mínimo para el caso más alto —dos filas de etiquetas y un pie de dos
+   líneas—: sin él, elegir una fila movía las filas de debajo hasta 90px y el
+   dedo se quedaba tocando otra cosa. */
+.r-heroe { display: flex; flex-direction: column; gap: 6px; padding: 6px 4px 0; min-height: 250px; }
+.r-eti { display: flex; align-items: center; gap: 10px; min-height: 26px; }
+.r-volver {
+  border: 0; border-radius: 999px; padding: 4px 10px; min-height: 26px;
+  background: var(--dato-tinte); color: var(--dato); cursor: pointer;
+  font: 500 11.5px/1 var(--texto);
+}
+.r-num {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  background: none; border: 0; padding: 0; margin: 0; text-align: left;
+  color: var(--heroe); cursor: pointer; font: inherit;
+}
+span.r-num { cursor: default; }
+.r-num .p-cifra {
+  font: 700 58px/1 var(--cifra); letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums; overflow-wrap: anywhere;
+}
+.r-num .u { font: 600 22px/1 var(--cifra); color: var(--apagado); }
+.r-heroe.staking .r-num { color: var(--dato); }
+.r-heroe.wallet .r-num { color: var(--tercero); }
+.r-heroe.sinBarrer .r-num { color: var(--acento); }
+.r-heroe.generado .r-num { color: var(--bien); }
+.r-sub { font: 400 13px/1.4 var(--texto); color: var(--apagado); }
+.r-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.r-chip { padding: 6px 10px; border-radius: 999px; font: 400 12px/1.2 var(--texto); }
+.r-chip.g { background: var(--bien-velo); color: var(--bien); }
+.r-chip.a { background: color-mix(in srgb, #fbbf24 10%, transparent); color: #fbbf77; }
+.r-chip.n { background: var(--dato-raya); color: var(--dato-suave); }
+.r-pie { font: 400 11.5px/1.4 var(--texto); color: var(--apagado); margin-top: 2px; }
+
+/* ── las filas ── */
+.r-filas {
+  display: flex; flex-direction: column; gap: 2px; padding: 6px;
+  border-radius: 18px; border: 1px solid var(--borde); background: var(--vidrio);
+}
+.r-fila, .r-generado {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  border: 0; background: none; color: inherit; font: inherit; text-align: left;
+  padding: 10px; border-radius: 13px; cursor: pointer; min-height: 56px;
+  transition: background .15s;
+}
+.r-fila:hover, .r-generado:hover { background: var(--dato-raya); }
+.r-fila.sel { background: var(--dato-tinte); }
+.r-ico {
+  flex: none; width: 40px; height: 40px; border-radius: 20px;
+  display: flex; align-items: center; justify-content: center;
+}
+.r-fila.staking .r-ico { background: var(--dato-tinte); color: var(--dato); }
+.r-fila.wallet .r-ico { background: color-mix(in srgb, var(--tercero) 16%, transparent); color: var(--tercero); }
+.r-fila.sinBarrer .r-ico { background: var(--acento-tinte); color: var(--acento); }
+.r-nom { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.r-nom b { font: 500 15px/1.25 var(--texto); color: var(--heroe); }
+.r-nom span { font: 400 12px/1.35 var(--texto); color: var(--apagado); }
+.r-val { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex: none; text-align: right; }
+.r-val b { font: 600 17px/1.2 var(--cifra); color: var(--heroe); font-variant-numeric: tabular-nums; }
+.r-val span { font: 400 11px/1.3 var(--texto); color: var(--apagado); }
+.r-val span.bien { color: var(--bien); }
+.r-fila.sel .r-val b { color: var(--dato); }
+.r-fila.wallet.sel .r-val b { color: var(--tercero); }
+.r-fila.sinBarrer.sel .r-val b { color: var(--acento); }
+
+.r-generado { border: 1px solid var(--borde); border-radius: 18px; padding: 12px 16px; background: var(--vidrio); }
+.r-generado .r-nom b { font-size: 14px; }
+.r-generado .r-val b { font-size: 16px; }
+.r-generado.sel { background: var(--bien-velo); border-color: var(--bien-vivo); }
+.r-generado.sel .r-val b { color: var(--bien); }
+.r-fila:focus-visible, .r-generado:focus-visible, .r-num:focus-visible, .r-volver:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px var(--dato);
+}
+
+/* En ancho, el patrimonio a la izquierda y lo demás a la derecha: dos columnas
+   y no las tres de siempre, que dejaban la cifra en 340px. */
+/* Lo de debajo, en pequeño: una sola cifra protagonista por pestaña. */
+#v-resumen .panel .c-num { font-size: 26px; }
+@media (min-width: 820px) {
+  #v-resumen { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  #v-resumen .r-patrimonio { grid-row: span 2; }
+  /* En ancho las etiquetas caben en una línea: el hueco reservado es menor. */
+  .r-heroe { min-height: 218px; }
+  .r-num .p-cifra { font-size: 64px; }
+}
