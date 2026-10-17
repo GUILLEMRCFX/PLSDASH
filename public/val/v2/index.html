@@ -570,8 +570,9 @@
     engancharCiclo(document, datos);
     engancharResumen(document, () => pintar(ultimos));
     // Tras apuntar o borrar hay que volver a PEDIR: el histórico vive en D1,
-    // no en `ultimos`. Por eso `refrescar` y no `pintar`.
-    engancharAportaciones(document, () => refrescar());
+    // no en `ultimos`. Por eso `refrescar` y no `pintar`, y COMPLETO: lo
+    // pesado se pide cada diez minutos, y lo recién apuntado no puede esperar.
+    engancharAportaciones(document, () => refrescar({ completo: true }));
     engancharSimulador(document, datos);
     engancharPrecioSimulado(document, datos);
     window.__datos = datos;
@@ -586,12 +587,16 @@
      15-20 s para que el pulso de datos se note en tiempo real. NO es la
      frecuencia del recolector: el NUC sigue empujando a KV cada 3 minutos por
      la cuota de escrituras, y tocar eso aquí no serviría de nada — lo único
-     que cambia es cada cuánto se vuelve a leer lo que ya está publicado. */
+     que cambia es cada cuánto se vuelve a leer lo que ya está publicado.
+
+     ⚠ Cada 18 s solo se pide lo LIGERO (estado y precio, ninguno toca D1). Lo
+     que sale de D1 se pide cada diez minutos: ver `PESADOS_MS` en datos.js y
+     por qué se agotó D1 el 17-oct-2026. */
   const REFRESCO_MS = 18000;
 
-  async function refrescar() {
+  async function refrescar(opciones) {
     try {
-      const datos = await cargarTodo();
+      const datos = await cargarTodo(opciones);
       /* La sesión dura 30 días y puede caducar CON EL PANEL ABIERTO. Antes eso
          dejaba el panel puesto diciendo «SIN SESIÓN» en una esquina y todos los
          números congelados en el último dato bueno — que es la peor mezcla
@@ -722,8 +727,23 @@
     if (datos) pintar(datos); else await refrescar();
     if (carga) { try { await carga.terminar(); } catch (e) { console.error('[val/v2] carga:', e); } }
     clearInterval(latido);                // por si se vuelve a arrancar
-    latido = setInterval(refrescar, REFRESCO_MS);
+    latido = document.hidden ? null : setInterval(refrescar, REFRESCO_MS);
   }
+
+  /* ── con la pestaña escondida no se pide nada ─────────────────────────────
+     Un panel olvidado en una pestaña de fondo seguía pidiendo datos que nadie
+     miraba, y con el ritmo de antes eso solo ya bastaba para agotar D1. Al
+     esconderse se para el latido; al volver se refresca en el acto —lo pesado
+     solo si ya toca— y el latido vuelve a empezar. Solo con el panel arrancado:
+     con la puerta del PIN puesta no hay nada que refrescar. */
+  document.addEventListener('visibilitychange', () => {
+    if (!arrancado) return;
+    clearInterval(latido);
+    latido = null;
+    if (document.hidden) return;
+    refrescar();
+    latido = setInterval(refrescar, REFRESCO_MS);
+  });
 
   function abrirPuerta() {
     /* El panel se esconde del árbol de accesibilidad mientras la puerta está
