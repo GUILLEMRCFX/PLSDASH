@@ -475,6 +475,19 @@ try:
 finally:
     collector.KEYSTORE_DIR = guardado10
 
+print("\n=== 8b. VARIAS CLAVES A LA VEZ: UN SOLO EVENTO ===")
+# ⚠ El 17-oct-2026 entraron cinco claves en la misma pasada y salieron cinco
+#   eventos con el mismo (ts, "aviso", NULL). El indice unico de D1 trata los
+#   NULL como -1, asi que rechazo cuatro. Tiene que salir UNO que las nombre.
+CINCO = [f"0xcc{i:02x}" for i in range(5)]
+evs5 = push.detectar_eventos(datos_con(activos11 + [E(pk) for pk in CINCO]), prev5)
+ok("cinco claves nuevas, un evento", tipos(evs5), ["aviso"])
+okque("que dice cuantas son", evs5 and evs5[0][2].startswith("5 validadores"), str(evs5))
+okque("y las nombra todas", evs5 and all(E(pk)["pubkey_corta"] in evs5[0][3] for pk in CINCO),
+      str(evs5))
+claves_unicas = {(e[0], e[1], e[5] if e[5] is not None else -1) for e in evs5}
+ok("ninguno choca con el indice unico", len(claves_unicas), len(evs5))
+
 print("\n=== 9. EL EXPLORADOR SE PUEDE IMPORTAR ===")
 # ⚠ No se podia: resolvia los indices AL IMPORTAR con un `BEACON` y un
 #   `requests` que no existian, y lanzaba NameError. `comprobar.py` lo tragaba

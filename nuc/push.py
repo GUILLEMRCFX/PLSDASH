@@ -263,13 +263,26 @@ def detectar_eventos(datos, previo):
     esp_prev = previo.get("esperando_pubkeys")
     if esp_prev is not None:
         cortas = {str(d.get("pubkey")): d.get("pubkey_corta") for d in detalle}
-        for pk in esp_ahora:
-            if pk in set(esp_prev):
-                continue
+        nuevas = [pk for pk in esp_ahora if pk not in set(esp_prev)]
+        # ⚠ UN SOLO EVENTO aunque lleguen varias claves a la vez. Antes salia
+        #   uno por clave, todos con el mismo (ts, "aviso", validador NULL), y
+        #   el indice unico de D1 —`(ts, tipo, COALESCE(validador, -1))`—
+        #   rechazaba todos menos el primero: al ampliar a 21 el 17-oct-2026
+        #   el log saco cuatro «UNIQUE constraint failed» y el registro se
+        #   quedo con una clave de cinco. Es una ampliacion: un evento.
+        if len(nuevas) == 1:
+            pk = nuevas[0]
             eventos.append((ahora, "aviso",
                             "Validador nuevo esperando a entrar en la cadena",
                             f"Clave {cortas.get(pk) or pk[:12]} · "
                             "depositado o a punto, la cadena aun no lo conoce",
+                            None, None))
+        elif nuevas:
+            claves = ", ".join(cortas.get(pk) or pk[:12] for pk in nuevas)
+            eventos.append((ahora, "aviso",
+                            f"{len(nuevas)} validadores nuevos esperando a entrar en la cadena",
+                            f"Claves {claves} · "
+                            "depositados o a punto, la cadena aun no los conoce",
                             None, None))
 
     if act_prev is not None:
