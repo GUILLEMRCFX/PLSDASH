@@ -28,6 +28,7 @@ SIN_NAVEGADOR=(
   "pruebas/precio-barridos-test.mjs"
   "pruebas/cadena-test.mjs"
   "pruebas/resumen-test.mjs"
+  "pruebas/d1-cupo-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"

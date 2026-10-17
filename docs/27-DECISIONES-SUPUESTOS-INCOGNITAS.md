@@ -25,6 +25,7 @@
 | **El NUC empuja, Cloudflare no pregunta** | ago-2026 | El nodo no expone nada a internet. |
 | **Cron a 3 minutos** | ago-2026 | 480 escrituras/día sobre 1.000 de cuota KV. A 1 minuto se agotaría. |
 | **KV para lo de ahora, D1 para lo de siempre** | ago-2026 | KV se regenera en 3 min; D1 no vuelve. |
+| **El panel pide a D1 cada 10 minutos, no cada 18 s** | 17-oct-2026 | Ese día se agotó el cupo gratuito de lecturas de D1 (5 millones de filas al día) y D1 dejó de contestar, también al NUC. Cada 18 s solo se pide lo que vive en KV (estado y precio). `ganancia` guarda su caché también con el explorador caído, y no relee `barridos` si no ha entrado ninguna fila. Con la pestaña escondida no se pide nada. Ver documento 08, sección 2. |
 
 ### Modelo de datos
 
@@ -215,3 +216,4 @@ Parte 2); la frase se queda porque sigue siendo cierta.
 | 23-sep-2026 | P9 decidido y P1 cerrada. Seis pestañas, el tema en Nodo, los cuatro niveles de dato personal, «manda lo observado» y la comprobación del `deposit_data`. |
 | 25-sep-2026 | El Resumen pasa a ser el patrimonio; una cifra protagonista por pestaña. |
 | 25-sep-2026 | La pestaña Ampliar pasa a decisiones superadas: el propietario la probó y no le convenció. Vuelven las cinco pestañas. |
+| 17-oct-2026 | Agotado el cupo de lecturas de D1. Nueva decisión de arquitectura sobre el ritmo del panel. |

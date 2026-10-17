@@ -54,6 +54,7 @@ a página lo que devuelve el explorador.
 | `wallets-test.js` | el interruptor «cuenta en los totales» | sí |
 | `invest-vista-test.js` | la vista Inversiones y los depósitos agrupados | sí |
 | `vault-test.js` | el gesto de la tarjeta para entrar en `/val/` | sí |
+| `d1-cupo-test.mjs` | que el panel no agote las lecturas de D1: caché de `ganancia`, ritmo del panel | no |
 
 ## Dos reglas que han costado dinero
 

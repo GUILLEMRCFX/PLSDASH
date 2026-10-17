@@ -70,6 +70,41 @@ estado y `push.py` lo publica. Los demás (`comprobar.py`, `explorador.py`,
 
 **Total:** ~505 escrituras KV al día, sobre 1.000 de cuota.
 
+### Las lecturas de D1 también tienen cuota
+
+**5 millones de filas leídas al día** en el plan gratuito, y desde el
+1-sep-2026 es un límite duro: al pasarse, D1 rechaza toda consulta hasta las
+00:00 UTC — las del panel y las del NUC. Cuenta lo **recorrido**, no lo
+devuelto: una consulta que suma toda la tabla `barridos` cuesta todas sus filas
+aunque devuelva una.
+
+Se agotó el **17-oct-2026**. En septiembre se había medido un 0,18 % del cupo y
+se dio el riesgo por bajo; la medida era buena, la conclusión no, porque no
+miraba qué pasa cuando algo falla. Fallaron tres cosas a la vez:
+
+1. El explorador devolvía 500 toda la tarde, y `ganancia` solo guardaba su
+   caché si el explorador iba bien: cada petición lo recalculaba todo.
+2. Recalcular leía `barridos` entera unas cinco veces (~22.000 filas) aunque
+   no hubiera entrado ninguna fila nueva.
+3. El panel pedía los nueve endpoints cada 18 s, y siete van a D1.
+
+Desde entonces:
+
+| Qué | Cada cuánto | Toca D1 |
+|---|---|---|
+| `estado`, `precio` | 18 s | no |
+| `historico`, `ganancia`, `eventos`, `aportaciones` | 10 min, o al apuntar una aportación | sí |
+| Todo | nunca con la pestaña escondida | — |
+
+`ganancia` guarda su caché también con el explorador caído (diciendo que es
+vieja), no relee `barridos` si su firma —índice más alto y más bajo— no ha
+cambiado, y si D1 no contesta sirve lo último bueno en vez de un 500. Lo
+comprueba `pruebas/d1-cupo-test.mjs`.
+
+**La pregunta que hay que hacerse con cada endpoint nuevo:** ¿cuántas filas
+recorre por petición, cuántas peticiones al día con el panel abierto todo el
+día, y qué pasa si lo que tiene delante falla?
+
 ---
 
 ## 3. Los endpoints

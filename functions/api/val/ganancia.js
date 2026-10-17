@@ -548,6 +548,35 @@ async function grupoPropio(env, cache) {
   return grupoDesde(estado, cache);
 }
 
+/**
+ * La firma de la tabla `barridos`: cambia si y solo si entra una fila.
+ *
+ * Las filas solo se AÑADEN —`INSERT OR IGNORE` por índice de retirada, nunca
+ * se borran ni se reescriben salvo el precio—, así que el índice más alto y el
+ * más bajo bastan para saber si la tabla es la misma que la última vez. Es la
+ * consulta que ya se hacía (`extremos`), así que saberlo no cuesta nada.
+ */
+export function firmaBarridos({ tope, suelo } = {}) {
+  return tope == null ? null : `${tope}:${suelo}`;
+}
+
+/**
+ * ¿Se puede contestar con lo calculado la última vez?
+ *
+ * ⚠ ESTO ES LO QUE TUMBÓ D1 EL 17-OCT-2026. Cada recálculo lee la tabla
+ *   `barridos` entera unas cinco veces (la consulta de ciclos, por validador,
+ *   valorado…), ~22.000 filas leídas. Y se recalculaba aunque no hubiera
+ *   entrado ni un barrido — que es lo normal: entran tres al día. Ahora, si la
+ *   firma no ha cambiado, se reutiliza lo de la caché y solo se lee lo nuevo.
+ *
+ *   Los eventos no se pierden: se registran cuando se recalcula, y se recalcula
+ *   siempre que entra un barrido nuevo, que es lo único que crea ciclos.
+ */
+export function reutilizable(cache, firma, nuevas) {
+  return nuevas === 0 && firma != null && cache != null
+    && cache.firma === firma && Number.isFinite(Number(cache.total));
+}
+
 export async function onRequestGet({ env }) {
   const db = env.VALIDATOR_DB;
   if (!db) return json({ error: 'D1 no configurado (binding VALIDATOR_DB)' }, 500);
@@ -563,14 +592,44 @@ export async function onRequestGet({ env }) {
       // cinco minutos y completar el histórico llevaría horas.
       const ventana = cache && cache.sembrando ? 5000 : FRESCURA_MS;
       if (cache && Date.now() - (cache.actualizado || 0) < ventana) {
-        return json({ ...cache, obsoleto: false, de_cache: true });
+        // ⚠ `obsoleto` sale de lo guardado, no se fuerza a false: desde el
+        //   17-oct-2026 también se guarda lo calculado con el explorador caído,
+        //   y eso tiene que seguir diciéndose como lo que es.
+        return json({ ...cache, obsoleto: !!cache.error, de_cache: true });
       }
     }
   } catch { /* sin caché, se recalcula */ }
 
+  try {
+    const cuerpo = await calcular(env, db, cacheGuardada);
+
+    /* Se guarda SIEMPRE, también con el explorador caído. Antes solo se
+       guardaba si todo había ido bien, y el 17-oct-2026 el explorador estuvo
+       devolviendo 500 toda la tarde: sin caché, cada refresco del panel —uno
+       cada 18 s— recalculaba todo contra D1, y se agotó el cupo diario de
+       lecturas (5 millones). Con el explorador caído, reintentar cada cinco
+       minutos es de sobra; reintentar en cada refresco no lo arregla antes. */
+    if (env.PLSDASH_KV) {
+      try { await env.PLSDASH_KV.put(CLAVE_CACHE, JSON.stringify(cuerpo)); } catch { /* la caché no es crítica */ }
+    }
+    return json({ ...cuerpo, obsoleto: !!cuerpo.error });
+  } catch (e) {
+    /* D1 no contesta —por ejemplo, porque se ha agotado el cupo del día—.
+       Si hay algo calculado antes, se sirve diciendo que es viejo (P8): una
+       cifra de hace un rato es mejor que un hueco. */
+    const error = 'D1: ' + String(e?.message || e);
+    if (cacheGuardada && Number.isFinite(Number(cacheGuardada.total))) {
+      return json({ ...cacheGuardada, obsoleto: true, error, de_cache: true });
+    }
+    return json({ error }, 503);
+  }
+}
+
+async function calcular(env, db, cacheGuardada) {
   let nuevas = 0;
   let error = null;
   let sembrando = false;
+  let firma = null;
 
   const { indices: propios, wallet, activacionTs } = await grupoPropio(env, cacheGuardada);
 
@@ -588,7 +647,9 @@ export async function onRequestGet({ env }) {
     }
     const comun = { propios, wallet, activacionTs };
 
-    const { tope, suelo } = await extremos(db);
+    const ext = await extremos(db);
+    const { tope, suelo } = ext;
+    firma = firmaBarridos(ext);
 
     // Fase 1 — novedades. Desde la más reciente hasta alcanzar lo guardado.
     const nov = await recorrer({ pararEn: tope, maxPaginas: PAGINAS_NOVEDADES, ...comun });
@@ -620,30 +681,51 @@ export async function onRequestGet({ env }) {
     error = String(e.message || e);
   }
 
-  const lista = await ciclos(db);
-  const total = lista.reduce((a, c) => a + c.pls, 0);
-  const bloques = lista.reduce((a, c) => a + c.bloques, 0);
-  const plsBloques = lista.reduce((a, c) => a + c.pls_bloques, 0);
+  // Si han entrado filas, la firma de antes ya no vale: se vuelve a pedir.
+  if (nuevas > 0) firma = firmaBarridos(await extremos(db));
+  const mismo = reutilizable(cacheGuardada, firma, nuevas);
+
+  let lista = null, total, bloques, plsBloques, numBarridos, retiradas, porVal, ultimos;
+  if (mismo) {
+    ({ total, bloques, pls_bloques: plsBloques, barridos: numBarridos, retiradas,
+       por_validador: porVal, ciclos: ultimos } = cacheGuardada);
+  } else {
+    lista = await ciclos(db);
+    total = lista.reduce((a, c) => a + c.pls, 0);
+    bloques = lista.reduce((a, c) => a + c.bloques, 0);
+    plsBloques = lista.reduce((a, c) => a + c.pls_bloques, 0);
+    numBarridos = lista.length;
+    retiradas = lista.reduce((a, c) => a + c.validadores, 0);
+    porVal = await porValidador(db);
+    ultimos = lista.slice(-40);
+  }
 
   // El registro avanza por su cuenta: se anotan los ciclos posteriores a lo
   // ya registrado, haya habido filas nuevas o no. Atarlo a `nuevas > 0` dejó
   // el registro vacío para siempre, porque la tabla ya estaba sembrada cuando
   // la escritura llegó a producción y `nuevas` valía 0 en cada pasada.
-  try {
-    const desdeTs = Number(await leerMeta(db, CLAVE_EVENTOS)) || 0;
-    const pendientes = lista.filter(c => c.ts > desdeTs);
-    if (pendientes.length) {
-      await registrarEventos(db, pendientes);
-      await escribirMeta(db, CLAVE_EVENTOS, Math.max(...pendientes.map(c => c.ts)));
+  //
+  // Con la tabla sin cambios (`mismo`) no hay ciclos que no se hayan visto ya
+  // en la pasada que calculó la caché, y ahí se registraron.
+  if (lista) {
+    try {
+      const desdeTs = Number(await leerMeta(db, CLAVE_EVENTOS)) || 0;
+      const pendientes = lista.filter(c => c.ts > desdeTs);
+      if (pendientes.length) {
+        await registrarEventos(db, pendientes);
+        await escribirMeta(db, CLAVE_EVENTOS, Math.max(...pendientes.map(c => c.ts)));
+      }
+    } catch (e) {
+      console.error('no se pudieron registrar los eventos:', e);
     }
-  } catch (e) {
-    console.error('no se pudieron registrar los eventos:', e);
   }
 
   let saldo = null;
   if (!error) {
     try { saldo = await saldoWallet(wallet); } catch { /* dato de adorno, no crítico */ }
   }
+  // Con el explorador caído se enseña el último saldo leído, no un hueco.
+  if (saldo == null) saldo = cacheGuardada?.saldo_wallet ?? null;
 
   /* El sellado del precio y su recuento. Los dos en su propio `try`: si la
      columna `precio_pls` no estuviera —la migración aparcada la borraba, ver
@@ -653,7 +735,10 @@ export async function onRequestGet({ env }) {
   let sellados = 0, precios = null;
   try {
     sellados = await sellarPrecios(db, Math.floor(Date.now() / 1000));
-    precios = await valorado(db);
+    // El recuento solo cambia si entra un barrido o se sella alguno.
+    precios = mismo && sellados === 0 && cacheGuardada.valorado
+      ? cacheGuardada.valorado
+      : await valorado(db);
   } catch (e) {
     console.error('no se pudo sellar el precio de los barridos:', e);
   }
@@ -661,13 +746,13 @@ export async function onRequestGet({ env }) {
   const cuerpo = {
     total,
     bloques,
-    barridos: lista.length,
-    retiradas: lista.reduce((a, c) => a + c.validadores, 0),
+    barridos: numBarridos,
+    retiradas,
     // Cuánto del total viene de proponer bloques. Es la parte de suerte
     // frente al rendimiento base del nodo, y explica que el APR baile.
     pls_bloques: plsBloques,
     peso_bloques: total > 0 ? (plsBloques / total) * 100 : 0,
-    por_validador: await porValidador(db),
+    por_validador: porVal,
     // Se publican para que la próxima pasada tenga respaldo si KV falla, y
     // para poder ver desde fuera con qué conjunto se filtró.
     indices: propios ? [...propios].sort((a, b) => a - b) : (cacheGuardada?.indices ?? []),
@@ -680,15 +765,15 @@ export async function onRequestGet({ env }) {
        el valor de la parte que tiene precio real. */
     valorado: precios,
     sellados,
-    ciclos: lista.slice(-40),
+    ciclos: ultimos,
     nuevas,
     sembrando,
+    // Con qué tabla se calculó: la próxima pasada la compara para saber si
+    // puede reutilizar esto en vez de volver a leer `barridos` entera.
+    firma,
+    reutilizado: mismo,
     actualizado: Date.now(),
   };
-
-  if (!error && env.PLSDASH_KV) {
-    try { await env.PLSDASH_KV.put(CLAVE_CACHE, JSON.stringify(cuerpo)); } catch { /* la caché no es crítica */ }
-  }
-
-  return json(error ? { ...cuerpo, obsoleto: true, error } : { ...cuerpo, obsoleto: false });
+  if (error) cuerpo.error = error;
+  return cuerpo;
 }

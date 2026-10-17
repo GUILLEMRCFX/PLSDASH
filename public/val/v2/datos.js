@@ -51,13 +51,46 @@ async function pedir(url) {
   return r.json();
 }
 
+/* ── Cada cuánto se pide cada cosa ──────────────────────────────────────────
+
+   ⚠ ESTO SE APRENDIÓ AGOTANDO D1 EL 17-OCT-2026. Antes se pedía TODO cada 18 s:
+     nueve endpoints, siete de ellos contra D1, cada uno leyendo miles de filas.
+     Con el panel abierto toda la tarde y el explorador caído se pasó del cupo
+     gratuito de 5 millones de filas leídas al día, y D1 dejó de contestar
+     hasta medianoche UTC — también al NUC.
+
+   Lo que de verdad cambia cada pocos segundos es poco:
+     · `estado` — KV, lo publica el NUC cada 3 min. Leerlo no toca D1.
+     · `precio` — su propia caché, tampoco toca D1.
+   Eso es lo LIGERO, y se sigue pidiendo en cada latido.
+
+   Lo demás sale de D1 y cambia despacio: los snapshots son horarios, los
+   barridos llegan tres veces al día. Eso es lo PESADO, y se pide al arrancar,
+   cada `PESADOS_MS`, y cuando el usuario cambia algo (una aportación). Entre
+   medias el panel pinta con la última copia, que no es vieja: es lo que hay. */
+const LIGEROS = ['estado', 'precio'];
+export const PESADOS_MS = 10 * 60 * 1000;
+
+// La última respuesta de cada endpoint pesado, para los latidos ligeros.
+let ultimaPesada = null;
+let ultimaPesadaTs = 0;
+
+/** ¿Toca volver a pedir lo pesado? */
+export function tocaPesado(ahoraMs = Date.now()) {
+  return !ultimaPesada || ahoraMs - ultimaPesadaTs >= PESADOS_MS;
+}
+
 /**
- * Trae todo lo que necesitan los paneles.
+ * Trae lo que necesitan los paneles.
  *
+ * @param {object}  [o]
+ * @param {boolean} [o.completo]  true: todo. false: solo lo ligero, y lo pesado
+ *                                sale de la última copia. Por defecto decide
+ *                                `tocaPesado()`.
  * @returns {object} { estado, serie, snapshots24h, daily, ganancia, precio,
  *                     fallos:string[], sesion:boolean, ahoraS:number }
  */
-export async function cargarTodo() {
+export async function cargarTodo({ completo = tocaPesado() } = {}) {
   const peticiones = {
     estado:       `${API}/estado`,
     serie:        `${API}/historico?rango=serie`,
@@ -70,7 +103,9 @@ export async function cargarTodo() {
     precio:       '/api/precio',
   };
 
-  const nombres = Object.keys(peticiones);
+  // Sin copia de lo pesado no hay con qué pintar: se pide todo sí o sí.
+  const todo = completo || !ultimaPesada;
+  const nombres = Object.keys(peticiones).filter(n => todo || LIGEROS.includes(n));
   const res = await Promise.allSettled(nombres.map(n => pedir(peticiones[n])));
 
   const salida = {
@@ -87,6 +122,13 @@ export async function cargarTodo() {
     ahoraS: Math.floor(Date.now() / 1000),
   };
 
+  // En un latido ligero, lo pesado —y sus fallos— son los de la última vez.
+  if (!todo) {
+    const { fallos, ...copia } = ultimaPesada;
+    Object.assign(salida, copia);
+    salida.fallos = [...fallos];
+  }
+
   res.forEach((r, i) => {
     const nombre = nombres[i];
     if (r.status === 'rejected') {
@@ -100,6 +142,13 @@ export async function cargarTodo() {
     else if (nombre === 'aportaciones') salida.aportaciones = v;
     else salida[nombre] = v.datos || [];
   });
+
+  if (todo && salida.sesion) {
+    const pesada = { fallos: salida.fallos.filter(n => !LIGEROS.includes(n)) };
+    for (const n of Object.keys(peticiones)) if (!LIGEROS.includes(n)) pesada[n] = salida[n];
+    ultimaPesada = pesada;
+    ultimaPesadaTs = Date.now();
+  }
 
   return salida;
 }
