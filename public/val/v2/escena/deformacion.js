@@ -18,12 +18,31 @@
  * raycast contra la esfera y los uniforms que la alimentaban. Lo único que
  * queda es la respiración: una onda lentísima que recorre la superficie y que
  * es lo que separa la esfera de un objeto muerto cuando nadie la toca.
+ *
+ * ## La onda al tocar (29-oct-2026) NO es el bulto que se quitó
+ *
+ * El bulto seguía al puntero mientras se movía: estaba siempre puesto y
+ * deformaba la esfera allí donde estuviera el ratón. La onda es otra cosa: sale
+ * UNA vez del punto tocado, recorre la superficie en algo más de un segundo y
+ * se apaga. Sin toque no existe, y no persigue a nadie. Va aquí, y no en cada
+ * material, por la misma regla de siempre: si cada capa ondulara por su cuenta
+ * las aristas se despegarían de las celdas al paso de la onda.
+ *
+ * `uOndaP` son las direcciones tocadas y `uOndaT` el instante de cada toque,
+ * en el RELOJ REAL (`uReloj`), no en `uTiempo`. `uTiempo` acumula `dt` acotado
+ * y en una máquina lenta va más despacio que el reloj: la onda duraría el doble
+ * en el móvil malo. Es el mismo fallo que ya tuvo el destello.
  */
+
+import { Vector3 } from '../vendor/three.module.js';
 
 export const UNIFORMS_DEFORMACION = /* glsl */`
   uniform float uTiempo;
   uniform float uRespiracion;  // 0 con movimiento reducido
   uniform float uNacer;        // 1 en reposo; <1 solo mientras se ensambla
+  uniform float uReloj;        // segundos de reloj real, para la onda
+  uniform vec3  uOndaP[4];     // direcciones tocadas
+  uniform float uOndaT[4];     // instante de cada toque, en uReloj; -100 = libre
 `;
 
 export const FUNCION_DEFORMACION = /* glsl */`
@@ -35,37 +54,58 @@ export const FUNCION_DEFORMACION = /* glsl */`
     return fract(q.x * q.y * q.z * (q.x + q.y + q.z));
   }
 
+  /* Cuanto le toca de onda a una direccion: 0 lejos del frente, 1 en el frente
+     de una onda recien nacida. La usan deformar() y el brillo de las lineas. */
+  float ondaToque(vec3 dir) {
+    float s = 0.0;
+    for (int i = 0; i < 4; i++) {
+      float edad = uReloj - uOndaT[i];
+      if (edad < 0.0 || edad > 2.6) continue;
+      float ang = acos(clamp(dot(dir, uOndaP[i]), -1.0, 1.0));
+      float frente = edad * 1.55;
+      s += exp(-pow((ang - frente) * 5.0, 2.0)) * exp(-edad * 1.35);
+    }
+    return s;
+  }
+
   vec3 deformar(vec3 p) {
     vec3 dir = normalize(p);
     float r = 1.0 + sin(uTiempo * 0.55 + dir.y * 2.6) * 0.007 * uRespiracion
-                  + sin(uTiempo * 0.31 - dir.x * 3.1) * 0.005 * uRespiracion;
+                  + sin(uTiempo * 0.31 - dir.x * 3.1) * 0.005 * uRespiracion
+                  + ondaToque(dir) * 0.045;
 
-    /* El nacimiento. Fuera de la pantalla de carga uNacer vale 1 y esto es un
-       salto que no se toma: la esfera de siempre, sin un ciclo de mas.
+    /* EL NACIMIENTO: LA IGNICION. Fuera de la pantalla de carga uNacer vale 1
+       y esto es un salto que no se toma: la esfera de siempre, sin un ciclo
+       de mas.
 
-       Cada vertice viene de mas lejos y girado, con su propio retardo, asi que
-       la malla se condensa como un enjambre y no como un globo hinchandose. Va
-       aqui y no en la pantalla de carga porque deformar() la comparten todos
-       los materiales: si el nacimiento viviera fuera, las aristas y las caras
-       se ensamblarian por separado y se verian despegadas.
+       Tres tramos, cada vertice con su propio retardo:
+         0,00-0,12  todo esta en el centro: un punto, que es el nucleo.
+         0,12-0,36  estalla hacia fuera y se pasa un poco de la superficie.
+         0,32-0,92  cae sobre ella, girando un poco, cada uno a su ritmo.
+       Las lineas no se ven en el primer tramo (ver materialLinea en
+       esfera.js): apelotonadas en un punto, cada una es un cuadrado.
+       Sustituye al enjambre que se condensaba (hasta el 29-oct-2026), y vive
+       aqui por lo mismo que vivia el: deformar() la comparten la cascara, las
+       aristas y los nodos, asi que no pueden ensamblarse por separado.
 
        (Sin tildes ni comillas invertidas: esto es GLSL dentro de una plantilla
         de JS, y una comilla invertida aqui la cierra.) */
     if (uNacer < 0.999) {
       float h  = ruidoDir(dir * 7.13);
       float h2 = ruidoDir(dir * 3.71 + 11.0);
-      float e  = 1.0 - pow(1.0 - clamp(uNacer, 0.0, 1.0), 3.0);
-      float retardo = h * 0.42;
-      float ti = clamp((e - retardo) / max(0.0001, 1.0 - retardo), 0.0, 1.0);
-      float giro = (1.0 - ti) * (h2 - 0.5) * 2.2;
+      float e  = clamp(uNacer, 0.0, 1.0);
+      float t1 = clamp((e - 0.12) / 0.24, 0.0, 1.0);
+      float sale = 1.0 - pow(1.0 - t1, 3.0);
+      float t2 = clamp((e - 0.32 - h * 0.22) / 0.38, 0.0, 1.0);
+      float cae = t2 * t2 * (3.0 - 2.0 * t2);
+      /* 1,12 + 0,25 y no mas: con 1,25 + 0,45 la red se salia de la pantalla
+         a 390 y el tramo del medio era una maraña de rayas. Mirado en tira. */
+      float rad = mix(0.02, 1.12 + 0.25 * h2, sale);
+      rad = mix(rad, 1.0, cae);
+      float giro = (1.0 - cae) * (h2 - 0.5) * 0.9;
       float c = cos(giro), s = sin(giro);
-      vec3 d2 = vec3(dir.x * c - dir.z * s, dir.y + (h - 0.5) * (1.0 - ti) * 0.7,
-                     dir.x * s + dir.z * c);
-      /* 0,55 y no 1,7. Con 1,7 los vertices salian a 2,7 radios y a uNacer=0 la
-         pantalla entera era una maraña blanca: no se leia un enjambre, se leia
-         una interferencia. A 1,55 radios la nube cabe en cuadro y se ve que es
-         una esfera deshecha. Mirado en tira de contacto a 390. */
-      return normalize(mix(d2, dir, ti)) * r * mix(1.0 + 0.55 * h2, 1.0, ti);
+      vec3 d2 = vec3(dir.x * c - dir.z * s, dir.y, dir.x * s + dir.z * c);
+      return normalize(mix(d2, dir, cae)) * r * rad;
     }
     return dir * r;
   }
@@ -78,6 +118,9 @@ export function crearUniformsDeformacion() {
     uRespiracion: { value: 1 },
     /* 1 = esfera hecha. Solo la pantalla de carga lo baja, y solo una vez. */
     uNacer:       { value: 1 },
+    uReloj:       { value: 0 },
+    uOndaP:       { value: [0, 1, 2, 3].map(() => new Vector3(0, 1, 0)) },
+    uOndaT:       { value: [-100, -100, -100, -100] },
   };
 }
 

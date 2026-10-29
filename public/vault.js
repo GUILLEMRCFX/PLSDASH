@@ -2,8 +2,13 @@
  * PLSDASH — VaultEasterEgg
  *
  * La tarjeta del valor total es una puerta. Se arrastra hacia la derecha y
- * debajo se descubre una nube de partículas que forma una esfera y se carga
- * con el recorrido. Al completarlo, fogonazo y salto a /val/.
+ * debajo aparece una CERRADURA: un dial que gira con el arrastre, con cuatro
+ * muescas —tantas como cifras tiene el PIN que viene después— que se encienden
+ * al pasar. Con la cuarta, el dial se abre en dos, la esfera de dentro se
+ * enciende, fogonazo y salto a /val/.
+ *
+ * Hasta el 29-oct-2026 era una nube de partículas que se cargaba. Se eligió la
+ * cerradura en el taller de prototipos: anuncia lo que hay detrás.
  *
  * ## No autentica
  *
@@ -44,6 +49,9 @@
     recorrido: 244,
 
     msFogonazo: 300,
+    // Lo que tarda el dial en abrirse antes del fogonazo. Corto: el gesto ya
+    // está hecho y lo que queda es entrar.
+    msAbrir: 380,
   };
 
   const hero = document.querySelector('.hero');
@@ -152,70 +160,96 @@
   }
 
   let giro = 0, deriva = 0;
+  let muescas = 0, golpe = 0;      // muescas pasadas y el destello de la última
+  let abre = 0;                    // 0..1 mientras el dial se abre al final
+
+  /* La esfera de partículas, pequeña, dentro del dial. */
+  function esfera(cx, cy, R, brillo, col) {
+    const ca = Math.cos(giro), sa = Math.sin(giro);
+    ctx.fillStyle = col;
+    for (let i = 0; i < N; i++) {
+      const q = pts[i];
+      const rx = q.x * ca - q.z * sa, rz = q.x * sa + q.z * ca;
+      const pz = 1.9 / (1.9 + rz);
+      const jx = Math.sin(q.f + deriva * q.w) * (1 - brillo) * 3 * escala;
+      ctx.globalAlpha = Math.min(1, (0.25 + brillo * 0.75) * q.o * pz);
+      ctx.beginPath();
+      ctx.arc(cx + (rx * R + jx) * pz, cy + q.y * R * pz, q.s * pz * (0.6 + brillo * 0.6) * escala, 0, 6.284);
+      ctx.fill();
+    }
+  }
 
   function dibujar(x, p) {
     ctx.clearRect(0, 0, anchoCSS, altoCSS);
     deriva += 0.012;
+    giro += 0.006 + p * 0.03 + abre * 0.2;
 
-    // El centro va pegado al borde de la tarjeta, no fijo a la derecha: así
-    // la esfera se ve desde el primer píxel de rendija en vez de aparecer al
-    // final del recorrido.
-    const cx = x;
-    const cy = altoCSS / 2;
-    const R = (10 + p * 29) * escala;
+    // El dial va centrado en la rendija que deja la tarjeta: se ve entero en
+    // cuanto hay sitio, y antes asoma por el borde.
+    const R = altoCSS * 0.34;
+    // Mientras no cabe, asoma pegado al borde; en cuanto cabe, al centro de
+    // la rendija. En x = 2,5 R las dos reglas dan lo mismo: no hay salto.
+    const cx = x / 2 >= R * 1.25 ? x / 2 : x - R * 1.25, cy = altoCSS / 2;
+    const n = Math.min(4, Math.floor(p * 4 + 1e-6));
+    if (n > muescas) golpe = 1;
+    muescas = n;
+    golpe = Math.max(0, golpe - 0.06);
     const col = tono(p);
-    giro += 0.006 + p * 0.048;
+    const giroDial = p * Math.PI * 3;
 
-    if (p > 0.02) {
-      ctx.globalAlpha = 0.08 + p * 0.28;
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.arc(cx, cy, R * (0.6 + p * 0.8), 0, 6.284);
-      ctx.fill();
+    // Halo de fondo: sube con el recorrido y con cada muesca.
+    ctx.globalAlpha = 0.06 + p * 0.18 + golpe * 0.22 + abre * 0.4;
+    ctx.fillStyle = col;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.25, 0, 6.284); ctx.fill();
+
+    // La esfera de dentro: apagada mientras está cerrado, se enciende al abrir.
+    esfera(cx, cy, R * (0.42 + abre * 0.35), 0.25 + p * 0.25 + abre * 0.75, col);
+
+    // Las dos mitades del dial, con sus marcas. Al abrir se separan.
+    ctx.lineCap = 'round';
+    for (const lado of [-1, 1]) {
+      ctx.save();
+      ctx.translate(cx + lado * abre * R * 1.1, cy);
+      ctx.rotate(giroDial);
+      const a0 = lado < 0 ? Math.PI / 2 : -Math.PI / 2;
+      ctx.globalAlpha = 0.45 + p * 0.45;
+      ctx.strokeStyle = col; ctx.lineWidth = 1.5 * escala;
+      ctx.beginPath(); ctx.arc(0, 0, R, a0, a0 + Math.PI); ctx.stroke();
+      for (let i = 0; i <= 30; i++) {
+        const a = a0 + (i / 30) * Math.PI;
+        const largo = (i % 5 === 0 ? 9 : 4) * escala;
+        ctx.globalAlpha = (i % 5 === 0 ? 0.8 : 0.35) * (0.5 + p * 0.5);
+        ctx.lineWidth = (i % 5 === 0 ? 1.4 : 1) * escala;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * (R - 3 * escala), Math.sin(a) * (R - 3 * escala));
+        ctx.lineTo(Math.cos(a) * (R - 3 * escala - largo), Math.sin(a) * (R - 3 * escala - largo));
+        ctx.stroke();
+      }
+      ctx.restore();
     }
 
-    // Las partículas nacen dispersas y se recogen en esfera al cargar.
-    const disp = (1 - p) * (1 - p) * 35 * escala;
-    const ca = Math.cos(giro), sa = Math.sin(giro);
-    const rayos = p > 0.5;
-    const alargue = 1.4 + p * 0.8;
-
-    for (let i = 0; i < N; i++) {
-      const q = pts[i];
-      const rx = q.x * ca - q.z * sa;
-      const rz = q.x * sa + q.z * ca;
-      const pz = 1.9 / (1.9 + rz);              // perspectiva simple
-      const jx = Math.sin(q.f + deriva * q.w) * disp;
-      const jy = Math.cos(q.f * 1.7 + deriva * q.w) * disp * 0.7;
-      const px = cx + (rx * R + jx) * pz;
-      const py = cy + (q.y * R + jy) * pz;
-
-      ctx.globalAlpha = Math.min(1, (0.36 + p * 0.64) * q.o * pz);
-      ctx.fillStyle = col;
-      ctx.beginPath();
-      ctx.arc(px, py, q.s * pz * (0.75 + p * 0.7) * escala, 0, 6.284);
-      ctx.fill();
-
-      if (rayos && (i & 3) === 0) {
-        ctx.globalAlpha = (p - 0.5) * 0.5 * q.o;
-        ctx.strokeStyle = col;
-        ctx.lineWidth = 0.4 * pz * escala;
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(cx + (px - cx) * alargue, cy + (py - cy) * alargue);
-        ctx.stroke();
+    // Las cuatro muescas, fijas: no giran con el dial. Se encienden al pasar.
+    for (let i = 0; i < 4; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 2;
+      const separa = abre * R * 1.1 * Math.sign(Math.round(Math.cos(a) * 100));
+      const mx = cx + Math.cos(a) * (R + 12 * escala) + separa, my = cy + Math.sin(a) * (R + 12 * escala);
+      const encendida = i < n;
+      ctx.globalAlpha = encendida ? 1 : 0.35;
+      ctx.fillStyle = encendida ? (n >= 4 ? '#fff' : col) : col;
+      ctx.beginPath(); ctx.arc(mx, my, (encendida ? 3.6 : 2.4) * escala, 0, 6.284); ctx.fill();
+      if (encendida && i === n - 1 && golpe > 0) {
+        ctx.globalAlpha = golpe;
+        ctx.strokeStyle = col; ctx.lineWidth = 1.2 * escala;
+        ctx.beginPath(); ctx.arc(mx, my, (6 + (1 - golpe) * 18) * escala, 0, 6.284); ctx.stroke();
       }
     }
 
-    if (p > 0.75) {
-      const k = (p - 0.75) / 0.25;
-      ctx.globalAlpha = k * 0.9;
+    // El corazón, al abrirse: un punto blanco que crece hasta el fogonazo.
+    if (abre > 0) {
+      ctx.globalAlpha = Math.min(1, abre * 1.2);
       ctx.fillStyle = '#fff';
-      ctx.beginPath();
-      ctx.arc(cx, cy, (1.5 + k * 4.5) * escala, 0, 6.284);
-      ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, (2 + abre * 10) * escala, 0, 6.284); ctx.fill();
     }
-
     ctx.globalAlpha = 1;
   }
 
@@ -254,11 +288,18 @@
     // completa es justo lo que esa preferencia pide evitar.
     if (reduccion.matches) { window.location.href = CONFIG.destino; return; }
 
-    const flash = document.createElement('div');
-    flash.className = 'vault-fogonazo';
-    document.body.appendChild(flash);
-    requestAnimationFrame(() => flash.classList.add('on'));
-    setTimeout(() => { window.location.href = CONFIG.destino; }, CONFIG.msFogonazo);
+    // El dial se abre en dos y, ya abierto, el fogonazo y el salto.
+    const t0 = performance.now();
+    const abrir = ahora => {
+      abre = Math.min(1, (ahora - t0) / CONFIG.msAbrir);
+      if (abre < 1) { requestAnimationFrame(abrir); return; }
+      const flash = document.createElement('div');
+      flash.className = 'vault-fogonazo';
+      document.body.appendChild(flash);
+      requestAnimationFrame(() => flash.classList.add('on'));
+      setTimeout(() => { window.location.href = CONFIG.destino; }, CONFIG.msFogonazo);
+    };
+    requestAnimationFrame(abrir);
   }
 
   hero.addEventListener('pointerdown', ev => {
@@ -322,7 +363,7 @@
   // aparecer cerrada: no se recuerda ningún estado.
   window.addEventListener('pageshow', () => {
     hecho = false; arrastrando = false; volviendo = false;
-    x = 0;
+    x = 0; abre = 0; muescas = 0; golpe = 0;
     hero.style.transform = '';
     if (raf !== null) { cancelAnimationFrame(raf); raf = null; }
     if (anchoCSS) ctx.clearRect(0, 0, anchoCSS, altoCSS);

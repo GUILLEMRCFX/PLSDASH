@@ -305,6 +305,7 @@
 
 <script type="module">
   import { engancharNav } from './paneles/nav.js';
+  import { engancharLente } from './paneles/lente.js';
   import { iniciarCarga } from './carga/carga.js';
   import * as pantallaCarga from './carga/naciendo.js';
   import { escenaDesde } from './escena/estado-escena.js';
@@ -528,6 +529,22 @@
     }
   }
 
+  /* El barrido, igual que el bloque: un hecho puntual del registro, y solo los
+     que llegan NUEVOS. El núcleo de la esfera se descarga con él. Varios
+     barridos nuevos de golpe —el panel llevaba horas cerrado— son UNA descarga:
+     repetirla seis veces seguidas no diría nada más. */
+  let ultimoBarridoTs = null;
+
+  function descargarBarridosNuevos(datos) {
+    const ts = (datos.eventos || [])
+      .filter(e => e.tipo === 'barrido' && Number.isFinite(Number(e.ts)))
+      .map(e => Number(e.ts));
+    if (!ts.length) return;
+    const ultimo = Math.max(...ts);
+    if (ultimoBarridoTs == null) { ultimoBarridoTs = ultimo; return; }
+    if (ultimo > ultimoBarridoTs) { ultimoBarridoTs = ultimo; esfera?.barrido(); }
+  }
+
   function pintar(datos) {
     ultimos = datos;
 
@@ -541,6 +558,7 @@
        encendido escalonado. Al entregarla se le pasan los datos de una vez. */
     esfera?.actualizar(escenaDesde(datos, datos.ahoraS));
     destellarBloquesNuevos(datos);
+    descargarBarridosNuevos(datos);
 
     /* ⚠ EL FOCO NO SE PIERDE AL REPINTAR. El HTML se regenera entero cada 18
        segundos y, con él, el campo en el que estés escribiendo: el importe de
@@ -618,6 +636,8 @@
   /* La barra se contrae al desplazar y se expande cuando el desplazamiento
      PARA — no cuando se levanta el dedo. Ver nav.js. */
   engancharNav();
+  // La lente líquida de la barra, solo en el móvil. Ver paneles/lente.js.
+  engancharLente();
 
   /* ── la hoja vieja en la caché ────────────────────────────────────────────
      Pasó, y se pudo reproducir: en el iPhone, Safari y la app instalada tienen
@@ -698,6 +718,9 @@
     try {
       carga = iniciarCarga(document.body, pantallaCarga, {
         opcionesEsfera,
+        // Para que la ignición encienda los validadores de verdad, y cuente
+        // cuántos son, en cuanto llegan los datos.
+        datos: primeros.then(d => (d && d.sesion !== false ? escenaDesde(d, d.ahoraS) : null), () => null),
         alEntregar(e) {
           esfera = e;
           window.__esfera = e;

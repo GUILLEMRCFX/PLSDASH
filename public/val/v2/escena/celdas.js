@@ -109,11 +109,36 @@ export function campoInterior(n, semillaNum = 991) {
   return { pos, brillo, n };
 }
 
-export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815, variacion = 1 } = {}) {
+/**
+ * Relajación de Lloyd sobre la esfera: cada semilla se muda al centro de su
+ * celda. Una o dos pasadas bastan para que desaparezcan las celdas alargadas y
+ * los vértices apelotonados —lo que de cerca se leía como una maraña de
+ * palitos— sin llegar a la regularidad del balón: las celdas siguen siendo de
+ * tamaños distintos porque la densidad de siembra sigue mandando.
+ *
+ * Añadido el 29-oct-2026, al bajar a 300 celdas con resplandor: con celdas más
+ * grandes, la irregularidad extrema se veía de lejos.
+ */
+function relajar(THREE, semillas, pasadas) {
+  let pts = semillas;
+  for (let k = 0; k < pasadas; k++) {
+    const casco = new ConvexHull().setFromPoints(pts);
+    const suma = new Map(pts.map(p => [p, new THREE.Vector3()]));
+    for (const cara of casco.faces) {
+      const c = cara.normal;
+      let e = cara.edge;
+      do { suma.get(e.head().point)?.add(c); e = e.next; } while (e !== cara.edge);
+    }
+    pts = pts.map(p => { const v = suma.get(p); return v.lengthSq() > 0 ? v.normalize() : p.clone(); });
+  }
+  return pts;
+}
+
+export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815, variacion = 1, pasadas = 0 } = {}) {
   const t0 = performance.now();
 
   const aleatorio = generador(semilla);
-  const semillas = sembrar(THREE, nCeldas, aleatorio, variacion);
+  const semillas = relajar(THREE, sembrar(THREE, nCeldas, aleatorio, variacion), pasadas);
 
   // Índice de cada semilla por identidad: ConvexHull conserva el mismo objeto
   // Vector3 que se le pasa, así que sirve como clave.
@@ -131,6 +156,9 @@ export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815, vari
   for (let s = 0; s < nCeldas; s++) brilloCelda[s] = aleatorio();
 
   const aristas = [];
+  // Las mismas aristas como pares de índices de vértice: por aquí viajan los
+  // pulsos de luz, que necesitan saber qué vértice toca con cuál.
+  const pares = [];
   const vertsCascara = [];
   const tonos = [];
 
@@ -155,6 +183,7 @@ export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815, vari
       if (iVecina > iCara) {
         const c2 = centros[iVecina];
         aristas.push(c1.x, c1.y, c1.z, c2.x, c2.y, c2.z);
+        pares.push(iCara, iVecina);
 
         // Las dos semillas separadas por esta arista de Voronoi son justamente
         // los extremos de la arista de Delaunay que la genera.
@@ -202,6 +231,7 @@ export function construirCeldas(THREE, { nCeldas = 300, semilla = 20260815, vari
   return {
     cascara,
     aristas: new Float32Array(aristas),
+    grafo: { vertices: centros, pares: new Uint32Array(pares) },
     puntos,
     brilloPunto,
     nPuntos: brilloPunto.length,

@@ -20,6 +20,11 @@
  *   malla principal  la retícula marcada                  → estructura
  *   vértices         puntos con núcleo duro               → grano y resplandor
  *   cadena + nodos   los validadores, en naranja          → lo único con dato
+ *   núcleo           plasma dentro; crece con el ciclo     → lo generado sin barrer
+ *   pulsos           luz que viaja por las aristas         → vida, no dato
+ *
+ * Y por encima, desde el 29-oct-2026, un resplandor (bloom) en los tres
+ * escalones. Ver `calidad.js` para por qué vuelve y con qué regla.
  *
  * La jerarquía entre los tres niveles de línea es la mitad del efecto: con
  * todas al mismo grosor y brillo la esfera se lee plana.
@@ -51,6 +56,10 @@ import * as THREE from '../vendor/three.module.js';
 import { LineSegments2 } from '../vendor/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from '../vendor/jsm/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from '../vendor/jsm/lines/LineMaterial.js';
+import { EffectComposer } from '../vendor/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from '../vendor/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from '../vendor/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from '../vendor/jsm/postprocessing/OutputPass.js';
 
 import { construirCeldas, campoInterior } from './celdas.js';
 import { ESCALONES, elegirEscalon, Vigilante } from './calidad.js';
@@ -176,10 +185,10 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
 
   // ─────────────────────────────────────────────── renderer y escena
   const renderer = new THREE.WebGLRenderer({
-    // Siempre activo, también en el escalón bajo. Sin postprocesado se dibuja
-    // directamente al framebuffer por defecto, que es justo donde el MSAA
-    // funciona — y es lo que quita los escalones de las siluetas. Es de lo más
-    // barato que se puede comprar en nitidez.
+    // Siempre activo. Con el resplandor puesto no se dibuja al framebuffer por
+    // defecto sino a un objetivo propio, que lleva su propio MSAA (ver
+    // `objetivo` más abajo); este cubre el camino directo, cuando el vigilante
+    // apaga el resplandor en una máquina que no puede.
     antialias: true,
     powerPreference: 'high-performance',
     alpha: false,
@@ -197,6 +206,27 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   const grupo = new THREE.Group();
   escena.add(grupo);
 
+  /* ── el resplandor ──────────────────────────────────────────────────────
+     ⚠ EL MSAA SE PIERDE SI NO SE PIDE. Al dibujar a un objetivo intermedio el
+       `antialias` del renderer ya no aplica, y las siluetas salen en escalera:
+       justo lo que el antialias quitaba. El objetivo se crea con `samples: 4`,
+       que es MSAA en WebGL2. Media precisión para que el bloom tenga brillo
+       por encima de 1 con el que trabajar.
+
+     `escalaBloom` reduce la resolución a la que se calcula el resplandor, no
+     la de la escena: el bloom es borroso por definición y a mitad de
+     resolución no se nota, pero cuesta la cuarta parte. */
+  const objetivo = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
+  const composer = new EffectComposer(renderer, objetivo);
+  composer.addPass(new RenderPass(escena, camara));
+  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), cfg.bloom.fuerza, cfg.bloom.radio, cfg.bloom.umbral);
+  let escalaBloom = cfg.bloom.escala;
+  const tamBloomOriginal = bloom.setSize.bind(bloom);
+  bloom.setSize = (w, h) => tamBloomOriginal(Math.max(1, Math.round(w * escalaBloom)), Math.max(1, Math.round(h * escalaBloom)));
+  composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+  let conBloom = true;
+
   const uniformes = crearUniformsDeformacion();
   uniformes.uRespiracion.value = reducido ? 0 : 1;
   const uFrescura = { value: 1 };
@@ -206,6 +236,11 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
      los usa para encender un anillo que sale de ahí y recorre la esfera. */
   const uDestDir = { value: new THREE.Vector3(0, 1, 0) };
   const uDestTM  = { value: -1 };
+  /* El barrido: 0..1 mientras dura el golpe, 0 el resto. Lo leen las líneas,
+     los puntos y los nodos. Y el foco: 0..1 mientras hay un validador
+     acercado; apaga un poco el resto para que el elegido se lea solo. */
+  const uBarrido = { value: 0 };
+  const uFoco = { value: 0 };
   const materialesLinea = [];
 
   // ─────────────────────────────────────────────── materiales
@@ -219,9 +254,13 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         ${FUNCION_DEFORMACION}
         attribute float aTono;
         uniform vec3 uDestDir;
-        varying float vTono; varying float vBorde; varying float vAng;
+        varying float vTono; varying float vBorde; varying float vAng; varying float vToque;
+        varying float vNace;
         void main(){
           vTono = aTono;
+          vToque = ondaToque(normalize(position));
+          // Apelotonada en el punto inicial de la ignición, no se dibuja.
+          vNace = smoothstep(0.11, 0.17, uNacer);
           // Distancia ANGULAR al punto donde cayó el bloque, de 0 a 1. Sobre
           // una esfera es la distancia de verdad: la onda recorre la superficie
           // igual en todas direcciones en vez de deformarse con la proyección.
@@ -235,7 +274,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       fragmentShader: /* glsl */`
         uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
         uniform float uDestT;
-        varying float vTono; varying float vBorde; varying float vAng;
+        varying float vTono; varying float vBorde; varying float vAng; varying float vToque;
+        varying float vNace;
         void main(){
           float borde = pow(vBorde, 3.0);
           float matiz = 0.55 + vTono * 0.45;
@@ -255,6 +295,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
           // nitidez se va con él.
           vec3 col = uColor * matiz * (0.004 + borde * 0.20) * (0.5 + uEnergia * 0.7);
           col += uColor * onda * 0.75;
+          col += uColor * vToque * 1.1;
+          col *= vNace;
           col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
           gl_FragColor = vec4(col, 1.0);
         }`,
@@ -270,7 +312,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
    */
   function materialPuntos(color, tamBase, tamVar, ganancia) {
     return new THREE.ShaderMaterial({
-      uniforms: { ...uniformes, uFrescura, uEnergia,
+      uniforms: { ...uniformes, uFrescura, uEnergia, uBarrido,
         uTam: { value: cfg.punto }, uColor: { value: color.clone() },
         uBase: { value: tamBase }, uVar: { value: tamVar }, uGan: { value: ganancia } },
       vertexShader: /* glsl */`
@@ -292,6 +334,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         }`,
       fragmentShader: /* glsl */`
         uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia; uniform float uGan;
+        uniform float uBarrido; uniform float uNacer;
         varying vec2 vP; varying float vB;
         void main(){
           float d = length(vP) * 2.0;
@@ -300,9 +343,14 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
           float nucleo = 1.0 - smoothstep(0.30, 0.46, d);
           float halo   = exp(-d * 3.6) * 0.20;
           float i = nucleo + halo;
-          vec3 col = mix(uColor, vec3(1.0), nucleo * 0.45) * vB * uGan * (0.75 + uEnergia * 0.75);
+          vec3 col = mix(uColor, vec3(1.0), nucleo * 0.45) * vB * uGan * (0.75 + uEnergia * 0.75)
+                   * (1.0 + uBarrido * 0.8);
           col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
-          gl_FragColor = vec4(col, i * vB * uGan);
+          /* ⚠ Novecientos puntos apilados en el mismo píxel al empezar la
+             ignición suman un brillo enorme, y el resplandor lo convierte en un
+             CUADRADO borroso: así es como sale un punto saturado de las
+             reducciones del bloom. Visto en tira a 390. */
+          gl_FragColor = vec4(col, i * vB * uGan * smoothstep(0.11, 0.17, uNacer));
         }`,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
@@ -313,20 +361,26 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       color: 0xffffff, linewidth: grosor,
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     });
-    Object.assign(m.uniforms, uniformes, { uFrescura, uEnergia,
+    Object.assign(m.uniforms, uniformes, { uFrescura, uEnergia, uBarrido, uFoco,
       uCian: { value: color.clone() },
       uIntensidad: { value: cfg.intensidad * ganancia } });
 
     m.vertexShader = inyectar(m.vertexShader)
+      .replace('uniform float linewidth;', 'uniform float linewidth;\n varying float vToque; varying float vCara;')
       .replace('vec4 start = modelViewMatrix * vec4( instanceStart, 1.0 );',
-               'vec4 start = modelViewMatrix * vec4( deformar(instanceStart), 1.0 );')
+               'vec3 dirL = normalize(position.y < 0.5 ? instanceStart : instanceEnd);\n'
+               + 'vToque = ondaToque(dirL);\n'
+               + 'vCara = dot(normalize(normalMatrix * dirL), vec3(0.0, 0.0, 1.0));\n'
+               + 'vec4 start = modelViewMatrix * vec4( deformar(instanceStart), 1.0 );')
       .replace('vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );',
                'vec4 end = modelViewMatrix * vec4( deformar(instanceEnd), 1.0 );');
 
     m.fragmentShader = m.fragmentShader
       .replace('#include <common>', `#include <common>
         uniform float uFrescura; uniform float uEnergia; uniform float uIntensidad;
-        uniform vec3 uCian;`)
+        uniform float uBarrido; uniform float uFoco; uniform float uNacer;
+        uniform vec3 uCian;
+        varying float vToque; varying float vCara;`)
       .replace('gl_FragColor = vec4( diffuseColor.rgb, alpha );',
         // Núcleo estrecho y duro: el quad es más ancho que la línea visible, y
         // esa banda de más es la que antialía el borde por sí sola. Subir el
@@ -338,6 +392,19 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
          // El centro casi a blanco: una línea estrecha y muy brillante se lee
          // afilada; una estrecha y tenue se lee simplemente débil.
          vec3 col = mix(uCian, vec3(1.0), nucleo * 0.24) * (0.6 + uEnergia * 0.7);
+         // La onda del toque y el golpe del barrido suben el brillo; el foco
+         // lo baja, para que el validador acercado se lea solo.
+         col *= (1.0 + vToque * 2.2 + uBarrido * 0.9) * (1.0 - uFoco * 0.4);
+         /* ⚠ LA CARA DE ATRÁS, APAGADA. Sin esto las aristas de las dos caras
+            se veían a la vez con el mismo brillo, cruzándose, y la red se
+            leía como una maraña de palitos en vez de como celdas: era lo que
+            hacía la esfera de antes tan densa a la vista, más que el número
+            de celdas. Con la de atrás a un octavo, la de delante manda y la
+            de atrás da profundidad. */
+         col *= mix(0.12, 1.0, smoothstep(-0.15, 0.6, vCara));
+         // En la ignición, mientras todo está en un punto, las líneas no se
+         // dibujan: con su grosor, cada una apelotonada es un cuadrado.
+         col *= smoothstep(0.11, 0.17, uNacer);
          col = mix(vec3(dot(col, vec3(0.33))), col, uFrescura);
          gl_FragColor = vec4(col, alpha * (nucleo + halo) * uIntensidad);`);
     materialesLinea.push(m);
@@ -350,7 +417,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   const matPrincipal= materialLinea(CIAN, cfg.grosor, 1);
   const matVertices = materialPuntos(CIAN, 0.0075, 0.014, 1.45);
   const matCampo    = materialPuntos(CIAN, 0.005, 0.015, 0.62);
-  const matCadena   = materialLinea(NARANJA, cfg.grosor * 1.25, 1.75);
+  const matCadena   = materialLinea(NARANJA, cfg.grosor * 1.1, 1.05);
 
   function nube(pos, brillo, material, destino) {
     const g = instanciar(planoUnidad, brillo.length);
@@ -386,7 +453,9 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     return g;
   }
 
-  const vor = construirCeldas(THREE, { nCeldas: cfg.celdas, semilla, variacion: 1 });
+  // Dos pasadas de Lloyd y media variación de densidad: celdas de tamaños
+  // distintos pero sin las alargadas. Ver `relajar()` en celdas.js.
+  const vor = construirCeldas(THREE, { nCeldas: cfg.celdas, semilla, variacion: 0.6, pasadas: 2 });
   const vorFina = construirCeldas(THREE, {
     nCeldas: cfg.celdasFinas, semilla: (semilla || 20260815) + 7717, variacion: 0.75,
   });
@@ -434,8 +503,11 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   escena.add(atmosfera);
 
   // ── anillos de ambiente ──
+  // Fuera del bloque para que el nacimiento los pueda encender al final: no
+  // usan `deformar()` y sin esto estarían puestos desde el primer fotograma,
+  // flotando alrededor de un punto.
+  const anillos = new THREE.Group();
   {
-    const anillos = new THREE.Group();
     for (const [radio, inclinacion, alfa] of [[1.14, 0.05, 0.14], [1.24, -0.09, 0.09], [1.36, 0.13, 0.05]]) {
       const pts = [];
       const N = 160;
@@ -507,7 +579,12 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       /* Destello de bloque. `uDestIdx` es el índice del validador que acaba de
          proponer uno; `uDestT`, los segundos transcurridos desde entonces, o
          -1 cuando no hay ninguno vivo. Ver `destello()` más abajo. */
-      uDestIdx: { value: -1 }, uDestT: { value: -1 } },
+      uDestIdx: { value: -1 }, uDestT: { value: -1 },
+      /* El validador acercado (-1 = ninguno) y cuánto foco hay, 0..1. */
+      uFocoIdx: { value: -1 }, uFoco,
+      /* La ola del barrido: recorre los nodos en orden, segundos desde que
+         empezó o -1. `uNumNodos` para que tarde lo mismo con 21 que con 40. */
+      uBarT: { value: -1 }, uNumNodos: { value: 1 } },
     vertexShader: /* glsl */`
       #include <common>
       ${UNIFORMS_DEFORMACION}
@@ -521,10 +598,15 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       uniform float uProf;
       uniform float uSenalado;
       uniform float uDestIdx; uniform float uDestT;
+      uniform float uFocoIdx; uniform float uBarT; uniform float uNumNodos;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
-      varying float vDest; varying float vPul;
+      varying float vDest; varying float vPul; varying float vFoc; varying float vOla;
       void main(){
         vP = position.xy; vI = aInt; vAct = aAct;
+        vFoc = abs(aIndice - uFocoIdx) < 0.5 ? 1.0 : 0.0;
+        // La ola del barrido pasa por cada nodo una vez, en 1,4 s para todos.
+        vOla = uBarT < 0.0 ? 0.0 : exp(-pow((uBarT / 1.4 * uNumNodos - aIndice) * 0.55, 2.0));
+        vOla += ondaToque(normalize(aDir)) * 0.8;
         /* EL LATIDO DEL QUE ESPERA TURNO.
            Un validador en cola no ha ganado nada y no tiene bloques: con los
            dos estados de antes se dibujaba igual que uno muerto. Late a ~0,42 Hz
@@ -553,7 +635,9 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
            constante para por qué no va a 1. */
         float comp = mix(1.0, max(-mv.z, 0.35) / uProf, COMPENSA_PROF);
         mv.xy += position.xy * s * uTam * comp
-                 * (1.0 + vSen * 0.18 + vDest * 1.10 + vPul * 0.30);
+                 * (1.0 + vSen * 0.18 + vDest * 1.10 + vPul * 0.30 + vOla * 0.55 + vFoc * 0.25)
+                 // En la ignición los nodos no existen hasta que la red ha caído.
+                 * smoothstep(0.25, 0.45, uNacer);
         gl_Position = projectionMatrix * mv;
       }`
       .replace(/TAM_MIN/g, TAM_MIN.toFixed(3))
@@ -561,8 +645,9 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       .replace(/COMPENSA_PROF/g, COMPENSA_PROF.toFixed(3)),
     fragmentShader: /* glsl */`
       uniform vec3 uColor; uniform float uFrescura; uniform float uEnergia;
+      uniform float uFoco;
       varying vec2 vP; varying float vI; varying float vAct; varying float vSen;
-      varying float vDest; varying float vPul;
+      varying float vDest; varying float vPul; varying float vFoc; varying float vOla;
       void main(){
         float r = length(vP) * 2.0;
 
@@ -597,6 +682,10 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         // Y un halo ancho propio, para que el latido se vea de reojo sin tener
         // que estar mirando ese punto.
         i += vPul * exp(-pow(r / 1.05, 2.0)) * 0.30;
+        // La ola del barrido y la onda del toque: un golpe de luz al pasar.
+        i += vOla * (exp(-pow(r / 0.9, 2.0)) * 0.7 + nucleo * 0.9);
+        // Con un validador acercado, los demás se apagan a la mitad.
+        i *= mix(1.0, vFoc > 0.5 ? 1.25 : 0.45, uFoco);
         if (i < 0.004) discard;
 
         // El núcleo tira a blanco y el halo se queda naranja: es lo que lo hace
@@ -620,6 +709,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     }
     mallaNodos = mallaCadena = null;
     nNodos = n;
+    matNodo.uniforms.uNumNodos.value = Math.max(1, n);
     if (n === 0) return;
 
     // Direcciones de Fibonacci: reparto uniforme sobre la esfera, sin clavar
@@ -674,6 +764,225 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     }
   }
 
+
+  // ─────────────────────────────────────────────── el núcleo
+  //
+  // Plasma dentro de la red. Su tamaño y su brillo son el AVANCE DEL CICLO DE
+  // BARRIDO, el mismo dato que ya llevaba `uEnergia`: crece durante las ~8 h que
+  // tarda en acumularse el excedente y se vacía cuando el protocolo lo retira.
+  // A simple vista casi no se le ve crecer —son horas—; la descarga sí, porque
+  // la dispara un hecho puntual: `barrido()`.
+  //
+  // Colores del tema: el centro caliente es `--acento`, el borde `--dato`.
+  const RUIDO = /* glsl */`
+    vec3 m289(vec3 x){return x-floor(x*(1./289.))*289.;}
+    vec4 m289(vec4 x){return x-floor(x*(1./289.))*289.;}
+    vec4 perm(vec4 x){return m289(((x*34.)+1.)*x);}
+    vec4 tis(vec4 r){return 1.79284291400159-.85373472095314*r;}
+    float snoise(vec3 v){
+      const vec2 C=vec2(1./6.,1./3.); const vec4 D=vec4(0.,.5,1.,2.);
+      vec3 i=floor(v+dot(v,C.yyy)); vec3 x0=v-i+dot(i,C.xxx);
+      vec3 g=step(x0.yzx,x0.xyz); vec3 l=1.-g; vec3 i1=min(g.xyz,l.zxy); vec3 i2=max(g.xyz,l.zxy);
+      vec3 x1=x0-i1+C.xxx; vec3 x2=x0-i2+C.yyy; vec3 x3=x0-D.yyy; i=m289(i);
+      vec4 p=perm(perm(perm(i.z+vec4(0.,i1.z,i2.z,1.))+i.y+vec4(0.,i1.y,i2.y,1.))+i.x+vec4(0.,i1.x,i2.x,1.));
+      float n_=.142857142857; vec3 ns=n_*D.wyz-D.xzx; vec4 j=p-49.*floor(p*ns.z*ns.z);
+      vec4 x_=floor(j*ns.z); vec4 y_=floor(j-7.*x_); vec4 x=x_*ns.x+ns.yyyy; vec4 y=y_*ns.x+ns.yyyy;
+      vec4 h=1.-abs(x)-abs(y); vec4 b0=vec4(x.xy,y.xy); vec4 b1=vec4(x.zw,y.zw);
+      vec4 s0=floor(b0)*2.+1.; vec4 s1=floor(b1)*2.+1.; vec4 sh=-step(h,vec4(0.));
+      vec4 a0=b0.xzyw+s0.xzyw*sh.xxyy; vec4 a1=b1.xzyw+s1.xzyw*sh.zzww;
+      vec3 p0=vec3(a0.xy,h.x); vec3 p1=vec3(a0.zw,h.y); vec3 p2=vec3(a1.xy,h.z); vec3 p3=vec3(a1.zw,h.w);
+      vec4 norm=tis(vec4(dot(p0,p0),dot(p1,p1),dot(p2,p2),dot(p3,p3)));
+      p0*=norm.x; p1*=norm.y; p2*=norm.z; p3*=norm.w;
+      vec4 m=max(.6-vec4(dot(x0,x0),dot(x1,x1),dot(x2,x2),dot(x3,x3)),0.); m=m*m;
+      return 42.*dot(m*m,vec4(dot(p0,x0),dot(p1,x1),dot(p2,x2),dot(p3,x3)));
+    }`;
+  const uCarga = { value: 0.5 };
+  const uDescarga = { value: 0 };
+  const matNucleo = new THREE.ShaderMaterial({
+    uniforms: { uTiempo: uniformes.uTiempo, uRespiracion: uniformes.uRespiracion, uNacer: uniformes.uNacer,
+      uCarga, uDescarga, uFrescura,
+      uCaliente: { value: NARANJA.clone() }, uBorde: { value: CIAN.clone() } },
+    vertexShader: RUIDO + /* glsl */`
+      uniform float uTiempo; uniform float uRespiracion; uniform float uCarga;
+      uniform float uDescarga; uniform float uNacer;
+      varying vec3 vN; varying vec3 vV; varying float vR;
+      void main(){
+        // Con movimiento reducido el plasma casi no se mueve, pero no se congela:
+        // un núcleo quieto del todo se lee como una bola, no como energía.
+        float t = uTiempo * (0.2 + 0.8 * uRespiracion);
+        float n = snoise(normal * 2.2 + t * 0.45);
+        float n2 = snoise(normal * 5.0 - t * 0.8) * 0.4;
+        vR = n;
+        // En la ignición el núcleo ES el punto que estalla: empieza pequeño.
+        float aparece = mix(0.25, 1.0, smoothstep(0.0, 0.45, uNacer));
+        float r = (0.10 + uCarga * 0.20) * (1.0 + (n + n2) * 0.15) * (1.0 - uDescarga * 0.7) * aparece;
+        vec4 mv = modelViewMatrix * vec4(normal * r, 1.0);
+        vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform float uCarga; uniform float uDescarga; uniform float uFrescura; uniform float uNacer;
+      uniform vec3 uCaliente; uniform vec3 uBorde;
+      varying vec3 vN; varying vec3 vV; varying float vR;
+      void main(){
+        float nv = clamp(dot(vN, vV), 0.0, 1.0);
+        /* Sin silueta dura: el borde se funde a negro y el centro arde. Con el
+           borde del mismo brillo que el centro se leía como una piedra, no
+           como plasma. */
+        vec3 c = mix(uBorde * 0.6, uCaliente, smoothstep(0.2, 0.9, nv));
+        c = mix(c, vec3(1.0), pow(nv, 6.0) * 0.35);
+        c *= smoothstep(0.0, 0.55, nv);
+        c *= (0.55 + vR * 0.35) * (0.25 + uCarga * 0.5 + uDescarga * 2.0);
+        c *= 1.0 + (1.0 - smoothstep(0.05, 0.35, uNacer)) * 3.0;
+        c = mix(vec3(dot(c, vec3(0.33))), c, uFrescura);
+        gl_FragColor = vec4(c, 1.0);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const nucleo = new THREE.Mesh(new THREE.IcosahedronGeometry(1, cfg.nucleoDetalle), matNucleo);
+  nucleo.frustumCulled = false;
+  grupo.add(nucleo);
+
+  // El halo del núcleo: un cuadro de cara a la cámara, como la atmósfera.
+  const matAura = new THREE.ShaderMaterial({
+    uniforms: { uCarga, uDescarga, uFrescura, uColor: { value: NARANJA.clone() } },
+    vertexShader: /* glsl */`
+      varying vec2 vP;
+      void main(){
+        vP = position.xy;
+        vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        mv.xy += position.xy * 0.9;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform float uCarga; uniform float uDescarga; uniform float uFrescura; uniform vec3 uColor;
+      varying vec2 vP;
+      void main(){
+        float r = length(vP);
+        float g = exp(-pow(r / (0.28 + uCarga * 0.22), 2.0)) * (0.16 + uCarga * 0.26 + uDescarga * 0.8);
+        vec3 c = uColor * g;
+        c = mix(vec3(dot(c, vec3(0.33))), c, uFrescura);
+        gl_FragColor = vec4(c, g);
+      }`,
+    transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+  });
+  const aura = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), matAura);
+  aura.frustumCulled = false;
+  grupo.add(aura);
+
+  // La onda de choque del barrido: una cáscara que sale del núcleo.
+  const uChoque = { value: -1 };
+  const matChoque = new THREE.ShaderMaterial({
+    uniforms: { uK: uChoque, uColor: { value: NARANJA.clone() } },
+    vertexShader: /* glsl */`
+      uniform float uK; varying vec3 vN; varying vec3 vV;
+      void main(){
+        vec4 mv = modelViewMatrix * vec4(position * (0.2 + max(uK, 0.0) * 1.15), 1.0);
+        vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform float uK; uniform vec3 uColor; varying vec3 vN; varying vec3 vV;
+      void main(){
+        if (uK < 0.0) discard;
+        float f = pow(1.0 - clamp(dot(vN, vV), 0.0, 1.0), 2.5);
+        gl_FragColor = vec4(mix(uColor, vec3(1.0), 0.35) * f * (1.0 - uK) * 1.3, 1.0);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const choque = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), matChoque);
+  choque.frustumCulled = false;
+  choque.visible = false;
+  grupo.add(choque);
+
+  // ─────────────────────────────────────────────── pulsos por la red
+  //
+  // Puntos de luz que recorren las aristas de la malla principal, de vértice en
+  // vértice. NO SON UN DATO: no hay nada viajando entre celdas de verdad. Son
+  // vida, como la respiración, y por eso con movimiento reducido no existen.
+  // En un barrido se ponen en naranja y corren el triple durante un momento.
+  const grafo = vor.grafo;
+  const vecinos = grafo.vertices.map(() => []);
+  for (let k = 0; k < grafo.pares.length; k += 2) {
+    const a = grafo.pares[k], b = grafo.pares[k + 1];
+    vecinos[a].push(b); vecinos[b].push(a);
+  }
+  const NPUL = reducido ? 0 : cfg.pulsos;
+  const pulsos = Array.from({ length: NPUL }, () => {
+    const a = Math.floor(Math.random() * grafo.vertices.length);
+    return { a, b: vecinos[a][0] ?? a, s: Math.random(), vel: 0.45 + Math.random() * 0.6, naranja: 0 };
+  });
+  const pulDir = new Float32Array(NPUL * 2 * 3);
+  const pulCola = new Float32Array(NPUL * 2);
+  const pulNar = new Float32Array(NPUL * 2);
+  for (let i = 0; i < NPUL; i++) pulCola[i * 2 + 1] = 1;
+  const matPulso = new THREE.ShaderMaterial({
+    uniforms: { ...uniformes, uFrescura, uFoco, uTam: { value: cfg.punto },
+      uColor: { value: CIAN.clone() }, uNaranja: { value: NARANJA.clone() } },
+    vertexShader: /* glsl */`
+      #include <common>
+      ${UNIFORMS_DEFORMACION}
+      ${FUNCION_DEFORMACION}
+      attribute vec3 aDir; attribute float aCola; attribute float aNar;
+      uniform float uTam;
+      varying vec2 vP; varying float vCola; varying float vNar;
+      void main(){
+        vP = position.xy; vCola = aCola; vNar = aNar;
+        vec4 mv = modelViewMatrix * vec4(deformar(aDir) * 1.004, 1.0);
+        mv.xy += position.xy * (aCola > 0.5 ? 0.012 : 0.02) * uTam;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */`
+      uniform vec3 uColor; uniform vec3 uNaranja; uniform float uFrescura; uniform float uFoco;
+      uniform float uNacer;
+      varying vec2 vP; varying float vCola; varying float vNar;
+      void main(){
+        float d = length(vP) * 2.0;
+        if (d > 1.0) discard;
+        float k = exp(-d * d * 4.0);
+        vec3 c = mix(mix(uColor, vec3(1.0), 0.55), uNaranja, vNar);
+        float a = k * (vCola > 0.5 ? 0.35 : 1.0) * (1.0 - uFoco * 0.6) * smoothstep(0.85, 1.0, uNacer);
+        c = mix(vec3(dot(c, vec3(0.33))), c, uFrescura);
+        gl_FragColor = vec4(c * a, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  let mallaPulsos = null;
+  if (NPUL) {
+    const g = instanciar(planoUnidad, NPUL * 2);
+    g.setAttribute('aDir', new THREE.InstancedBufferAttribute(pulDir, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aCola', new THREE.InstancedBufferAttribute(pulCola, 1));
+    g.setAttribute('aNar', new THREE.InstancedBufferAttribute(pulNar, 1).setUsage(THREE.DynamicDrawUsage));
+    mallaPulsos = new THREE.Mesh(g, matPulso);
+    mallaPulsos.frustumCulled = false;
+    grupo.add(mallaPulsos);
+  }
+  const vPul = new THREE.Vector3();
+  function moverPulsos(dt) {
+    if (!mallaPulsos) return;
+    const V = grafo.vertices;
+    for (let i = 0; i < NPUL; i++) {
+      const p = pulsos[i];
+      p.s += dt * p.vel * 1.4;
+      while (p.s >= 1) {
+        const antes = p.a; p.a = p.b;
+        const vs = vecinos[p.a];
+        const otros = vs.length > 1 ? vs.filter(x => x !== antes) : vs;
+        p.b = otros[Math.floor(Math.random() * otros.length)] ?? antes;
+        p.s -= 1;
+      }
+      p.naranja = Math.max(0, p.naranja - dt * 0.45);
+      for (let k = 0; k < 2; k++) {
+        const t = Math.max(0, p.s - k * 0.18);
+        vPul.copy(V[p.a]).lerp(V[p.b], t).normalize();
+        vPul.toArray(pulDir, (i * 2 + k) * 3);
+        pulNar[i * 2 + k] = p.naranja;
+      }
+    }
+    mallaPulsos.geometry.getAttribute('aDir').needsUpdate = true;
+    mallaPulsos.geometry.getAttribute('aNar').needsUpdate = true;
+  }
+
   // ─────────────────────────────────────────────── tamaño y zoom
   let ancho = 1, alto = 1, distanciaBase = 3.05, zoom = 1;
   const ZOOM_MIN = 0.72, ZOOM_MAX = 2.2;
@@ -698,6 +1007,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     const dpr = Math.min(window.devicePixelRatio || 1, cfg.dprMax);
     renderer.setPixelRatio(dpr);
     renderer.setSize(ancho, alto, false);
+    composer.setPixelRatio(dpr);
+    composer.setSize(ancho, alto);
     camara.aspect = ancho / alto;
 
     // `fov` es el VERTICAL: en pantalla estrecha y alta el ángulo horizontal
@@ -722,8 +1033,14 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
 
   const lienzo = renderer.domElement;
 
+  /* El TOQUE: un pulsar y soltar casi sin moverse. Es lo que lanza la onda y
+     lo que acerca un validador. Se distingue del arrastre por distancia y por
+     tiempo, y un pellizco lo anula: dos dedos nunca son un toque. */
+  let toque = null;
+
   lienzo.addEventListener('pointerdown', ev => {
     if (ev.pointerType === 'mouse' && ev.buttons !== 1) return;
+    toque = punteros.size === 0 ? { x: ev.clientX, y: ev.clientY, t: performance.now() } : null;
     punteros.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
     if (punteros.size === 1) { arrastrando = true; ultX = ev.clientX; ultY = ev.clientY; }
     else { arrastrando = false; pellizcoPrevio = 0; }
@@ -742,6 +1059,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
       if (pellizcoPrevio > 0 && dist > 0) {
         zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * (dist / pellizcoPrevio)));
+        zoomObjetivo = null;
         aplicarCamara();
       }
       pellizcoPrevio = dist;
@@ -752,13 +1070,25 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       velY += (ev.clientX - ultX) * 0.00042;
       velX += (ev.clientY - ultY) * 0.00042;
       ultX = ev.clientX; ultY = ev.clientY;
+      // Girarla a mano suelta el validador acercado: la mano manda.
+      if (toque && Math.hypot(ev.clientX - toque.x, ev.clientY - toque.y) > 7) {
+        toque = null;
+        if (focoIdx >= 0) soltarFoco();
+      }
     }
   });
 
   const soltar = ev => {
     punteros.delete(ev.pointerId);
     if (punteros.size < 2) pellizcoPrevio = 0;
-    if (punteros.size === 0) arrastrando = false;
+    if (punteros.size >= 1) toque = null;          // era un pellizco
+    if (punteros.size === 0) {
+      arrastrando = false;
+      if (toque && ev.type === 'pointerup'
+          && Math.hypot(ev.clientX - toque.x, ev.clientY - toque.y) < 7
+          && performance.now() - toque.t < 400) tocar(ev);
+      toque = null;
+    }
     try { lienzo.releasePointerCapture(ev.pointerId); } catch {}
   };
   lienzo.addEventListener('pointerup', soltar);
@@ -802,6 +1132,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   }
 
   function alSenalarPuntero(ev) {
+    // Con un validador acercado, el rótulo es el suyo y no se mueve.
+    if (focoIdx >= 0) return;
     // Mientras se gira la esfera no se señala: el rótulo persiguiendo al dedo
     // durante un arrastre estorba y no se lee.
     if (arrastrando || punteros.size > 0) { fijar(-1); return; }
@@ -825,7 +1157,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   }
 
   const alSenalarRef = alSenalarPuntero;
-  const limpiarSenal = () => fijar(-1);
+  const limpiarSenal = () => { if (focoIdx < 0) fijar(-1); };
   lienzo.addEventListener('pointermove', alSenalarRef);
   lienzo.addEventListener('pointerleave', limpiarSenal);
   // En táctil no hay «pasar por encima»: se señala al tocar.
@@ -833,9 +1165,72 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     if (ev.pointerType !== 'mouse') alSenalarPuntero(ev);
   });
 
+  /* ─────────────────────────────────────────────── tocar: onda y foco
+
+     La onda sale de donde cae el dedo sobre la esfera, no de la pantalla: se
+     corta el rayo de la cámara con la esfera de radio 1 y el punto se pasa a
+     coordenadas de la esfera, que es donde vive la onda. Así la onda se queda
+     pegada a la superficie aunque la esfera siga girando.
+
+     Y si el toque cae sobre un validador, la esfera gira hasta ponerlo de
+     frente y se acerca. Tocar fuera lo suelta. */
+  const rayo = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const esferaUnidad = new THREE.Sphere(new THREE.Vector3(), 1);
+  const golpe = new THREE.Vector3(), invGrupo = new THREE.Matrix4();
+  let ondaSig = 0;
+  let focoIdx = -1, focoGiro = null, zoomObjetivo = null, zoomAntesFoco = 1;
+
+  function tocar(ev) {
+    const caja = lienzo.getBoundingClientRect();
+    const x = ev.clientX - caja.left, y = ev.clientY - caja.top;
+    ndc.set(x / caja.width * 2 - 1, -(y / caja.height) * 2 + 1);
+    rayo.setFromCamera(ndc, camara);
+    if (!reducido && rayo.ray.intersectSphere(esferaUnidad, golpe)) {
+      invGrupo.copy(grupo.matrixWorld).invert();
+      golpe.applyMatrix4(invGrupo).normalize();
+      uniformes.uOndaP.value[ondaSig].copy(golpe);
+      uniformes.uOndaT.value[ondaSig] = uniformes.uReloj.value;
+      ondaSig = (ondaSig + 1) % 4;
+    }
+    let mejor = -1, mejorD = RADIO_ACIERTO;
+    for (let i = 0; i < nNodos; i++) {
+      const p = enPantalla(i);
+      if (!p) continue;
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < mejorD) { mejorD = d; mejor = i; }
+    }
+    if (mejor >= 0) enfocar(mejor); else soltarFoco();
+  }
+
+  /** Gira la esfera para poner el validador `i` de frente y se acerca. */
+  function enfocar(i) {
+    const d = dirNodos[i];
+    if (!d) return;
+    if (focoIdx < 0) zoomAntesFoco = zoom;
+    focoIdx = i;
+    matNodo.uniforms.uFocoIdx.value = i;
+    /* Con el giro en orden XYZ —`grupo.rotation.set(girX, girY, 0)`— el nodo
+       queda de frente si primero el giro en Y lo lleva al plano YZ y luego el
+       giro en X lo sube o baja al eje de la cámara. */
+    const rho = Math.hypot(d.x, d.z);
+    focoGiro = { y: Math.atan2(-d.x, d.z), x: Math.max(-1.15, Math.min(1.15, Math.atan2(d.y, rho))) };
+    zoomObjetivo = Math.min(ZOOM_MAX, Math.max(zoom, 1.45));
+    velX = velY = 0;
+    senalado = -2;                 // fuerza el aviso aunque ya estuviera señalado
+    fijar(i);
+  }
+  function soltarFoco() {
+    if (focoIdx < 0) return;
+    focoIdx = -1; focoGiro = null;
+    matNodo.uniforms.uFocoIdx.value = -1;
+    zoomObjetivo = zoomAntesFoco;
+    fijar(-1);
+  }
+
   lienzo.addEventListener('wheel', ev => {
     ev.preventDefault();
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * Math.exp(-ev.deltaY * 0.0012)));
+    zoomObjetivo = null;
     aplicarCamara();
   }, { passive: false });
 
@@ -883,6 +1278,14 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     if (acento) {
       poner(matNodo, 'uColor', acento);
       poner(matCadena, 'uCian', acento);
+      poner(matNucleo, 'uCaliente', acento);
+      poner(matAura, 'uColor', acento);
+      poner(matChoque, 'uColor', acento);
+      poner(matPulso, 'uNaranja', acento);
+    }
+    if (dato) {
+      poner(matNucleo, 'uBorde', dato);
+      poner(matPulso, 'uColor', dato);
     }
     return true;
   }
@@ -949,14 +1352,34 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     return true;
   }
 
+  /**
+   * Un barrido: el núcleo se vacía, sale una onda de choque, la luz recorre
+   * los validadores en orden y los pulsos se ponen en naranja.
+   *
+   * Como `destello()`, responde a un HECHO PUNTUAL —lo llama `index.html`
+   * cuando el registro trae un barrido nuevo— y no a una magnitud. El vaciado
+   * de verdad del núcleo lo hace el dato: cuando el ciclo vuelve a empezar,
+   * `energia` baja y el núcleo encoge solo. Esto es el golpe que lo anuncia.
+   */
+  let barridoT0 = -1;
+  function barrido() {
+    barridoT0 = performance.now();
+    for (const p of pulsos) { p.naranja = 1; p.vel = 2.2 + Math.random(); }
+    return true;
+  }
+
   // ─────────────────────────────────────────────── bucle
   const vigilante = new Vigilante(() => {
-    // Lo único barato que queda es bajar resolución. La geometría no se toca:
-    // rehacerla a mitad de sesión daría un tirón y cambiaría el dibujo delante
-    // del usuario.
+    // Lo barato primero: la resolución. Luego la del resplandor, y solo al
+    // final, sin nada más que bajar, el resplandor entero. La geometría no se
+    // toca: rehacerla a mitad de sesión daría un tirón y cambiaría el dibujo
+    // delante del usuario.
     if (cfg.dprMax > 1.0) { cfg.dprMax = Math.max(1.0, cfg.dprMax - 0.25); medir(); return true; }
+    if (conBloom && escalaBloom > 0.5) { escalaBloom = 0.5; medir(); return true; }
+    if (conBloom) { conBloom = false; return true; }
     return false;
   });
+  const t0Reloj = performance.now();
 
   let raf = null, ultimo = performance.now(), visible = true, reloj = 0;
   let destelloT0 = -1;   // instante del último bloque, en ms de `performance.now()`
@@ -976,12 +1399,46 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
 
     reloj += dt;
     uniformes.uTiempo.value = reloj;
+    uniformes.uReloj.value = (ahora - t0Reloj) / 1000;
 
-    if (!reducido) girY += dt * 0.055;
+    const kf = 1 - Math.exp(-dt * 5);
+    if (focoGiro) {
+      // El camino corto: girar 350° para llegar a -10° marea.
+      let dy = focoGiro.y - girY;
+      dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      girY += dy * kf; girX += (focoGiro.x - girX) * kf;
+    } else if (!reducido) girY += dt * 0.055;
     girY += velY; girX += velX;
     velX *= 0.92; velY *= 0.92;
     girX = Math.max(-1.15, Math.min(1.15, girX));
     grupo.rotation.set(girX, girY, 0);
+
+    if (zoomObjetivo != null) {
+      zoom += (zoomObjetivo - zoom) * kf;
+      if (Math.abs(zoomObjetivo - zoom) < 0.002) { zoom = zoomObjetivo; zoomObjetivo = null; }
+      aplicarCamara();
+    }
+    uFoco.value += ((focoIdx >= 0 ? 1 : 0) - uFoco.value) * kf;
+
+    // El núcleo lee el avance del ciclo, que ya viene suavizado en uEnergia.
+    uCarga.value = Math.max(0, Math.min(1, (uEnergia.value - 0.35) / 0.5));
+    if (barridoT0 >= 0) {
+      const t = (ahora - barridoT0) / 1000;
+      if (t < 2.6) {
+        uBarrido.value = Math.exp(-Math.pow((t - 0.25) * 3, 2));
+        matNodo.uniforms.uBarT.value = t;
+        uDescarga.value = Math.exp(-Math.pow((t - 0.12) * 5, 2));
+        const k = t / 1.1;
+        choque.visible = !reducido && k < 1;
+        uChoque.value = k < 1 ? k : -1;
+      } else {
+        barridoT0 = -1;
+        uBarrido.value = 0; uDescarga.value = 0; uChoque.value = -1; choque.visible = false;
+        matNodo.uniforms.uBarT.value = -1;
+        for (const p of pulsos) p.vel = 0.45 + Math.random() * 0.6;
+      }
+    }
+    moverPulsos(dt);
 
     const k = 1 - Math.exp(-dt * 7);
     uEnergia.value  += (energiaObjetivo  - uEnergia.value)  * k * 0.5;
@@ -1003,7 +1460,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       uDestTM.value = vivo ? t : -1;
     }
 
-    renderer.render(escena, camara);
+    if (conBloom) composer.render(dt); else renderer.render(escena, camara);
 
     // El rótulo del nodo señalado tiene que seguirlo mientras la esfera gira.
     // Va DESPUÉS del render, que es cuando `matrixWorld` ya está al día.
@@ -1020,9 +1477,18 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
   return {
     actualizar,
     destello,
-    /* El nacimiento, para la pantalla de carga. 0 = enjambre disperso,
-       1 = esfera. Lo lee `deformar()`, que comparten todos los materiales. */
-    nacer(v) { uniformes.uNacer.value = Math.max(0, Math.min(1, v)); },
+    barrido,
+    /* El nacimiento, para la pantalla de carga. 0 = un punto en el centro,
+       1 = esfera. Lo lee `deformar()`, que comparten todos los materiales.
+       Los anillos de ambiente no deforman: entran al final, cuando la esfera
+       ya ha caído sobre su superficie. */
+    nacer(v) {
+      const n = Math.max(0, Math.min(1, v));
+      uniformes.uNacer.value = n;
+      const k = Math.max(0, Math.min(1, (n - 0.7) / 0.3));
+      anillos.visible = k > 0;
+      anillos.scale.setScalar(0.85 + 0.15 * k);
+    },
 
     /**
      * Cambia de contenedor sin perder el contexto de WebGL.
@@ -1053,6 +1519,18 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
     },
     // Para poder forzarlo desde una prueba sin depender del evento.
     aplicarTema,
+    /* Para las pruebas: dónde cae en pantalla el validador `i` (o null si mira
+       hacia atrás), y un toque sintético en coordenadas del lienzo. */
+    _enPantalla: i => enPantalla(i),
+    /* Para calibrar el resplandor mirando, sin recompilar: desde la consola o
+       desde una prueba. No lo usa el panel. */
+    _bloom({ fuerza, radio, umbral, activo } = {}) {
+      if (fuerza != null) bloom.strength = fuerza;
+      if (radio != null) bloom.radius = radio;
+      if (umbral != null) bloom.threshold = umbral;
+      if (activo != null) conBloom = !!activo;
+      return { fuerza: bloom.strength, radio: bloom.radius, umbral: bloom.threshold, activo: conBloom };
+    },
     info: () => {
       const m = MALLA;
       return {
@@ -1066,6 +1544,8 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
         nacer: uniformes.uNacer.value,
         llamadas: renderer.info.render.calls, reducido,
         destello: matNodo.uniforms.uDestT.value,
+        bloom: conBloom, escalaBloom, pulsos: NPUL,
+        nucleo: +uCarga.value.toFixed(3), barrido: barridoT0 >= 0, foco: focoIdx,
         /* Los colores tal como los tiene CADA FAMILIA de material ahora mismo,
            no como los tiene el CSS. Es la única forma de comprobar desde fuera
            que el tema llegó al shader y no se quedó en la hoja de estilo.
@@ -1093,6 +1573,7 @@ export function crearEsfera(contenedor, { escalon = null, semilla, alSenalar = n
       window.removeEventListener('plsdash:tema', alCambiarTema);
       lienzo.removeEventListener('pointermove', alSenalarRef);
       lienzo.removeEventListener('pointerleave', limpiarSenal);
+      composer.dispose(); objetivo.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     },
