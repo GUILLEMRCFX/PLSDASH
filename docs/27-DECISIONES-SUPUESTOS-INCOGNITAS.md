@@ -49,10 +49,15 @@
 | **La wallet de retirada y la activación, de la cadena** | 23-sep-2026 | El recolector las lee de las `withdrawal_credentials` y de la epoch de activación; dejan de estar escritas en `ganancia.js`, `explorador.py` y `datos.js`. Es lo que se queda de la regla de los cuatro niveles de dato personal, que nació con la pestaña Ampliar. |
 | **La esfera no es navegación** | ago-2026 | En 390 px, elegir un validador girando una esfera es peor que tocar una fila. |
 | **Malla Voronoi, no geodésica** | ago-2026 | La geodésica hace muaré y deja costura en el ecuador. Y una malla irregular dice «red». |
-| **Sin bloom** | ago-2026 | Con el resplandor dentro de cada primitiva, el postprocesado lo aplica dos veces: negro a gris. |
+| **300 celdas relajadas, y la cara de atrás apagada** | 29-oct-2026 | Antes 620/430/300 según el aparato. Con resplandor, 620 celdas se fundían en bruma, tapaban el núcleo y perdían a los validadores. Dos pasadas de Lloyd quitan las celdas alargadas sin volver al balón, y la cara de atrás a un octavo es lo que hacía que la red se leyera como maraña. Elegido por el propietario en el taller de prototipos. |
+| **Resplandor (bloom) con umbral alto, en los tres escalones** | 29-oct-2026 | Sustituye a «Sin bloom». Lo pidió el propietario tras ver el taller. Umbral 1,2 sobre una imagen de media precisión: solo brilla lo que ya pasaba de blanco. Medido a 390: brillo medio 14,6 → 54,4 y píxeles por encima de 40 del 10 % al 44 %, o sea casi lo mismo que en agosto; la diferencia es que el fondo sigue negro (esquina 0 → 3,6 de 255). Es una decisión de aspecto, no un arreglo. Los tres escalones lo llevan; el vigilante lo baja de resolución y, como último recurso, lo apaga. |
+| **El núcleo es el ciclo de barrido** | 29-oct-2026 | Plasma dentro de la esfera. Su tamaño es el mismo dato que ya llevaba `energia`, y se descarga cuando el registro trae un barrido nuevo. Ningún efecto de la esfera sin dato detrás, salvo los pulsos, que se declaran adorno. |
+| **La ignición, con los validadores reales** | 29-oct-2026 | La carga sale de un punto que estalla y dura ~3 s aunque los datos lleguen antes (decisión del propietario). Los diez nodos escritos a mano que tenía `naciendo.js` se fueron: ahora enciende los que hay. |
+| **El anillo del PIN enseña puntos, no dígitos** | 29-oct-2026 | La referencia los enseñaba. Un PIN en claro se lee por encima del hombro. |
+| **Lente líquida solo en el móvil** | 29-oct-2026 | En escritorio la barra está arriba y no es una píldora. No es la refracción de Apple: Safari no la soporta. |
 | **Cinco temas de color** | sep-2026 | Disuelve el problema de tener tres paletas: pasan a ser opciones. |
 | **Desglose base/suerte, no ranking** | ago-2026 | La base por ciclo varía 2,2 % entre validadores. Un ranking sería una tabla de suerte. |
-| **El Vault es puerta, no cerradura** | ago-2026 | Autenticar en la portada pública no aportaba nada; el PIN ya está en `/val/`. |
+| **El Vault es puerta, no cerradura** | ago-2026 | Autenticar en la portada pública no aportaba nada; el PIN ya está en `/val/`. Sigue siendo así: la «cerradura» del 29-oct-2026 es solo el dibujo del gesto, no comprueba nada. |
 | **Registro manual de aportaciones** | sep-2026 | La cadena no distingue una aportación propia. Exacto porque tú sabes lo que mandaste. |
 | **Historial de inversiones sin regla de reparto** | sep-2026 | Clasificar por transacción, no por transferencia: la propia transacción dice si es entrada o swap. Sin notas de procedencia no hay regla que equivocarse. |
 
@@ -85,7 +90,7 @@
 |---|---|---|
 | **React + R3F + Drei + GSAP** | 3× de descarga para una escena de un objeto, y obliga a un build que pone en riesgo el sitio público. | ago-2026 |
 | **Esfera geodésica** | Muaré a densidad alta y costura visible en el ecuador. | ago-2026 |
-| **Bloom / postprocesado** | Duplicaba el resplandor. Brillo medio 19 → 59, halo 12 % → 78 %. | ago-2026 |
+| **Bloom / postprocesado** | Duplicaba el resplandor. Brillo medio 19 → 59, halo 12 % → 78 %. **Volvió el 29-oct-2026** por decisión de aspecto: ver arriba. | ago-2026 |
 | **Gráfico circular en 3D** | La perspectiva deforma la relación ángulo/área: miente sobre las proporciones. Y 259 KB en una portada de 32 KB. | sep-2026 |
 | **Ranking de validadores** | Tabla de suerte disfrazada de rendimiento. El que más bloques tenía era el que menos base. | ago-2026 |
 | **Bloques esperados vs observados** | El divisor de red no cuadra: 46.905 declarados contra ~32.700 implícitos. | ago-2026 |
@@ -217,3 +222,4 @@ Parte 2); la frase se queda porque sigue siendo cierta.
 | 25-sep-2026 | El Resumen pasa a ser el patrimonio; una cifra protagonista por pestaña. |
 | 25-sep-2026 | La pestaña Ampliar pasa a decisiones superadas: el propietario la probó y no le convenció. Vuelven las cinco pestañas. |
 | 17-oct-2026 | Agotado el cupo de lecturas de D1. Nueva decisión de arquitectura sobre el ritmo del panel. |
+| 29-oct-2026 | Taller de prototipos: vuelve el resplandor, 300 celdas, núcleo, ignición, anillo del PIN, lente líquida y cerradura del Vault. |

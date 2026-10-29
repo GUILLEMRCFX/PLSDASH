@@ -170,6 +170,7 @@ Esto es lo que hace que ampliar no exija tocar código.
 | **Módulos ES nativos con importmap** | Sin build, sin bundler, sin configuración de Pages que romper |
 | **Three.js a pelo** | 165 KB frente a ~500 con React |
 | **Canvas 2D para el Vault** | Sin librerías, módulo independiente |
+| **Postproceso de three r170 en `vendor/jsm/postprocessing`** | Desde el 29-oct-2026, para el resplandor. Misma versión que `three.module.js`; sin build |
 | **Fuentes alojadas en el repositorio** | Son variables: 69 KB los dos frente a 207. Y permiten revisar capturas sin depender de Google |
 | **`ON CONFLICT DO NOTHING` sin objetivo explícito** | Se traga los choques de unicidad pero deja salir un `NOT NULL` |
 | **Un solo contexto de WebGL** | La esfera de la pantalla de carga se muda al panel en vez de crearse dos veces |
