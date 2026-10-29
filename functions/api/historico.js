@@ -147,7 +147,7 @@ export async function precios(pares, rango, tiempos) {
     ids.forEach((id, k) => { if (d[`h${k}`]?.length) filasPar.set(id, d[`h${k}`]); });
   }
 
-  const salida = {}, faltan = [];
+  const salida = {}, liquidez = {}, faltan = [];
   for (const [token, par] of pares) {
     const info = infoPar.get(par), filas = filasPar.get(par);
     if (!info || !filas) { faltan.push(token); continue; }
@@ -156,8 +156,12 @@ export async function precios(pares, rango, tiempos) {
     const puntos = filas.map(f => ({ t: Number(f.t), v: precioDeFila(f, esToken0) })).filter(x => x.v != null);
     if (!puntos.length) { faltan.push(token); continue; }
     salida[token] = alinear(puntos, tiempos);
+    // La liquidez de ahora del par, para que la portada pueda descartar los
+    // pares de juguete: su precio no dice nada.
+    const ultima = [...filas].sort((a, b) => Number(a.t) - Number(b.t)).at(-1);
+    liquidez[token] = Number(ultima.reserveUSD) || 0;
   }
-  return { precios: salida, faltan };
+  return { precios: salida, liquidez, faltan };
 }
 
 /** Saldo de PLS sumado de todas las wallets en la rejilla, o null si falla. */
@@ -208,7 +212,7 @@ export async function onRequestGet({ request, waitUntil }) {
   const saldo = await saldoPls(pet.wallets, tiempos);
   const ttl = RANGOS[pet.rango].ttl;
   const res = responder({
-    rango: pet.rango, tiempos, precios: pr.precios, faltan: pr.faltan,
+    rango: pet.rango, tiempos, precios: pr.precios, liquidez: pr.liquidez, faltan: pr.faltan,
     saldoPls: saldo,
     fuentes: { precios: 'PulseX (graph.pulsechain.com)', saldo: saldo ? 'scan.pulsechain.com' : null },
     generado: ahora,

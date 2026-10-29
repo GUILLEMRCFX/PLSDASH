@@ -72,7 +72,7 @@
 }
 .vault-cripta{
   position:absolute;inset:0;z-index:1;border-radius:24px;overflow:hidden;
-  background:linear-gradient(150deg,#0a0710,#05040a 60%);
+  background:linear-gradient(150deg,#040a0e,#020507 60%);
   box-shadow:inset 0 2px 14px rgba(0,0,0,.9),inset 0 0 60px rgba(0,0,0,.7);
   pointer-events:none;
 }
@@ -153,9 +153,12 @@
   function mezcla(a, b, t) {
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
   }
-  const CIAN = [34, 211, 238], VIOLETA = [168, 85, 247], ROSA = [255, 92, 168];
+  // Los dos colores de la marca (29-oct-2026): el dial va del cian del dato al
+  // naranja del acento según se arrastra. Antes iba de cian a violeta y rosa,
+  // los colores viejos de la portada.
+  const CIAN = [42, 212, 240], NARANJA = [255, 138, 61];
   function tono(t) {
-    const m = t < 0.5 ? mezcla(CIAN, VIOLETA, t / 0.5) : mezcla(VIOLETA, ROSA, (t - 0.5) / 0.5);
+    const m = mezcla(CIAN, NARANJA, Math.max(0, Math.min(1, t)));
     return 'rgb(' + (m[0] | 0) + ',' + (m[1] | 0) + ',' + (m[2] | 0) + ')';
   }
 
@@ -304,6 +307,9 @@
 
   hero.addEventListener('pointerdown', ev => {
     if (hecho) return;
+    // El gráfico del total vive dentro de la tarjeta y se recorre con el mismo
+    // gesto. Lo que empieza en él es del gráfico, no de la puerta.
+    if (ev.target.closest && ev.target.closest('[data-no-vault]')) return;
     // En ratón se exige el botón principal. En táctil y lápiz no se filtra
     // aquí: un `buttons` raro de un dispositivo concreto dejaría el gesto
     // inservible, y el filtro que de verdad importa está en pointermove.

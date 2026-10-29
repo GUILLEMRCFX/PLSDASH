@@ -107,6 +107,7 @@ console.log('── precios de los dos subgraphs');
   ok('el par de v1 y el de v2 salen los dos; el que no existe, en «faltan»', [Object.keys(r.precios).sort(), r.faltan], [[T, U].sort(), [X]]);
   ok('token0 de v1: 2 antes de la hora 10, 3 desde ahí', [a[0], a[3], a[9], a[10], a.at(-1)], [2, 2, 2, 3, 3]);
   ok('token1 de v2: 5 en toda la rejilla', b.every(v => cerca(v, 5)), true);
+  ok('la liquidez de ahora de cada par (la de su última fila)', [r.liquidez[T], r.liquidez[U]], [600, 100]);
   ok('una sola consulta por subgraph, no una por par', llamadas.filter(x => x.includes('graph.pulsechain')).length, 2);
   llamadas = [];
   caido = new Set(['/pulsexv2']);

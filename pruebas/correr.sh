@@ -34,6 +34,7 @@ SIN_NAVEGADOR=(
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"
   "pruebas/wallets-test.js"
+  "pruebas/portada-test.js"
   "pruebas/invest-vista-test.js"
   "pruebas/vault-test.js"
   "pruebas/zoom-test.js"
