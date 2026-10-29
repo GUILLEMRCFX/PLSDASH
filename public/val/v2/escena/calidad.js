@@ -17,25 +17,44 @@
 /**
  * Los escalones cambian el coste, no el aspecto.
  *
- * Antes había dos familias —una con bloom y otra compensando su ausencia— y
- * eso abría una brecha entre escritorio y móvil por construcción. Sin
- * postprocesado todos usan la misma técnica, y lo único que varía es cuánta
- * geometría se dibuja y a qué resolución.
+ * ## 29-oct-2026: vuelve el resplandor, y vuelve para todos
+ *
+ * Hubo una época con dos familias —una con bloom y otra compensando su
+ * ausencia— y eso abría una brecha entre escritorio y móvil por construcción.
+ * Se quitó el postprocesado entero. Vuelve ahora, a petición del propietario
+ * tras ver el taller de prototipos, pero con la regla que faltaba entonces:
+ * LOS TRES ESCALONES LO LLEVAN. Lo que cambia entre ellos es a qué resolución
+ * se calcula (`bloom.escala`), no si está. El vigilante solo lo apaga como
+ * último recurso, cuando ya no queda resolución que bajar.
+ *
+ * ## 300 celdas para todos
+ *
+ * Antes eran 620 / 430 / 300. Con resplandor, 620 celdas de líneas finas se
+ * funden en una bruma blanca, tapan el núcleo y dejan a los validadores —que
+ * son el dato— perdidos en una maraña. 300 era ya el escalón bajo: el tamaño
+ * existía y funcionaba, solo se usa para todos. La malla fina y el campo
+ * interior bajan en proporción.
  *
  * `grosor`, `halo` y `punto` sí suben en los escalones pequeños, pero no por
  * técnica: en 390px la esfera ocupa muchos menos píxeles y una línea que en
  * escritorio se lee bien allí sería un pelo. Es corrección de tamaño.
  */
 export const ESCALONES = {
-  alto:  { celdas: 620, celdasFinas: 1700, puntosInterior: 1500, dprMax: 2,
-           grosor: 1.15, grosorFino: 0.62, ganFina: 0.20,
-           halo: 1.00, intensidad: 2.35, atmosfera: 0.15, punto: 1.00 },
-  medio: { celdas: 430, celdasFinas: 1100, puntosInterior: 950, dprMax: 2,
-           grosor: 1.35, grosorFino: 0.70, ganFina: 0.22,
-           halo: 1.30, intensidad: 2.45, atmosfera: 0.17, punto: 1.15 },
-  bajo:  { celdas: 300, celdasFinas: 700,  puntosInterior: 550, dprMax: 1.5,
-           grosor: 1.60, grosorFino: 0.80, ganFina: 0.24,
-           halo: 1.50, intensidad: 2.55, atmosfera: 0.19, punto: 1.30 },
+  alto:  { celdas: 300, celdasFinas: 900, puntosInterior: 650, dprMax: 2,
+           grosor: 1.30, grosorFino: 0.62, ganFina: 0.09,
+           halo: 1.00, intensidad: 2.10, atmosfera: 0.14, punto: 1.00,
+           pulsos: 70, nucleoDetalle: 16,
+           bloom: { fuerza: 0.45, radio: 0.45, umbral: 1.2, escala: 1 } },
+  medio: { celdas: 300, celdasFinas: 800, puntosInterior: 600, dprMax: 2,
+           grosor: 1.45, grosorFino: 0.70, ganFina: 0.10,
+           halo: 1.30, intensidad: 2.20, atmosfera: 0.16, punto: 1.15,
+           pulsos: 55, nucleoDetalle: 12,
+           bloom: { fuerza: 0.45, radio: 0.45, umbral: 1.2, escala: 0.75 } },
+  bajo:  { celdas: 300, celdasFinas: 700, puntosInterior: 450, dprMax: 1.5,
+           grosor: 1.60, grosorFino: 0.80, ganFina: 0.11,
+           halo: 1.50, intensidad: 2.30, atmosfera: 0.18, punto: 1.30,
+           pulsos: 40, nucleoDetalle: 8,
+           bloom: { fuerza: 0.45, radio: 0.45, umbral: 1.2, escala: 0.5 } },
 };
 
 /**

@@ -37,6 +37,7 @@ CON_NAVEGADOR=(
   "pruebas/vault-test.js"
   "pruebas/zoom-test.js"
   "pruebas/repintado-test.js"
+  "pruebas/esfera-taller-test.js"
 )
 
 # El servidor solo hace falta para las de navegador, pero levantarlo siempre
