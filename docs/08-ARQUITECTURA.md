@@ -116,6 +116,10 @@ Bajo `/api/`, como Cloudflare Pages Functions.
   último precio bueno
 - `/api/portfolio/[code]` — carteras guardadas en la nube
 - `/api/inversiones` — historial de inversiones de las wallets
+- `/api/historico` — precios pasados (24 h / 7 d / 30 d) para el gráfico del
+  total de la portada, sacados en el momento del subgraph de PulseX (v1 y v2), y
+  el saldo de PLS por día del explorador. **No guarda nada**: solo la respuesta,
+  10 min a 2 h, en la caché del borde. Ni KV ni D1
 
 **Tras el guardia de sesión (`/api/val/*`):**
 `auth`, `logout`, `estado`, `historico`, `ganancia`, `eventos`, `aportaciones`

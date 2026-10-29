@@ -225,13 +225,28 @@ const RESPUESTA = {
       return [...new Set(problemas)].slice(0, 5);
     });
     ok('nada que señalar a 390', mal, []);
-    // La fila de pestañas, en rejilla 2+2 y no tres y una suelta.
+    /* Las pestañas, en UNA fila que se desliza (29-oct-2026; antes, rejilla de
+       2×2). Lo que importa es que no se parta en dos y que la pestaña en la
+       que estás —Inversiones, la última— se vea entera, no cortada en el
+       borde. */
+    // Playwright desplaza solo lo que pulsa; aquí se pulsa como un dedo, desde
+    // la fila sin desplazar, para que sea la página la que traiga la pestaña.
+    await q.evaluate(() => {
+      document.querySelector('.tabs').scrollLeft = 0;
+      document.querySelector('.tabs .tab:nth-child(1)').click();
+      document.querySelector('.tabs').scrollLeft = 0;
+      document.querySelector('.tabs .tab:nth-child(4)').click();
+    });
+    await hasta(() => q.$('.iv-dias'), 15000);
     const filas = await q.$$eval('.tabs .tab', ts => {
       const y = [...new Set(ts.map(t => Math.round(t.getBoundingClientRect().top)))];
-      return { filas: y.length, anchos: [...new Set(ts.map(t => Math.round(t.getBoundingClientRect().width)))] };
+      const caja = document.querySelector('.tabs').getBoundingClientRect();
+      const on = document.querySelector('.tabs .tab.on').getBoundingClientRect();
+      return { filas: y.length, entera: on.left >= caja.left - 1 && on.right <= caja.right + 1,
+               cual: document.querySelector('.tabs .tab.on').textContent.trim() };
     });
-    ok('dos filas', filas.filas, 2);
-    ok('y todas del mismo ancho', filas.anchos.length, 1);
+    ok('una sola fila', filas.filas, 1);
+    ok('y la activa se ve entera', [filas.cual, filas.entera], ['Inversiones', true]);
     okQue('sin errores de consola', e4.length === 0, e4.join(' | '));
     await q.close();
   }

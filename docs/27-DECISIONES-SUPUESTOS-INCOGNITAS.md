@@ -55,6 +55,10 @@
 | **La ignición, con los validadores reales** | 29-oct-2026 | La carga sale de un punto que estalla y dura ~3 s aunque los datos lleguen antes (decisión del propietario). Los diez nodos escritos a mano que tenía `naciendo.js` se fueron: ahora enciende los que hay. |
 | **El anillo del PIN enseña puntos, no dígitos** | 29-oct-2026 | La referencia los enseñaba. Un PIN en claro se lee por encima del hombro. |
 | **Lente líquida solo en el móvil** | 29-oct-2026 | En escritorio la barra está arriba y no es una píldora. No es la refracción de Apple: Safari no la soporta. |
+| **Una sola marca: la del panel** | 29-oct-2026 | La portada iba en rosa y violeta y el icono y el panel en cian y naranja: al entrar por el Vault cambiabas de app. Ahora negro, cian para el dato, naranja para el acento, verde y rojo para sube y baja. También el dial del Vault. La marca va entera en el móvil («plsdash», no «pls»). |
+| **El gráfico del total, sin guardar nada** | 29-oct-2026 | Lo pidió el propietario con una condición: «no quiero ir guardándolos yo». `/api/historico` saca los precios del subgraph de PulseX y el saldo de PLS por día del explorador en el momento. El PLS es exacto; el resto de tokens van con la cantidad de hoy a los precios de cada momento, y el pie del gráfico lo dice. Dos guardas contra el número inventado del 30D de antes: un token cuyo precio fue más de 20 veces el de ahora, o con menos de 1.000 $ de liquidez en su par, cuenta fijo. La curva se escala para acabar en el número grande. La píldora de «hoy» sigue siendo la de DexScreener. |
+| **El reparto, a la vista** | 29-oct-2026 | Una barra fina encima de la tabla en vez de un botón. Fuera la tarjeta «Cambio 24h», que repetía la píldora. Cada fila lleva su peso y, al tocarla, el detalle (curva, precio, parte, gráfico en vivo). Los logos siguen siendo los oficiales. |
+| **Pestañas de la portada en una fila** | 29-oct-2026 | En el móvil se deslizan en vez de la rejilla 2×2; la activa se trae a la vista. |
 | **Cinco temas de color** | sep-2026 | Disuelve el problema de tener tres paletas: pasan a ser opciones. |
 | **Desglose base/suerte, no ranking** | ago-2026 | La base por ciclo varía 2,2 % entre validadores. Un ranking sería una tabla de suerte. |
 | **El Vault es puerta, no cerradura** | ago-2026 | Autenticar en la portada pública no aportaba nada; el PIN ya está en `/val/`. Sigue siendo así: la «cerradura» del 29-oct-2026 es solo el dibujo del gesto, no comprueba nada. |
@@ -96,7 +100,7 @@
 | **Bloques esperados vs observados** | El divisor de red no cuadra: 46.905 declarados contra ~32.700 implícitos. | ago-2026 |
 | **Tamaño de nodo por bloques/hora** | Un golpe de suerte convertiría al recién llegado en el nodo más grande. | sep-2026 |
 | **Descontar lo aportado del progreso** | Para depositar hacen falta 32M vengan de donde vengan. Sería la mentira contraria. | sep-2026 |
-| **Gráfica de saldo + histórico de cartera** | Se descartó por decisión del propietario. | sep-2026 |
+| **Gráfica de saldo + histórico de cartera** | Se descartó por decisión del propietario. **En la portada volvió el 29-oct-2026**, también por decisión suya, sin guardar histórico propio: ver «El gráfico del total, sin guardar nada». | sep-2026 |
 | **Exportar a CSV** | Descartado por el propietario. | sep-2026 |
 | **Interruptores de Telegram** | Decorativos: no enviaban nada. Un interruptor que no conmuta enseña a desconfiar del panel. | sep-2026 |
 | **`nuc/precio_y_bloques.revisar_bloques()`** | `/api/val/ganancia` ya registra los bloques: saldrían duplicados. | ago-2026 |
