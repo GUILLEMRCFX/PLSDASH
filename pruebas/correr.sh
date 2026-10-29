@@ -29,6 +29,7 @@ SIN_NAVEGADOR=(
   "pruebas/cadena-test.mjs"
   "pruebas/resumen-test.mjs"
   "pruebas/d1-cupo-test.mjs"
+  "pruebas/historico-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"
