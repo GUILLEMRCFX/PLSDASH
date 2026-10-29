@@ -305,6 +305,7 @@
 
 <script type="module">
   import { engancharNav } from './paneles/nav.js';
+  import { engancharLente } from './paneles/lente.js';
   import { iniciarCarga } from './carga/carga.js';
   import * as pantallaCarga from './carga/naciendo.js';
   import { escenaDesde } from './escena/estado-escena.js';
@@ -635,6 +636,8 @@
   /* La barra se contrae al desplazar y se expande cuando el desplazamiento
      PARA — no cuando se levanta el dedo. Ver nav.js. */
   engancharNav();
+  // La lente líquida de la barra, solo en el móvil. Ver paneles/lente.js.
+  engancharLente();
 
   /* ── la hoja vieja en la caché ────────────────────────────────────────────
      Pasó, y se pudo reproducir: en el iPhone, Safari y la app instalada tienen

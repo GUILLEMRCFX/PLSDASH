@@ -54,6 +54,8 @@ a página lo que devuelve el explorador.
 | `wallets-test.js` | el interruptor «cuenta en los totales» | sí |
 | `invest-vista-test.js` | la vista Inversiones y los depósitos agrupados | sí |
 | `vault-test.js` | el gesto de la tarjeta para entrar en `/val/` | sí |
+| `esfera-taller-test.js` | la esfera nueva: 300 celdas, bloom, acercar un validador, barrido, ignición | sí |
+| `lente-test.js` | la lente líquida de la barra: sigue al dedo, abre al soltar, no existe en escritorio | sí |
 | `d1-cupo-test.mjs` | que el panel no agote las lecturas de D1: caché de `ganancia`, ritmo del panel | no |
 
 ## Dos reglas que han costado dinero
