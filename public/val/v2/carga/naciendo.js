@@ -17,11 +17,26 @@
  * compilación de shaders, que es la parte cara. Con la mudanza se compila una
  * vez, igual que antes de que esta pantalla existiera.
  *
- * ## El ensamblaje
+ * ## La ignición (desde el 29-oct-2026; antes, un enjambre que se condensaba)
  *
  * Lo único que añade a la esfera es un uniforme —`uNacer`— que en reposo vale 1
- * y no hace nada; mientras sube de 0 a 1, cada vértice viene de más lejos,
- * girado y con su propio retardo, así que la malla se condensa como un enjambre.
+ * y no hace nada. Mientras sube de 0 a 1: todo está en un punto, que es el
+ * núcleo; estalla con un fogonazo; la red sale despedida más allá de la
+ * superficie y cae sobre ella, cada vértice a su ritmo. Después se encienden
+ * los validadores, UNO A UNO Y LOS DE VERDAD, con un contador debajo.
+ *
+ * ## Los validadores, de verdad
+ *
+ * Hasta el 29-oct-2026 aquí había diez nodos de mentira escritos a mano —ya
+ * con veintiún validadores—. Ahora `index.html` pasa la promesa de los datos y
+ * se encienden los que hay. Si los datos tardan, el pie lo dice y los nodos
+ * entran cuando llegan: no se inventa ningún recuento mientras.
+ *
+ * ## Tres segundos
+ *
+ * La entrada dura 2,5 s y la salida medio: unos tres en total, se tarde lo que
+ * se tarde en tener los datos. Decidido por el propietario: la animación se ve
+ * entera aunque los datos lleguen antes.
  *
  * El nacimiento vive en `deformacion.js` y no aquí a propósito: `deformar()` la
  * comparten la cáscara, las aristas y los nodos, y si cada capa se ensamblara
@@ -45,24 +60,38 @@
  */
 
 import { crearEsfera } from '../escena/esfera.js';
-import { suave } from './ritmo.js';
 
-const T_NACER = 1250;      // lo que tarda el enjambre en cerrar la malla
-const T_ASENTAR = 200;     // el respiro entre que cierra y se da por hecha
+const T_NACER = 2300;      // del punto a la esfera con todos los validadores
+const T_ASENTAR = 180;     // el respiro entre que cierra y se da por hecha
+
+/* Dónde cae cada cosa, en fracción de T_NACER. El estallido lo marca
+   `deformar()` (0,12-0,42); los nodos se encienden cuando la red ya ha caído. */
+const P_FOGONAZO = 0.13;
+const P_NODOS = [0.60, 0.94];
 
 /** Dos fotogramas de verdad, no un `setTimeout(0)`: hace falta que PINTE. */
 const cederDosFotogramas = () =>
   new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-/** Nodos de mentira para el nacimiento: los diez que hay, encendiéndose. */
-function nodosA(p) {
-  const n = [];
-  for (let i = 0; i < 10; i++) {
-    // Se encienden escalonados dentro del último tercio del ensamblaje.
-    const v = Math.max(0, Math.min(1, (p - 0.55 - i * 0.035) / 0.3));
-    n.push({ intensidad: 0.25 + 0.6 * v, activo: v > 0.15 });
-  }
-  return n;
+/**
+ * Los validadores reales, encendiéndose uno a uno entre `P_NODOS[0]` y
+ * `P_NODOS[1]`. Los que aún no tocan van apagados —`activo: false`—, no
+ * ausentes: la esfera reparte las posiciones según cuántos hay, y si la lista
+ * creciera fotograma a fotograma los nodos cambiarían de sitio.
+ */
+export function nodosA(p, reales) {
+  if (!reales || !reales.length) return { nodos: [], encendidos: 0 };
+  const [a, b] = P_NODOS;
+  const n = reales.length;
+  let encendidos = 0;
+  const nodos = reales.map((nodo, i) => {
+    const pi = a + (b - a) * (n > 1 ? i / (n - 1) : 0);
+    const v = Math.max(0, Math.min(1, (p - pi) / 0.05));
+    if (v > 0.5) encendidos++;
+    return { ...nodo, intensidad: (nodo.intensidad ?? 0.5) * v, activo: v > 0.5 && nodo.activo !== false,
+             pendiente: v > 0.5 && nodo.pendiente === true };
+  });
+  return { nodos, encendidos };
 }
 
 /**
@@ -70,40 +99,58 @@ function nodosA(p) {
  * mete su `escalon` forzado y su `alSenalar`, para que la esfera que nace ya
  * sea la que va a quedarse y no haya que reconfigurarla al mudarla.
  */
-export function montar(caja, { reducido = false, manual = false, opcionesEsfera = {} } = {}) {
+export function montar(caja, { reducido = false, manual = false, opcionesEsfera = {}, datos = null } = {}) {
   const capa = document.createElement('div');
   capa.className = 'cg cg-naciendo';
-  capa.innerHTML = '<div class="cg-escena"></div>'
-    + '<p class="cg-marca">PLSDASH</p><p class="cg-pie">Ensamblando la red</p>';
+  capa.innerHTML = '<div class="cg-escena"></div><div class="cg-fogonazo"></div>'
+    + '<p class="cg-marca">PLSDASH</p><p class="cg-pie">Conectando con el nodo</p>';
   caja.appendChild(capa);
 
   const hueco = capa.querySelector('.cg-escena');
+  const fogonazo = capa.querySelector('.cg-fogonazo');
   const marca = capa.querySelector('.cg-marca');
   const pie = capa.querySelector('.cg-pie');
+
+  // La escena real —nodos, energía, frescura— en cuanto la haya.
+  let escena = null;
+  Promise.resolve(datos).then(e => { if (e && Array.isArray(e.nodos)) escena = e; }, () => {});
 
   let esfera = null, raf = 0, t0 = 0, esperando = false, entregada = false;
   let resolverEntrada = null;
   const laEntrada = new Promise(r => { resolverEntrada = r; });
   let laSalida = null;
 
-  const pintarEstado = p => esfera?.actualizar({
-    nodos: nodosA(p), energia: 0.35 + 0.5 * p, frescura: 1,
-  });
+  let ultimoPie = '';
+  const ponerPie = t => { if (t !== ultimoPie) { pie.textContent = t; ultimoPie = t; } };
 
-  /* La nube entra fundida. Sin esto, el primer fotograma es la maraña a plena
-     luz: cientos de aristas largas cruzando la pantalla a la vez suman mucho
-     más brillo que la esfera hecha, y lo que se ve es un fogonazo blanco. Con
-     la opacidad subiendo con el ensamblaje, lo que entra es una nube. */
-  const fundir = p => { hueco.style.opacity = String(0.30 + 0.70 * Math.min(1, p * 1.4)); };
+  const pintarEstado = p => {
+    const { nodos, encendidos } = nodosA(p, escena?.nodos);
+    esfera?.actualizar({ nodos, energia: escena?.energia ?? 0.6, frescura: escena?.frescura ?? 1 });
+    if (!escena) ponerPie(p < 0.5 ? 'Encendiendo la red' : 'Esperando datos del nodo');
+    else if (p < P_NODOS[0]) ponerPie('Encendiendo la red');
+    else ponerPie(`Validadores · ${encendidos} de ${nodos.length}`);
+  };
+
+  /* ⚠ AL PRINCIPIO TODA LA RED ESTÁ EN UN PUNTO, y cientos de aristas sumadas
+     en el mismo píxel con mezcla aditiva y resplandor dan un blanco que se
+     come la pantalla. Se entra con la capa a media luz y se sube después del
+     estallido: lo que se ve es el núcleo encendiéndose, no un fallo. */
+  const fundir = p => { hueco.style.opacity = String(0.55 + 0.45 * Math.min(1, Math.max(0, (p - 0.1) / 0.3))); };
+  const fogonear = p => { fogonazo.style.opacity = String(Math.exp(-Math.pow((p - P_FOGONAZO) * 13, 2)) * 0.8); };
 
   function bucle(ahora) {
     if (!t0) t0 = ahora;
     const t = ahora - t0;
     if (!esperando) {
       const p = Math.min(1, t / T_NACER);
-      esfera.nacer(suave(p));
-      pintarEstado(p); fundir(p);
+      // Lineal y no `suave`: los tramos del estallido ya llevan sus propias
+      // curvas dentro de `deformar()`, y otra curva encima los deformaba.
+      esfera.nacer(p);
+      pintarEstado(p); fundir(p); fogonear(p);
       if (t >= T_NACER + T_ASENTAR) { esperando = true; resolverEntrada(); }
+    } else if (escena) {
+      // En la espera, por si los datos llegan tarde: que entren sin saltos.
+      pintarEstado(1);
     }
     /* En la espera no se toca nada: la esfera ya está hecha y su propio bucle
        la mantiene girando y respirando. Es sostenible sin fin por construcción,
@@ -133,7 +180,7 @@ export function montar(caja, { reducido = false, manual = false, opcionesEsfera 
       return;
     }
     esfera.nacer(0);
-    pintarEstado(0); fundir(0);
+    pintarEstado(0); fundir(0); fogonear(0);
     /* `manual` no arranca el bucle: lo mueve quien llama, con `_instante(ms)`.
        Existe porque una captura con Playwright tarda ~1,2 s en salir cuando hay
        WebGL por software, así que pedir «enséñame el fotograma de los 300 ms»
@@ -184,8 +231,8 @@ export function montar(caja, { reducido = false, manual = false, opcionesEsfera 
     async _instante(t) {
       await listo;
       const p = Math.min(1, t / T_NACER);
-      esfera.nacer(suave(p));
-      pintarEstado(p); fundir(p);
+      esfera.nacer(p);
+      pintarEstado(p); fundir(p); fogonear(p);
     },
   };
 }

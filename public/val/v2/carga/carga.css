@@ -68,3 +68,18 @@
   transform: scale(1.14);
   transition: transform .52s cubic-bezier(.4, 0, .2, 1);
 }
+
+/* ── la ignición (29-oct-2026) ──────────────────────────────────────────────
+   El fogonazo del estallido. Va en el DOM y no en la escena porque es un
+   golpe de un instante a pantalla completa: en el shader costaría un cuadro
+   más por fotograma toda la vida de la esfera para usarlo una vez. */
+.cg-fogonazo {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, #fff 85%, var(--dato)) 0%,
+    color-mix(in srgb, var(--dato) 55%, transparent) 14%,
+    transparent 46%);
+}
+/* El contador cambia de cifra cada pocos fotogramas: con cifras de ancho fijo
+   el texto no baila. */
+.cg-pie { font-variant-numeric: tabular-nums; }
