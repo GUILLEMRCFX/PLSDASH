@@ -177,6 +177,30 @@ const ICONOS = {
   sinBarrer: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 4h10M7 20h10M8 4c0 4 8 4 8 8s-8 4-8 8M16 4c0 4-8 4-8 8"/></svg>',
 };
 
+/**
+ * El ciclo de barrido, en anillo, al pie de la cifra (29-oct-2026).
+ *
+ * Es lo que más se mueve del nodo —lo sin barrer sube cada segundo y cae a
+ * cero cada ~8 h— y vivía dos pestañas más allá. Aquí ocupa el hueco que
+ * dejaba el alto mínimo de la cifra. El avance sale de `proximoBarrido()`, el
+ * mismo cálculo que el núcleo de la esfera y la pestaña Ganancias: sin ritmo
+ * de barrido medido no se pinta, no se inventa un ciclo.
+ */
+function anilloCiclo(barrido, sinBarrer) {
+  if (!barrido || !Number.isFinite(barrido.avance)) return '';
+  const pct = Math.round(barrido.avance * 100);
+  const cuando = barrido.falta > 0 ? `próximo barrido en ~${duracion(barrido.falta)}` : 'el barrido está al caer';
+  return `
+      <div class="r-ciclo" role="img" aria-label="Ciclo de barrido al ${pct} %: ${escapar(cuando)}">
+        <span class="rc-anillo" aria-hidden="true">
+          <svg viewBox="0 0 64 64"><circle class="rc-fondo" cx="32" cy="32" r="27"/><circle class="rc-arco" cx="32" cy="32" r="27" pathLength="100" stroke-dasharray="${pct} 100"/></svg>
+          <b>${pct}<small>%</small></b>
+        </span>
+        <span class="rc-txt"><b>Ciclo de barrido</b><span>${escapar(cuando)}</span>${
+          sinBarrer != null ? `<span>Lo sin barrer, ${fmtCompacto(sinBarrer)} PLS, pasa entonces a la wallet.</span>` : ''}</span>
+      </div>`;
+}
+
 export function panelResumen(datos) {
   const { estado, serie, ganancia } = datos;
 
@@ -296,14 +320,20 @@ export function panelResumen(datos) {
       <p class="r-sub">${escapar(sub)}</p>
       ${chips ? `<div class="r-chips">${chips}</div>` : ''}
       <p class="r-pie">${escapar(cur.pie)}</p>
+      ${anilloCiclo(barrido, pat.sinBarrer)}
     </div>`;
 
   // ── Las tres filas, que suman la cifra de arriba ──
   const fila = (k, nombre, detalle) => {
     const pls = pat[k];
+    // El peso de la fila en el patrimonio: tres barras que, juntas, son el
+    // total. Con el stake en el 99 % se ve de un vistazo lo poco que pesa lo
+    // demás —que es justo lo que se mueve—.
+    const cuota = pls != null && pat.total > 0 ? Math.max(0, Math.min(100, pls / pat.total * 100)) : null;
     return `
       <button type="button" class="r-fila ${k}${sel === k ? ' sel' : ''}" data-sel="${k}"
-              aria-pressed="${sel === k}">
+              aria-pressed="${sel === k}"${cuota != null ? ` style="--peso:${Math.max(cuota > 0 ? 1 : 0, cuota).toFixed(2)}%"` : ''}>
+        ${cuota != null ? '<span class="r-peso" aria-hidden="true"><i></i></span>' : ''}
         <span class="r-ico" aria-hidden="true">${ICONOS[k]}</span>
         <span class="r-nom"><b>${nombre}</b><span>${escapar(detalle)}</span></span>
         <span class="r-val">${pls == null ? '<b>–</b><span>no se ha podido leer</span>'

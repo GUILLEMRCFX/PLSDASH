@@ -53,6 +53,8 @@ function runway(daily, snapshots24h, discoActual) {
     const dias = (b.ts - a.ts) / 86400;
     if (dias >= 0.2) { pctPorDia = (b.disco_pct - a.disco_pct) / dias; provisional = true; }
   }
+  // Un día sin `disco_pct` daría NaN y la frase saldría con «NaN %/semana».
+  if (!Number.isFinite(pctPorDia)) pctPorDia = null;
 
   if (pctPorDia === null) return { texto: 'Faltan horas de historial para estimar el crecimiento.' };
 
@@ -85,14 +87,23 @@ export function panelSaludNodo(datos) {
 
   const nvme = tempNvme(datos.snapshots24h);
   const ramUsada = Number(n.ram_total_gb) - Number(n.ram_libre_gb);
-  const ramPct = Number(n.ram_total_gb) > 0 ? (ramUsada / Number(n.ram_total_gb)) * 100 : null;
-  const disco = Number(n.disco_usado_pct);
-  const rw = runway(datos.daily || [], datos.snapshots24h || [], disco);
+  const ramPct = Number(n.ram_total_gb) > 0 && Number.isFinite(ramUsada) ? (ramUsada / Number(n.ram_total_gb)) * 100 : null;
+  /* ⚠ Un campo que el NUC no manda NO es un cero ni un «NaN». `Number()` de
+     un campo ausente da NaN, y la tarjeta pintaba «NaN %» en el disco; de uno
+     a `null` daba 0, que es peor porque parece una lectura. Se ve con datos de
+     prueba incompletos; en producción no se ha visto, pero un recolector viejo
+     o una lectura fallida lo traerían igual. Sin lectura, «–». */
+  const num = x => (x == null || x === '' || !Number.isFinite(Number(x)) ? null : Number(x));
+  const disco = num(n.disco_usado_pct);
+  const libre = num(n.disco_libre_gb);
+  const cpu = num(n.temp_cpu);
+  const rw = disco == null ? { texto: 'Sin lectura del disco.' }
+    : runway(datos.daily || [], datos.snapshots24h || [], disco);
 
-  const alerta = Number(n.temp_cpu) >= CPU_ALTA
+  const alerta = (cpu != null && cpu >= CPU_ALTA)
     || (nvme != null && nvme >= NVME_ALTA)
     || (ramPct != null && ramPct >= RAM_ALTA)
-    || disco >= DISCO_ALTO
+    || (disco != null && disco >= DISCO_ALTO)
     || Number(n.peers) < PEERS_POCOS;
 
   const cifra = (valor, unidad, etiqueta, sub, mal) => `
@@ -111,7 +122,8 @@ export function panelSaludNodo(datos) {
       </header>
 
       <div class="rejilla">
-        ${cifra(fmt(n.temp_cpu, 0), '°C', 'CPU', null, Number(n.temp_cpu) >= CPU_ALTA)}
+        ${cifra(cpu == null ? '–' : fmt(cpu, 0), cpu == null ? '' : '°C', 'CPU',
+                cpu == null ? 'sin lectura' : null, cpu != null && cpu >= CPU_ALTA)}
         ${cifra(nvme == null ? '–' : fmt(nvme, 1), nvme == null ? '' : '°C', 'NVMe',
                 nvme == null ? 'sin lectura' : null, nvme != null && nvme >= NVME_ALTA)}
       </div>
@@ -120,7 +132,8 @@ export function panelSaludNodo(datos) {
         ${cifra(ramPct == null ? '–' : fmt(ramPct, 1), ramPct == null ? '' : '%', 'RAM',
                 Number.isFinite(ramUsada) ? `${fmt(ramUsada, 1)} de ${fmt(n.ram_total_gb, 0)} GB` : null,
                 ramPct != null && ramPct >= RAM_ALTA)}
-        ${cifra(fmt(disco, 1), '%', 'Disco', `${fmt(n.disco_libre_gb, 0)} GB libres`, disco >= DISCO_ALTO)}
+        ${cifra(disco == null ? '–' : fmt(disco, 1), disco == null ? '' : '%', 'Disco',
+                libre != null ? `${fmt(libre, 0)} GB libres` : 'sin lectura', disco != null && disco >= DISCO_ALTO)}
       </div>
 
       <p class="c-sub${rw.provisional ? '' : ''}">${rw.texto}${
@@ -128,7 +141,7 @@ export function panelSaludNodo(datos) {
 
       <dl class="p-fondo">
         <div><dt>Carga</dt><dd>${n.carga_pct == null ? '–' : `${fmt(n.carga_pct, 1)} %`}</dd></div>
-        <div><dt>Slot</dt><dd>${fmt(n.head_slot)}</dd></div>
+        <div><dt>Slot</dt><dd>${num(n.head_slot) == null ? '–' : fmt(n.head_slot)}</dd></div>
       </dl>
     </section>`;
 }

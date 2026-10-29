@@ -31,6 +31,41 @@ import { fmt, fmtCompacto, escapar } from './formato.js';
 
 export const TITULO = 'Validadores';
 
+/* ── Mapa o lista (29-oct-2026) ─────────────────────────────────────────────
+   Con 21 claves la lista eran 21 filas casi iguales. El mapa los enseña de una
+   vez, una celda por validador: validando, en espera o con aviso —con la
+   palabra en la hoja de detalle, nunca solo el color— y un punto por bloque
+   propuesto. Tocar una celda abre su hoja debajo. La lista de siempre sigue a
+   un toque, y la elección se recuerda.
+
+   Las dos van en el HTML y la que no se ve lleva `hidden`: así la lista sigue
+   existiendo para quien la busque —las pruebas, un lector de pantalla con la
+   vista cambiada— y cambiar de vista no tiene que esperar al repintado. */
+const CLAVE_VISTA = 'plsdash.v2.vista-validadores';
+let vista = leerVista();
+let selV = null;
+function leerVista() {
+  try { return localStorage.getItem(CLAVE_VISTA) === 'lista' ? 'lista' : 'mapa'; }
+  catch { return 'mapa'; }
+}
+
+/** Engancha el selector y las celdas. Hay que llamarla en cada repintado. */
+export function engancharValidadores(raiz, repintar) {
+  raiz.querySelectorAll('.vseg [data-vista]').forEach(b => b.addEventListener('click', () => {
+    vista = b.dataset.vista === 'lista' ? 'lista' : 'mapa';
+    try { localStorage.setItem(CLAVE_VISTA, vista); } catch { /* da igual */ }
+    repintar();
+  }));
+  raiz.querySelectorAll('.vcelda[data-v]').forEach(b => b.addEventListener('click', () => {
+    selV = selV === b.dataset.v ? null : b.dataset.v;
+    repintar();
+    raiz.querySelector(`.vcelda[data-v="${CSS.escape(b.dataset.v)}"]`)?.focus({ preventScroll: true });
+  }));
+}
+
+/** Solo para las pruebas. */
+export function _reiniciarValidadores(v = 'mapa', sel = null) { vista = v; selV = sel; }
+
 const EXPLORADOR = 'https://www.g4mm4.io/validator/';
 
 /**
@@ -228,6 +263,8 @@ export function panelValidadores(datos) {
   // cómo estuviera el array.
   const orden = d => (d?.indice == null ? Number.POSITIVE_INFINITY : Number(d.indice));
 
+  const celdas = [];
+  let hoja = '';
   const filas = [...detalle].sort((a, b) => orden(a) - orden(b)).map(d => {
     const ganado = Number(d.ganado) || 0;
     const balance = Number(d.balance);
@@ -274,6 +311,32 @@ export function panelValidadores(datos) {
           fuera ? '—' : penalizado ? fmt(balance) : fmtCompacto(balance)}</span>
         ${nota ? `<span class="v-nota${cola ? ' espera' : ''}">${escapar(nota)}</span>` : ''}`;
 
+    // ── la celda del mapa y, si es la elegida, su hoja ──
+    const k = String(clave(d));
+    const est = fuera || cola ? 'espera' : mal ? 'mal' : reciente ? 'reciente' : 'ok';
+    const estTxt = nota || 'validando';
+    const nombre = fuera ? (d.pubkey_corta || 'sin número') : `Validador ${d.indice}`;
+    const pips = nBloques ? `<span class="vc-pips" aria-hidden="true">${
+      '<i></i>'.repeat(Math.min(4, nBloques))}${nBloques > 4 ? '<b>+</b>' : ''}</span>` : '';
+    celdas.push(`<button type="button" class="vcelda ${est}" data-v="${escapar(k)}" aria-pressed="${selV === k}"
+        aria-label="${escapar(nombre)}: ${escapar(estTxt)}${nBloques ? `, ${nBloques} bloque${nBloques === 1 ? '' : 's'}` : ''}">
+        <span class="vc-id">${escapar(fuera ? 'nuevo' : d.indice)}</span>${pips}</button>`);
+    if (selV === k) {
+      const frente = ref != null && !cola && !reciente ? (ganado / ref - 1) * 100 : null;
+      hoja = `
+      <div class="vhoja" role="region" aria-label="${escapar(nombre)}">
+        <div class="vh-cab"><b class="${fuera ? 'mono' : ''}">${escapar(nombre)}</b><span class="vh-est ${est}">${escapar(estTxt)}</span></div>
+        <dl>
+          <div><dt>Sin barrer</dt><dd>${fuera ? '—' : `${fmt(ganado)} PLS`}</dd></div>
+          <div><dt>Balance</dt><dd${penalizado ? ' class="alerta"' : ''}>${fuera ? '—' : `${fmtCompacto(balance)} PLS`}</dd></div>
+          <div><dt>Bloques</dt><dd>${fmt(nBloques)}</dd></div>
+          <div><dt>Frente al grupo</dt><dd>${frente == null ? '–'
+            : `${frente < 0 ? '−' : '+'}${fmt(Math.abs(frente), 1)} %`}</dd></div>
+        </dl>
+        ${fuera ? '' : `<a class="vh-ir" href="${EXPLORADOR}${encodeURIComponent(d.indice)}" target="_blank" rel="noopener noreferrer">Ver en g4mm4.io ↗</a>`}
+      </div>`;
+    }
+
     const estilo = `style="--barra:${(fuera ? 0 : (ganado / tope) * 100).toFixed(1)}%${
       ref != null ? `;--ref:${((ref / tope) * 100).toFixed(1)}%` : ''}"`;
 
@@ -302,7 +365,18 @@ export function panelValidadores(datos) {
         }</span>
       </header>
 
-      <div class="vlista">${filas}</div>
+      <div class="vseg" role="group" aria-label="Cómo verlos">
+        <button type="button" data-vista="mapa" aria-pressed="${vista === 'mapa'}">Mapa</button>
+        <button type="button" data-vista="lista" aria-pressed="${vista === 'lista'}">Lista</button>
+      </div>
+
+      <div class="vmapa-caja"${vista === 'mapa' ? '' : ' hidden'}>
+        <div class="vmapa">${celdas.join('')}</div>
+        <p class="vley" aria-hidden="true"><span><i class="ok"></i>validando</span><span><i class="espera"></i>en espera</span><span><i class="mal"></i>con aviso</span><span><i class="pip"></i>bloque</span></p>
+        ${hoja || '<p class="vh-pista">Toca uno para ver su detalle.</p>'}
+      </div>
+
+      <div class="vlista"${vista === 'lista' ? '' : ' hidden'}>${filas}</div>
 
       <dl class="p-fondo">
         <div><dt>Bloques</dt><dd>${fmt(totalBloques)}</dd></div>
