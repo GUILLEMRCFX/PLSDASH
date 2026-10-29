@@ -61,22 +61,51 @@
   color: var(--acento, #ff8a3d);
 }
 
-.pu-puntos { display: flex; gap: 13px; justify-content: center; margin-bottom: 26px; }
+/* ── el anillo (29-oct-2026) ────────────────────────────────────────────────
+   Las casillas viven en un punto de origen —`.pu-puntos` mide 0×0 y está en el
+   centro de la zona— y se colocan con `transform`. Así el giro del anillo es
+   girar ese punto, y la fila y el anillo son solo dos juegos de posiciones.
+   La zona tiene ALTO FIJO: el anillo cabe dentro, y el teclado no salta al
+   subir las casillas. */
+.pu-zona { position: relative; height: 140px; margin: -4px 0 18px; }
+.pu-puntos { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .pu-punto {
-  width: 12px; height: 12px; border-radius: 50%;
-  border: 1.5px solid color-mix(in srgb, var(--dato, #2ad4f0) 40%, transparent);
-  transition: background .12s, border-color .12s;
+  position: absolute; left: -21px; top: -25px; width: 42px; height: 50px;
+  border-radius: 13px; display: grid; place-items: center;
+  background: var(--vidrio, rgba(255, 255, 255, .04));
+  border: 1px solid color-mix(in srgb, var(--dato, #2ad4f0) 26%, transparent);
+  transition: border-color .15s, background .2s, box-shadow .2s;
 }
-.pu-punto.lleno { background: var(--dato, #2ad4f0); border-color: transparent; }
+.pu-punto.lleno { border-color: color-mix(in srgb, var(--dato, #2ad4f0) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dato, #2ad4f0) 9%, transparent); }
+/* Un punto y no el dígito: ver la nota de `puerta.js`. */
+.pu-punto.lleno::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--dato, #2ad4f0); }
+.pu-punto.bien { border-color: var(--bien, #4ade80);
+  background: color-mix(in srgb, var(--bien, #4ade80) 14%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--bien, #4ade80) 40%, transparent); }
+.pu-punto.bien::after { background: var(--bien, #4ade80); }
+.pu-zona[data-estado="mal"] .pu-punto { border-color: var(--acento, #ff8a3d);
+  background: color-mix(in srgb, var(--acento, #ff8a3d) 12%, transparent); }
+.pu-zona[data-estado="mal"] .pu-punto::after { background: var(--acento, #ff8a3d); }
 
-.pu-puntos.mal { animation: pu-temblor .3s; }
-@keyframes pu-temblor {
-  0%, 100% { transform: translateX(0); }
-  25%      { transform: translateX(-8px); }
-  75%      { transform: translateX(8px); }
-}
+.pu-aro { position: absolute; left: 50%; top: 50%; width: 160px; height: 160px;
+  transform: translate(-50%, -50%); overflow: visible; pointer-events: none; }
+.pu-aro circle { fill: none; stroke-width: 1.2; stroke-dasharray: 100; stroke-dashoffset: 100;
+  stroke: color-mix(in srgb, var(--dato, #2ad4f0) 45%, transparent); }
+.pu-zona[data-estado="bien"] .pu-aro circle { stroke: color-mix(in srgb, var(--bien, #4ade80) 60%, transparent); }
+.pu-zona[data-estado="mal"] .pu-aro circle { stroke: color-mix(in srgb, var(--acento, #ff8a3d) 60%, transparent); }
+.pu-centro { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px;
+  border-radius: 50%; background: var(--dato, #2ad4f0); opacity: 0;
+  box-shadow: 0 0 10px var(--dato, #2ad4f0); }
+.pu-sello { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px;
+  border-radius: 16px; display: grid; place-items: center; opacity: 0;
+  border: 1.5px solid var(--bien, #4ade80);
+  background: color-mix(in srgb, var(--bien, #4ade80) 12%, transparent);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--bien, #4ade80) 35%, transparent); }
+.pu-sello svg { width: 26px; height: 26px; }
+.pu-sello path { fill: none; stroke: var(--bien, #4ade80); stroke-width: 2.4;
+  stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 100; stroke-dashoffset: 100; }
 @media (prefers-reduced-motion: reduce) {
-  .pu-puntos.mal { animation: none; }
   .pu-punto { transition: none; }
 }
 
