@@ -318,7 +318,7 @@
   import { panelAportaciones, engancharAportaciones } from './paneles/aportaciones.js';
   import { panelPrecio } from './paneles/precio-historico.js';
   import { panelPrecioSimulado, engancharPrecioSimulado } from './paneles/precio-simulado.js';
-  import { panelValidadores } from './paneles/validadores.js';
+  import { panelValidadores, engancharValidadores } from './paneles/validadores.js';
   import { panelHitos } from './paneles/hitos.js';
   import { panelSaludNodo } from './paneles/salud-nodo.js';
   import { panelEstadoGlobal } from './paneles/estado-global.js';
@@ -587,6 +587,7 @@
     // entero: hay que volver a engancharlas en cada repintado.
     engancharCiclo(document, datos);
     engancharResumen(document, () => pintar(ultimos));
+    engancharValidadores(document, () => pintar(ultimos));
     // Tras apuntar o borrar hay que volver a PEDIR: el histórico vive en D1,
     // no en `ultimos`. Por eso `refrescar` y no `pintar`, y COMPLETO: lo
     // pesado se pide cada diez minutos, y lo recién apuntado no puede esperar.
