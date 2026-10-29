@@ -616,8 +616,15 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/icons/plsdash-16x16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/plsdash-32x32.png">
   <link rel="icon" type="image/png" sizes="48x48" href="/icons/plsdash-48x48.png">
-  <!-- iOS aplica su propia máscara: se le da el arte a pelo, sin recortar. -->
-  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180x180.png">
+  <!-- iOS aplica su propia máscara: se le da el arte a pelo, sin recortar.
+       ⚠ Y A SANGRE, desde el 29-oct-2026. El máster es una baldosa redondeada
+       con las esquinas negras y un filo brillante; iOS le ponía SU máscara
+       encima, de otro radio, y en la pantalla de inicio salía un borde negro y
+       un doble canto que ningún otro icono tiene. El de ahora llena el cuadrado
+       entero (`plsdash-MASTER-sangre-1024x1024.png`, el mismo arte con el borde
+       rehecho a partir de su propio degradado) y la forma la pone iOS.
+       El `?v=2` es para que Safari no use el viejo de su caché al añadirlo. -->
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180x180.png?v=2">
   <!-- ⚠ El manifiesto NO lleva `start_url`, y es a propósito: sin él, instalar
        desde /p/<código> deja ese URL grabado en el icono, que es el único modo
        de que la app abra tu cartera con el almacenamiento vacío (iOS borra el
