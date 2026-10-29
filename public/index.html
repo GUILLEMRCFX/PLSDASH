@@ -616,8 +616,19 @@
   <link rel="icon" type="image/png" sizes="16x16" href="/icons/plsdash-16x16.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/icons/plsdash-32x32.png">
   <link rel="icon" type="image/png" sizes="48x48" href="/icons/plsdash-48x48.png">
-  <!-- iOS aplica su propia máscara: se le da el arte a pelo, sin recortar. -->
-  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180x180.png">
+  <!-- iOS aplica su propia máscara: se le da el arte a pelo, sin recortar.
+       ⚠ Y A SANGRE, desde el 29-oct-2026, con el icono en los colores del panel
+       (cian y naranja). El original que se diseñó —`plsdash-MASTER-validador-
+       original.png`— es una baldosa redondeada sobre negro con un filo de luz;
+       iOS le pondría SU máscara encima, de otro radio, y saldría un borde negro
+       y un doble canto. El máster de ahora es el mismo escudo sobre su propio
+       fondo extendido hasta el borde, con el filo de luz REDIBUJADO con la
+       forma de iOS (superelipse) y pegado al contorno: así el marco es el
+       borde del icono y no un segundo borde. El `maskable` de Android va sin
+       marco (`plsdash-MASTER-sin-marco`), porque allí la forma varía. El rosa
+       de antes queda en `plsdash-MASTER-rosa-1024x1024.png`.
+       El `?v=4` es para que Safari no use el viejo de su caché al añadirlo. -->
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180x180.png?v=4">
   <!-- ⚠ El manifiesto NO lleva `start_url`, y es a propósito: sin él, instalar
        desde /p/<código> deja ese URL grabado en el icono, que es el único modo
        de que la app abra tu cartera con el almacenamiento vacío (iOS borra el
