@@ -38,8 +38,9 @@ import { fmt, fmtPrecio, fmtCompacto, escapar } from './formato.js';
 import { tablaRitmo } from './ritmo.js';
 import { desglosarSaldo } from './aportaciones.js';
 import { estadoPulso, MARCA } from './pulso.js';
+import { t } from './i18n.js';
 
-export const TITULO = 'Resumen';
+export const TITULO = 'Resumen';   // se traduce al pintarlo: t(TITULO)
 
 /**
  * La palabra de estado, reconciliada con el pulso.
@@ -61,8 +62,8 @@ export const TITULO = 'Resumen';
  */
 function palabraDeEstado(salud, pulsoTarde) {
   if (salud.tono !== 'ok' || !pulsoTarde) return salud;
-  return { ...salud, palabra: 'SIN SEÑAL', tono: 'aviso',
-           nota: 'El NUC no ha empujado dato nuevo en plazo. Lo de abajo es lo último que llegó.' };
+  return { ...salud, palabra: t('SIN SEÑAL'), tono: 'aviso',
+           nota: t('El NUC no ha empujado dato nuevo en plazo. Lo de abajo es lo último que llegó.') };
 }
 
 /* La unidad de la cifra grande. Clave NUEVA y no la de antes: aquella era la
@@ -119,7 +120,7 @@ export function patrimonioDesde(datos) {
   return { staking, wallet, sinBarrer, total, faltan, completo: faltan.length === 0, precio };
 }
 
-const NOMBRE = { staking: 'el staking', wallet: 'la wallet', sinBarrer: 'lo sin barrer' };
+const NOMBRE = { staking: 'el staking', wallet: 'la wallet', sinBarrer: 'lo sin barrer' };   // claves de t()
 
 /** «2 h 10 min», «35 min». */
 function duracion(s) {
@@ -147,10 +148,10 @@ function franja(datos, salud, pulso) {
   const enCola = Number(v.pendientes) || 0;
 
   const linea = tono === 'ok'
-    ? `<b>${fmt(v.activos)} de ${fmt(claves)} validando</b>${
-        enCola ? ` · ${fmt(enCola)} en cola` : ''}${
-        esperando ? ` · ${fmt(esperando)} esperando a entrar` : ''}${
-        n.sincronizado ? ' · sincronizado' : ''}`
+    ? `<b>${t('{a} de {b} validando', { a: fmt(v.activos), b: fmt(claves) })}</b>${
+        enCola ? ` · ${t('{n} en cola', { n: fmt(enCola) })}` : ''}${
+        esperando ? ` · ${t('{n} esperando a entrar', { n: fmt(esperando) })}` : ''}${
+        n.sincronizado ? ` · ${t('sincronizado')}` : ''}`
     : `<b>${escapar(salud.palabra)}</b>${salud.nota ? ` · ${escapar(salud.nota)}` : ''}`;
 
   const ts = Number(datos?.estado?.generado_ts) || 0;
@@ -189,15 +190,15 @@ const ICONOS = {
 function anilloCiclo(barrido, sinBarrer) {
   if (!barrido || !Number.isFinite(barrido.avance)) return '';
   const pct = Math.round(barrido.avance * 100);
-  const cuando = barrido.falta > 0 ? `próximo barrido en ~${duracion(barrido.falta)}` : 'el barrido está al caer';
+  const cuando = barrido.falta > 0 ? t('próximo barrido en ~{d}', { d: duracion(barrido.falta) }) : t('el barrido está al caer');
   return `
-      <div class="r-ciclo" role="img" aria-label="Ciclo de barrido al ${pct} %: ${escapar(cuando)}">
+      <div class="r-ciclo" role="img" aria-label="${t('Ciclo de barrido al {p} %', { p: pct })}: ${escapar(cuando)}">
         <span class="rc-anillo" aria-hidden="true">
           <svg viewBox="0 0 64 64"><circle class="rc-fondo" cx="32" cy="32" r="27"/><circle class="rc-arco" cx="32" cy="32" r="27" pathLength="100" stroke-dasharray="${pct} 100"/></svg>
           <b>${pct}<small>%</small></b>
         </span>
-        <span class="rc-txt"><b>Ciclo de barrido</b><span>${escapar(cuando)}</span>${
-          sinBarrer != null ? `<span>Lo sin barrer, ${fmtCompacto(sinBarrer)} PLS, pasa entonces a la wallet.</span>` : ''}</span>
+        <span class="rc-txt"><b>${t('Ciclo de barrido')}</b><span>${escapar(cuando)}</span>${
+          sinBarrer != null ? `<span>${t('Lo sin barrer, {n} PLS, pasa entonces a la wallet.', { n: fmtCompacto(sinBarrer) })}</span>` : ''}</span>
       </div>`;
 }
 
@@ -230,59 +231,59 @@ export function panelResumen(datos) {
 
   const deposito = Number(v.total) > 0 ? Number(v.stake_total) / Number(v.total) : null;
   const barrido = proximoBarrido(ganancia?.ciclos || [], ahora);
-  const txtBarrido = !barrido ? 'sin ritmo de barrido todavía'
-    : barrido.falta > 0 ? `próximo barrido en ${duracion(barrido.falta)}`
-    : 'el barrido está al caer';
+  const txtBarrido = !barrido ? t('sin ritmo de barrido todavía')
+    : barrido.falta > 0 ? t('próximo barrido en {d}', { d: duracion(barrido.falta) })
+    : t('el barrido está al caer');
 
   const d = desglosarSaldo(datos);
   const cuadra = d && d.hayRegistro && !d.restoVisible;
   const aportadoAhora = cuadra ? Math.min(Number(d.aportado) || 0, d.saldo) : 0;
 
   // ── Las etiquetas ──
-  const G = t => ({ t, c: 'g' });   // lo que hace el nodo
-  const A = t => ({ t, c: 'a' });   // lo que hace el precio
-  const N = t => ({ t, c: 'n' });   // contexto
-  const chipPrecio = hayCambio ? A(`PLS ${porcentaje(cambio)} en 24 h`) : null;
-  const chipHoy = hoyPls != null ? G(`tu nodo hoy +${fmt(hoyPls)} PLS`) : null;
+  const G = x => ({ t: x, c: 'g' });   // lo que hace el nodo
+  const A = x => ({ t: x, c: 'a' });   // lo que hace el precio
+  const N = x => ({ t: x, c: 'n' });   // contexto
+  const chipPrecio = hayCambio ? A(t('PLS {p} en 24 h', { p: porcentaje(cambio) })) : null;
+  const chipHoy = hoyPls != null ? G(t('tu nodo hoy +{n} PLS', { n: fmt(hoyPls) })) : null;
 
   const val = ganancia?.valorado;
   const cobrado = val && val.con_precio > 0
-    ? N(`valía ${fmt(val.usd, 2)} $ al cobrarlo${val.con_precio < val.barridos
-        ? ` · ${fmt(val.con_precio)}/${fmt(val.barridos)} barridos` : ''}`)
+    ? N(`${t('valía {n} $ al cobrarlo', { n: fmt(val.usd, 2) })}${val.con_precio < val.barridos
+        ? ` · ${t('{a}/{b} barridos', { a: fmt(val.con_precio), b: fmt(val.barridos) })}` : ''}`)
     : null;
 
   const vistas = {
     total: {
-      eti: 'Patrimonio del nodo', clase: 'total', pls: pat.total, crece: true,
+      eti: t('Patrimonio del nodo'), clase: 'total', pls: pat.total, crece: true,
       chips: [chipHoy, chipPrecio],
       pie: pat.completo
-        ? 'Los dólares siguen al precio. Lo que genera tu nodo va en verde.'
-        : `Sin contar ${pat.faltan.map(f => NOMBRE[f]).join(' ni ')}: no se ha podido leer.`,
+        ? t('Los dólares siguen al precio. Lo que genera tu nodo va en verde.')
+        : t('Sin contar {x}: no se ha podido leer.', { x: pat.faltan.map(f => t(NOMBRE[f])).join(t(' ni ')) }),
     },
     staking: {
-      eti: 'En staking', clase: 'staking', pls: pat.staking,
-      chips: [deposito ? N(`${fmtCompacto(deposito)} por validador`) : null, chipPrecio],
-      pie: 'Es el capital puesto. Solo cambia con el precio o al añadir un validador.',
+      eti: t('En staking'), clase: 'staking', pls: pat.staking,
+      chips: [deposito ? N(t('{n} por validador', { n: fmtCompacto(deposito) })) : null, chipPrecio],
+      pie: t('Es el capital puesto. Solo cambia con el precio o al añadir un validador.'),
     },
     wallet: {
-      eti: 'En la wallet', clase: 'wallet', pls: pat.wallet,
+      eti: t('En la wallet'), clase: 'wallet', pls: pat.wallet,
       chips: [d && d.hayRegistro
         ? (cuadra
-          ? N(`${fmtCompacto(d.saldo - aportadoAhora)} generado · ${fmtCompacto(aportadoAhora)} aportado`)
-          : N(`${fmtCompacto(d.aportado)} aportados en total`))
-        : N('todo generado · sin aportaciones apuntadas')],
-      pie: 'Lo que va juntando para el siguiente validador.',
+          ? N(t('{a} generado · {b} aportado', { a: fmtCompacto(d.saldo - aportadoAhora), b: fmtCompacto(aportadoAhora) }))
+          : N(t('{n} aportados en total', { n: fmtCompacto(d.aportado) })))
+        : N(t('todo generado · sin aportaciones apuntadas'))],
+      pie: t('Lo que va juntando para el siguiente validador.'),
     },
     sinBarrer: {
-      eti: 'Sin barrer', clase: 'sinBarrer', pls: pat.sinBarrer, crece: true,
+      eti: t('Sin barrer'), clase: 'sinBarrer', pls: pat.sinBarrer, crece: true,
       chips: [N(txtBarrido)],
-      pie: 'Vuelve a cero en cada barrido. Es lo normal.',
+      pie: t('Vuelve a cero en cada barrido. Es lo normal.'),
     },
     generado: {
-      eti: desde ? `Generado desde el ${desde}` : 'Generado', clase: 'generado',
+      eti: desde ? t('Generado desde el {f}', { f: desde }) : t('Generado'), clase: 'generado',
       pls: acum ? acum.total : null, crece: true,
-      chips: [hoyPls != null ? G(`+${fmt(hoyPls)} PLS hoy`) : null, cobrado],
-      pie: 'No suma al patrimonio: es lo que ha producido el nodo desde el principio.',
+      chips: [hoyPls != null ? G(t('+{n} PLS hoy', { n: fmt(hoyPls) })) : null, cobrado],
+      pie: t('No suma al patrimonio: es lo que ha producido el nodo desde el principio.'),
     },
   };
   if (!vistas[sel]) sel = 'total';
@@ -293,10 +294,10 @@ export function panelResumen(datos) {
   const conmutable = cur.pls != null && precio != null;
   const cifra = cur.pls == null ? '–'
     : enUsd ? fmt(cur.pls * precio, 2) : fmt(cur.pls);
-  const sub = cur.pls == null ? 'No se ha podido leer.'
-    : precio == null ? 'Sin precio de PLS: no se pasa a dólares.'
-    : enUsd ? `${fmt(cur.pls)} PLS · al precio de ahora`
-    : `≈ ${fmt(cur.pls * precio, 2)} $ al precio de ahora`;
+  const sub = cur.pls == null ? t('No se ha podido leer.')
+    : precio == null ? t('Sin precio de PLS: no se pasa a dólares.')
+    : enUsd ? t('{n} PLS · al precio de ahora', { n: fmt(cur.pls) })
+    : t('≈ {n} $ al precio de ahora', { n: fmt(cur.pls * precio, 2) });
   /* El contador corre en lo que crece con el nodo —el total, lo sin barrer y
      lo generado— y se queda quieto en lo que no: el stake y la wallet solo
      cambian cuando pasa algo. Ver `tictac()`. */
@@ -311,11 +312,11 @@ export function panelResumen(datos) {
     <div class="r-heroe ${cur.clase}">
       <div class="r-eti">
         <span class="h-eti">${escapar(cur.eti)}</span>
-        ${sel !== 'total' ? '<button type="button" class="r-volver" data-sel="total">← Patrimonio</button>' : ''}
+        ${sel !== 'total' ? `<button type="button" class="r-volver" data-sel="total">← ${t('Patrimonio')}</button>` : ''}
       </div>
       ${conmutable
         ? `<button type="button" class="p-num r-num" data-unidad="${unidad}"${datosTic}
-             aria-label="${escapar(cur.eti)}: ${enUsd ? `${cifra} dólares` : `${cifra} PLS`}. Pulsa para cambiar de unidad."><span class="p-cifra">${cifra}</span><span class="u">${enUsd ? '$' : 'PLS'}</span></button>`
+             aria-label="${escapar(cur.eti)}: ${enUsd ? t('{n} dólares', { n: cifra }) : `${cifra} PLS`}. ${t('Pulsa para cambiar de unidad.')}"><span class="p-cifra">${cifra}</span><span class="u">${enUsd ? '$' : 'PLS'}</span></button>`
         : `<span class="p-num r-num"${datosTic}><span class="p-cifra">${cifra}</span><span class="u">${cur.pls == null ? '' : 'PLS'}</span></span>`}
       <p class="r-sub">${escapar(sub)}</p>
       ${chips ? `<div class="r-chips">${chips}</div>` : ''}
@@ -336,25 +337,25 @@ export function panelResumen(datos) {
         ${cuota != null ? '<span class="r-peso" aria-hidden="true"><i></i></span>' : ''}
         <span class="r-ico" aria-hidden="true">${ICONOS[k]}</span>
         <span class="r-nom"><b>${nombre}</b><span>${escapar(detalle)}</span></span>
-        <span class="r-val">${pls == null ? '<b>–</b><span>no se ha podido leer</span>'
+        <span class="r-val">${pls == null ? `<b>–</b><span>${t('no se ha podido leer')}</span>`
           : precio != null ? `<b>${fmt(pls * precio, 2)} $</b><span>${fmt(pls)} PLS</span>`
           : `<b>${fmt(pls)}</b><span>PLS</span>`}</span>
       </button>`;
   };
   const filas = `
-    <div class="r-filas" role="group" aria-label="De qué está hecho el patrimonio">
-      ${fila('staking', 'En staking', `${fmt(v.total)} validadores${deposito ? ` · ${fmtCompacto(deposito)} cada uno` : ''}`)}
-      ${fila('wallet', 'En la wallet', d && d.hayRegistro ? 'generado y aportado' : 'lo generado')}
-      ${fila('sinBarrer', 'Sin barrer', txtBarrido)}
+    <div class="r-filas" role="group" aria-label="${t('De qué está hecho el patrimonio')}">
+      ${fila('staking', t('En staking'), `${t('{n} validadores', { n: fmt(v.total) })}${deposito ? ` · ${t('{n} cada uno', { n: fmtCompacto(deposito) })}` : ''}`)}
+      ${fila('wallet', t('En la wallet'), d && d.hayRegistro ? t('generado y aportado') : t('lo generado'))}
+      ${fila('sinBarrer', t('Sin barrer'), txtBarrido)}
     </div>`;
 
   // ── Lo generado, aparte ──
   const generado = `
     <button type="button" class="r-generado${sel === 'generado' ? ' sel' : ''}" data-sel="generado"
             aria-pressed="${sel === 'generado'}">
-      <span class="r-nom"><b>${escapar(vistas.generado.eti)}</b><span>aparte · no suma al patrimonio</span></span>
+      <span class="r-nom"><b>${escapar(vistas.generado.eti)}</b><span>${t('aparte · no suma al patrimonio')}</span></span>
       <span class="r-val"><b>${acum ? fmt(acum.total) : '–'}</b>${
-        hoyPls != null ? `<span class="bien">+${fmt(hoyPls)} hoy</span>` : '<span>PLS</span>'}</span>
+        hoyPls != null ? `<span class="bien">${t('+{n} hoy', { n: fmt(hoyPls) })}</span>` : '<span>PLS</span>'}</span>
     </button>`;
 
   /* ── «Tienes para un validador entero» ──────────────────────────────────
@@ -364,15 +365,15 @@ export function panelResumen(datos) {
   const listo = cuantos < 1 ? '' : `
       <p class="listo" role="status">
         <span class="listo-t">${cuantos === 1
-          ? 'Tienes para un validador entero'
-          : `Tienes para ${fmt(cuantos)} validadores enteros`}</span>
-        <span class="listo-s">${fmt(pat.wallet)} PLS en la wallet · el depósito son ${
-          fmtCompacto(deposito)} PLS · la guía está en Ampliar</span>
+          ? t('Tienes para un validador entero')
+          : t('Tienes para {n} validadores enteros', { n: fmt(cuantos) })}</span>
+        <span class="listo-s">${t('{a} PLS en la wallet · el depósito son {b} PLS · la guía está en Ampliar', {
+          a: fmt(pat.wallet), b: fmtCompacto(deposito) })}</span>
       </p>`;
 
   return `
     <section class="r-patrimonio" aria-labelledby="prs-t">
-      <h2 id="prs-t" class="oculto">${TITULO}</h2>
+      <h2 id="prs-t" class="oculto">${t(TITULO)}</h2>
       ${franja(datos, salud, pulso)}
       ${heroe}
       ${filas}
@@ -403,18 +404,18 @@ export function panelRitmo(datos) {
 
   return `
     <section class="panel" aria-labelledby="prit-t">
-      <header class="p-cab"><h2 id="prit-t">Ritmo</h2></header>
-      ${ritmo ? ritmo.html : '<p class="vacio">Sin ritmo medible todavía.</p>'}
+      <header class="p-cab"><h2 id="prit-t">${t('Ritmo')}</h2></header>
+      ${ritmo ? ritmo.html : `<p class="vacio">${t('Sin ritmo medible todavía.')}</p>`}
       <dl class="p-fondo">
-        <div><dt>Rendimiento</dt>${apr
+        <div><dt>${t('Rendimiento')}</dt>${apr
           ? `<dd class="bien">${fmt(apr.pct, 2)}<span class="u pct">%</span></dd>` : '<dd>–</dd>'}</div>
-        <div><dt>Precio</dt><dd>${hayPrecio ? `${fmtPrecio(precio.precio)} $` : '–'}</dd></div>
+        <div><dt>${t('Precio')}</dt><dd>${hayPrecio ? `${fmtPrecio(precio.precio)} $` : '–'}</dd></div>
       </dl>
       <p class="c-sub">${
-        ritmo ? escapar(ritmo.nota) : 'Aún no hay tramo medido suficiente para proyectar.'
+        ritmo ? escapar(ritmo.nota) : t('Aún no hay tramo medido suficiente para proyectar.')
       }${faltanActivaciones
-        ? ` El rendimiento sale de ${fmt(apr.conActivacion)} de ${fmt(enCadena.length)} validadores:`
-          + ' del resto no se conoce la hora de activación.'
+        ? ' ' + t('El rendimiento sale de {a} de {b} validadores: del resto no se conoce la hora de activación.', {
+            a: fmt(apr.conActivacion), b: fmt(enCadena.length) })
         : ''}</p>
     </section>`;
 }

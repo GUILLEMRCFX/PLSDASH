@@ -38,6 +38,7 @@
  */
 
 import { fmt, fmtPrecio, fmtEdad, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Precio de PLS';
 
@@ -87,7 +88,7 @@ function trazar(serie) {
 
 /** Segundos de ventana → «4,5 días» o «19 h». */
 const fmtVentana = s =>
-  s >= 48 * 3600 ? `${fmt(s / 86400, 1)} días` : `${fmt(s / 3600, 0)} h`;
+  s >= 48 * 3600 ? t('{n} días', { n: fmt(s / 86400, 1) }) : `${fmt(s / 3600, 0)} h`;
 
 /** Porcentaje con signo explícito. El signo es el que lleva la información. */
 const fmtPct = p => `${p >= 0 ? '+' : '−'}${fmt(Math.abs(p), 2)} %`;
@@ -101,8 +102,8 @@ export function panelPrecio(datos) {
   if (!hayPrecio && !(precioSerie || []).length) {
     return `
       <section class="panel" data-alerta aria-labelledby="ppr-t">
-        <header class="p-cab"><h2 id="ppr-t">${TITULO}</h2></header>
-        <p class="p-aviso">Sin precio de PLS: ni el endpoint responde ni hay histórico guardado.</p>
+        <header class="p-cab"><h2 id="ppr-t">${t(TITULO)}</h2></header>
+        <p class="p-aviso">${t('Sin precio de PLS: ni el endpoint responde ni hay histórico guardado.')}</p>
       </section>`;
   }
 
@@ -119,9 +120,9 @@ export function panelPrecio(datos) {
   const grafico = d ? `
     <figure class="pgraf${sube ? ' sube' : ' baja'}">
       <svg viewBox="0 0 ${ANCHO} ${ALTO}" preserveAspectRatio="none" role="img"
-           aria-label="Precio de PLS en las últimas ${escapar(fmtVentana(d.hasta - d.desde))}: ${
-             escapar(fmtPct(cambioVentana))}, entre ${escapar(fmtPrecio(d.min))} y ${
-             escapar(fmtPrecio(d.max))} dólares">
+           aria-label="${t('Precio de PLS en las últimas {v}: {p}, entre {a} y {b} dólares', {
+             v: escapar(fmtVentana(d.hasta - d.desde)), p: escapar(fmtPct(cambioVentana)),
+             a: escapar(fmtPrecio(d.min)), b: escapar(fmtPrecio(d.max)) })}">
         <polygon class="pg-area" points="${d.area}"/>
         <polyline class="pg-linea" points="${d.linea}"/>
       </svg>
@@ -131,20 +132,20 @@ export function panelPrecio(datos) {
            izquierda; el movimiento, a la derecha, que es lo que se compara con
            el «· 24 h» de la cabecera. -->
       <figcaption class="pg-pie">
-        <span>${escapar(fmtVentana(d.hasta - d.desde))} · ${fmt(d.n)} lecturas</span>
-        <span class="pg-cambio">${escapar(fmtPct(cambioVentana))} en total</span>
+        <span>${escapar(fmtVentana(d.hasta - d.desde))} · ${t('{n} lecturas', { n: fmt(d.n) })}</span>
+        <span class="pg-cambio">${t('{p} en total', { p: escapar(fmtPct(cambioVentana)) })}</span>
       </figcaption>
     </figure>`
-    : '<p class="vacio">Aún no hay histórico de precio suficiente para dibujarlo.</p>';
+    : `<p class="vacio">${t('Aún no hay histórico de precio suficiente para dibujarlo.')}</p>`;
 
   return `
     <section class="panel" aria-labelledby="ppr-t">
       <header class="p-cab">
-        <h2 id="ppr-t">${TITULO}</h2>
+        <h2 id="ppr-t">${t(TITULO)}</h2>
         ${cambio24 != null
           ? `<span class="p-marca ${cambio24 >= 0 ? 'bien' : 'alerta'}">${
               escapar(fmtPct(cambio24))} · 24 h</span>`
-          : precioViejo ? '<span class="p-marca alerta">No fresco</span>' : ''}
+          : precioViejo ? `<span class="p-marca alerta">${t('No fresco')}</span>` : ''}
       </header>
 
       <div class="cifra">
@@ -153,20 +154,20 @@ export function panelPrecio(datos) {
              contrato del par, y en mayúsculas bajo la cifra se leía
              «0XDAIPAIR», que no dice nada de nada.
              (Sin acentos graves aquí dentro: cerrarían la plantilla.) -->
-        <span class="c-eti">${escapar(precio?.simbolo || 'PLS')} · precio actual</span>
+        <span class="c-eti">${escapar(precio?.simbolo || 'PLS')} · ${t('precio actual')}</span>
         ${precioViejo
-          ? `<span class="c-sub alerta">Precio de ${escapar(fmtEdad(precio.edad_s))}: no está fresco.</span>`
-          : hayPrecio ? '' : '<span class="c-sub alerta">El endpoint de precio no responde.</span>'}
+          ? `<span class="c-sub alerta">${t('Precio de {e}: no está fresco.', { e: escapar(fmtEdad(precio.edad_s)) })}</span>`
+          : hayPrecio ? '' : `<span class="c-sub alerta">${t('El endpoint de precio no responde.')}</span>`}
       </div>
 
       ${grafico}
 
       ${d ? `
       <dl class="p-fondo">
-        <div><dt>Máximo</dt><dd>${escapar(fmtPrecio(d.max))} $</dd></div>
-        <div><dt>Mínimo</dt><dd>${escapar(fmtPrecio(d.min))} $</dd></div>
+        <div><dt>${t('Máximo')}</dt><dd>${escapar(fmtPrecio(d.max))} $</dd></div>
+        <div><dt>${t('Mínimo')}</dt><dd>${escapar(fmtPrecio(d.min))} $</dd></div>
       </dl>` : ''}
 
-      <p class="c-sub">Histórico guardado por el recolector, una lectura por hora.</p>
+      <p class="c-sub">${t('Histórico guardado por el recolector, una lectura por hora.')}</p>
     </section>`;
 }

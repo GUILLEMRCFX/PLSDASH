@@ -6,7 +6,8 @@
 const RAIZ = new URL('..', import.meta.url).href.replace(/\/$/, '');
 
 export async function resolve(especificador, contexto, siguiente) {
-  if (especificador.startsWith('/val/')) {
+  // `/i18n/` desde el 3-nov-2026: el motor de idiomas, que el panel importa.
+  if (especificador.startsWith('/val/') || especificador.startsWith('/i18n/')) {
     // La web vive en `public/` desde el 25-sep-2026: es lo único que publica Pages.
     return { url: RAIZ + '/public' + especificador, shortCircuit: true };
   }

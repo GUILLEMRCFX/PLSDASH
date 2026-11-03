@@ -30,6 +30,7 @@
 
 import { diarioReal } from '/val/compartido/ganancias.js';
 import { fmt, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const DIAS = 30;
 
@@ -81,7 +82,7 @@ export function htmlTreintaDias(datos) {
     <i class="td-b${d.salud === 'aviso' ? ' aviso' : d.salud === 'critico' ? ' mal' : ''}"
        style="--h:${(d.alto * 100).toFixed(1)}%"
        title="${escapar(dia(d.fecha))} · ${escapar(fmt(d.pls))} PLS${
-         d.salud && d.salud !== 'ok' ? ` · ${escapar(d.salud)}` : ''}"></i>`).join('');
+         d.salud && d.salud !== 'ok' ? ` · ${escapar(t(d.salud))}` : ''}"></i>`).join('');
 
   const mejor = f.reduce((a, d) => (d.pls > a.pls ? d : a), f[0]);
   const peor = f.reduce((a, d) => (d.pls < a.pls ? d : a), f[0]);
@@ -89,12 +90,12 @@ export function htmlTreintaDias(datos) {
   return `
     <div class="td">
       <div class="td-barras" role="img"
-           aria-label="Lo ganado cada uno de los últimos ${f.length} días. Mejor: ${
-             escapar(dia(mejor.fecha))}, ${escapar(fmt(mejor.pls))} PLS. Peor: ${
-             escapar(dia(peor.fecha))}, ${escapar(fmt(peor.pls))} PLS.">${barras}</div>
+           aria-label="${t('Lo ganado cada uno de los últimos {n} días. Mejor: {a}, {b} PLS. Peor: {c}, {d} PLS.', {
+             n: f.length, a: escapar(dia(mejor.fecha)), b: escapar(fmt(mejor.pls)),
+             c: escapar(dia(peor.fecha)), d: escapar(fmt(peor.pls)) })}">${barras}</div>
       <div class="td-pie">
         <span>${escapar(dia(f[0].fecha))}</span>
-        <span class="td-rango">${escapar(fmt(peor.pls))} – ${escapar(fmt(mejor.pls))} PLS al día</span>
+        <span class="td-rango">${escapar(fmt(peor.pls))} – ${escapar(fmt(mejor.pls))} ${t('PLS al día')}</span>
         <span>${escapar(dia(f[f.length - 1].fecha))}</span>
       </div>
     </div>`;

@@ -31,6 +31,7 @@ SIN_NAVEGADOR=(
   "pruebas/d1-cupo-test.mjs"
   "pruebas/historico-test.mjs"
   "pruebas/panel-revision-test.mjs"
+  "pruebas/idioma-test.mjs"
 )
 CON_NAVEGADOR=(
   "pruebas/puerta-test.js"

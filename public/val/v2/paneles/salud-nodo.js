@@ -21,6 +21,7 @@
 import { tempNvme } from '../datos.js';
 import { fmt } from './formato.js';
 
+import { t } from './i18n.js';
 export const TITULO = 'Salud del nodo';
 
 // Umbrales. Por encima, el número se marca.
@@ -56,19 +57,19 @@ function runway(daily, snapshots24h, discoActual) {
   // Un día sin `disco_pct` daría NaN y la frase saldría con «NaN %/semana».
   if (!Number.isFinite(pctPorDia)) pctPorDia = null;
 
-  if (pctPorDia === null) return { texto: 'Faltan horas de historial para estimar el crecimiento.' };
+  if (pctPorDia === null) return { texto: t('Faltan horas de historial para estimar el crecimiento.') };
 
   // Con la resolución de una décima, cualquier cosa por debajo de esto es
   // ruido de redondeo y no un crecimiento.
   if (pctPorDia <= 0.01) {
-    return { texto: 'Uso estable, sin crecimiento apreciable.', estable: true };
+    return { texto: t('Uso estable, sin crecimiento apreciable.'), estable: true };
   }
 
   const dias = (95 - discoActual) / pctPorDia;
   const fecha = new Date(Date.now() + dias * 86400000);
   return {
-    texto: `Crece ~${fmt(pctPorDia * 7, 2)} %/semana · prune hacia ${
-      fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}`,
+    texto: t('Crece ~{p} %/semana · prune hacia {f}', { p: fmt(pctPorDia * 7, 2),
+      f: fecha.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' }) }),
     dias,
     provisional,
   };
@@ -80,8 +81,8 @@ export function panelSaludNodo(datos) {
   if (!n) {
     return `
       <section class="panel" aria-labelledby="ps-t">
-        <header class="p-cab"><h2 id="ps-t">${TITULO}</h2></header>
-        <p class="vacio">Sin lectura de la máquina.</p>
+        <header class="p-cab"><h2 id="ps-t">${t(TITULO)}</h2></header>
+        <p class="vacio">${t('Sin lectura de la máquina.')}</p>
       </section>`;
   }
 
@@ -97,7 +98,7 @@ export function panelSaludNodo(datos) {
   const disco = num(n.disco_usado_pct);
   const libre = num(n.disco_libre_gb);
   const cpu = num(n.temp_cpu);
-  const rw = disco == null ? { texto: 'Sin lectura del disco.' }
+  const rw = disco == null ? { texto: t('Sin lectura del disco.') }
     : runway(datos.daily || [], datos.snapshots24h || [], disco);
 
   const alerta = (cpu != null && cpu >= CPU_ALTA)
@@ -110,37 +111,37 @@ export function panelSaludNodo(datos) {
     <div class="cifra">
       <span class="c-num${mal ? ' alerta' : ''}">${valor}${
         unidad ? `<span class="u${unidad === '%' ? ' pct' : ''}">${unidad}</span>` : ''}</span>
-      <span class="c-eti">${etiqueta}</span>
+      <span class="c-eti">${t(etiqueta)}</span>
       ${sub ? `<span class="c-sub">${sub}</span>` : ''}
     </div>`;
 
   return `
     <section class="panel"${alerta ? ' data-alerta' : ''} aria-labelledby="ps-t">
       <header class="p-cab">
-        <h2 id="ps-t">${TITULO}</h2>
-        <span class="p-marca${alerta ? ' alerta' : ''}">${alerta ? 'Revisar' : 'Sin novedad'}</span>
+        <h2 id="ps-t">${t(TITULO)}</h2>
+        <span class="p-marca${alerta ? ' alerta' : ''}">${alerta ? t('Revisar') : t('Sin novedad')}</span>
       </header>
 
       <div class="rejilla">
         ${cifra(cpu == null ? '–' : fmt(cpu, 0), cpu == null ? '' : '°C', 'CPU',
-                cpu == null ? 'sin lectura' : null, cpu != null && cpu >= CPU_ALTA)}
+                cpu == null ? t('sin lectura') : null, cpu != null && cpu >= CPU_ALTA)}
         ${cifra(nvme == null ? '–' : fmt(nvme, 1), nvme == null ? '' : '°C', 'NVMe',
-                nvme == null ? 'sin lectura' : null, nvme != null && nvme >= NVME_ALTA)}
+                nvme == null ? t('sin lectura') : null, nvme != null && nvme >= NVME_ALTA)}
       </div>
 
       <div class="rejilla">
         ${cifra(ramPct == null ? '–' : fmt(ramPct, 1), ramPct == null ? '' : '%', 'RAM',
-                Number.isFinite(ramUsada) ? `${fmt(ramUsada, 1)} de ${fmt(n.ram_total_gb, 0)} GB` : null,
+                Number.isFinite(ramUsada) ? t('{a} de {b} GB', { a: fmt(ramUsada, 1), b: fmt(n.ram_total_gb, 0) }) : null,
                 ramPct != null && ramPct >= RAM_ALTA)}
         ${cifra(disco == null ? '–' : fmt(disco, 1), disco == null ? '' : '%', 'Disco',
-                libre != null ? `${fmt(libre, 0)} GB libres` : 'sin lectura', disco != null && disco >= DISCO_ALTO)}
+                libre != null ? t('{n} GB libres', { n: fmt(libre, 0) }) : t('sin lectura'), disco != null && disco >= DISCO_ALTO)}
       </div>
 
       <p class="c-sub${rw.provisional ? '' : ''}">${rw.texto}${
-        rw.provisional ? ' · medido en pocas horas' : ''}</p>
+        rw.provisional ? ` · ${t('medido en pocas horas')}` : ''}</p>
 
       <dl class="p-fondo">
-        <div><dt>Carga</dt><dd>${n.carga_pct == null ? '–' : `${fmt(n.carga_pct, 1)} %`}</dd></div>
+        <div><dt>${t('Carga')}</dt><dd>${n.carga_pct == null ? '–' : `${fmt(n.carga_pct, 1)} %`}</dd></div>
         <div><dt>Slot</dt><dd>${num(n.head_slot) == null ? '–' : fmt(n.head_slot)}</dd></div>
       </dl>
     </section>`;

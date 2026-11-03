@@ -107,6 +107,15 @@ día, y qué pasa si lo que tiene delante falla?
 
 ---
 
+## Idiomas
+
+`/i18n/idioma.js` es el motor, un script clásico que comparten la portada (con
+`<script src>`) y el panel (importado por `paneles/i18n.js`). Los textos están
+en `/i18n/portada.js` y en `paneles/textos.js`, con el español como clave. En
+la portada la función se llama `tr()` —allí `t` es un token—; en el panel, `t()`.
+Lo fijo del HTML lleva `data-i18n`. Al cambiar de idioma se repinta lo que hay,
+sin recargar ni volver a pedir datos.
+
 ## 3. Los endpoints
 
 Bajo `/api/`, como Cloudflare Pages Functions.

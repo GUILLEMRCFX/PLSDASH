@@ -42,6 +42,8 @@
  */
 
 /** Cada cuánto empuja el NUC. Es el cron, y no se toca desde aquí. */
+import { t } from './i18n.js';
+
 export const PERIODO_S = 180;
 
 /** Margen antes de declararlo tarde. Ver la nota de arriba. */
@@ -76,8 +78,8 @@ export function estadoPulso(generadoTs, ahoraS) {
   const ts = Number(generadoTs);
   if (!Number.isFinite(ts) || ts <= 0) {
     return {
-      tarde: true, eti: 'Sin contacto', corto: 'sin contacto', resto: '—',
-      aria: 'Sin contacto con el NUC: no hay marca de tiempo del último dato.',
+      tarde: true, eti: t('Sin contacto'), corto: t('sin contacto'), resto: '—',
+      aria: t('Sin contacto con el NUC: no hay marca de tiempo del último dato.'),
     };
   }
 
@@ -90,19 +92,19 @@ export function estadoPulso(generadoTs, ahoraS) {
 
   if (falta > 0) {
     return {
-      tarde: false, avance, eti: 'Dato nuevo en', corto: 'dato en', resto: reloj(falta),
-      aria: `Próximo dato del NUC en ${reloj(falta)}.`,
+      tarde: false, avance, eti: t('Dato nuevo en'), corto: t('dato en'), resto: reloj(falta),
+      aria: t('Próximo dato del NUC en {x}.', { x: reloj(falta) }),
     };
   }
   if (edad <= VENTANA_S) {
     return {
-      tarde: false, avance, eti: 'Dato nuevo', corto: 'dato', resto: 'llegando',
-      aria: 'El NUC está en plazo; el dato nuevo está entrando.',
+      tarde: false, avance, eti: t('Dato nuevo'), corto: t('dato'), resto: t('llegando'),
+      aria: t('El NUC está en plazo; el dato nuevo está entrando.'),
     };
   }
   return {
-    tarde: true, avance: 1, eti: 'Sin señal desde hace', corto: 'sin señal', resto: reloj(edad),
-    aria: `El NUC no reporta desde hace ${reloj(edad)}. Lo que ves es el último dato bueno.`,
+    tarde: true, avance: 1, eti: t('Sin señal desde hace'), corto: t('sin señal'), resto: reloj(edad),
+    aria: t('El NUC no reporta desde hace {x}. Lo que ves es el último dato bueno.', { x: reloj(edad) }),
   };
 }
 

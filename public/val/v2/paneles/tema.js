@@ -28,6 +28,8 @@ const CLAVE = 'plsdash:tema';
  * Los cinco. El orden es el del selector, y va de más frío a más cálido para
  * que la fila de muestras se lea como una escala y no como un montón.
  */
+import { t, idioma } from './i18n.js';
+
 export const TEMAS = [
   { id: 'nucleo', nombre: 'Núcleo', pista: 'cian y naranja' },
   { id: 'menta',  nombre: 'Menta',  pista: 'frío y bajo en saturación' },
@@ -94,7 +96,11 @@ const ENGRANAJE = [
   '</svg>',
 ].join('\n');
 
-const rotulo = t => `Tema de color: ${t.nombre}. Cambiar`;
+const rotulo = x => `${t('Tema de color')}: ${t(x.nombre)}. ${t('Cambiar')}`;
+
+/* Los idiomas viven en este mismo menú (3-nov-2026): es el único sitio de la
+   barra que no es una pestaña, y en el móvil no cabe un botón más. */
+const IDIOMAS = [['es', 'Español'], ['en', 'English'], ['fr', 'Français']];
 
 /**
  * Pinta el engranaje y su desplegable dentro de `caja` y lo deja funcionando.
@@ -111,19 +117,24 @@ export function montarTema(caja, { alSalir } = {}) {
   const actual = temaGuardado();
   const puesto = TEMAS.find(t => t.id === actual) || TEMAS[0];
 
-  const opciones = TEMAS.map(t => `
+  const opciones = TEMAS.map(x => `
       <button type="button" class="tm-op" role="menuitemradio"
-              data-tema="${t.id}" aria-checked="${t.id === actual}"
-              title="${t.nombre} · ${t.pista}">${t.nombre}</button>`).join('');
+              data-tema="${x.id}" aria-checked="${x.id === actual}"
+              title="${t(x.nombre)} · ${t(x.pista)}">${t(x.nombre)}</button>`).join('');
+  const lenguas = `
+      <div class="tm-idiomas" role="group" aria-label="${t('Idioma')}">${IDIOMAS.map(([l, n]) => `
+        <button type="button" class="tm-id" role="menuitemradio" data-idioma="${l}" lang="${l}"
+                aria-checked="${l === idioma()}" title="${n}">${l.toUpperCase()}</button>`).join('')}
+      </div>`;
 
   caja.innerHTML = `
     <button type="button" class="tm-abrir" id="tmAbrir"
             aria-expanded="false" aria-haspopup="true"
-            aria-label="${rotulo(puesto)}">${ENGRANAJE}<span class="pt-eti">Tema</span></button>
+            aria-label="${rotulo(puesto)}">${ENGRANAJE}<span class="pt-eti">${t('Tema')}</span></button>
     <div class="tm-lista" id="tmLista" role="menu" aria-labelledby="tmAbrir" hidden>
-      ${opciones}${alSalir ? `
+      ${opciones}${lenguas}${alSalir ? `
       <button type="button" class="tm-op tm-salir" role="menuitem" id="tmSalir"
-              title="Cerrar sesión en este dispositivo">Cerrar sesión</button>` : ''}
+              title="${t('Cerrar sesión en este dispositivo')}">${t('Cerrar sesión')}</button>` : ''}
     </div>`;
 
   const abrir = caja.querySelector('#tmAbrir');
@@ -172,11 +183,11 @@ export function montarTema(caja, { alSalir } = {}) {
          síntoma es que todo parece ir bien. */
       if (salir.dataset.ocupado) return;
       salir.dataset.ocupado = '1';
-      salir.textContent = 'Cerrando…';
+      salir.textContent = t('Cerrando…');
       const ok = await alSalir();
       if (ok) return;                      // quien llama se encarga de navegar
       delete salir.dataset.ocupado;
-      salir.textContent = 'No se pudo cerrar · reintentar';
+      salir.textContent = t('No se pudo cerrar · reintentar');
     });
   }
 
@@ -184,8 +195,8 @@ export function montarTema(caja, { alSalir } = {}) {
     b.addEventListener('click', () => {
       const id = aplicarTema(b.dataset.tema);
       // Al sitio, sin regenerar nada: ver el aviso de arriba.
-      const t = TEMAS.find(x => x.id === id) || TEMAS[0];
-      abrir.setAttribute('aria-label', rotulo(t));
+      const elegido = TEMAS.find(x => x.id === id) || TEMAS[0];
+      abrir.setAttribute('aria-label', rotulo(elegido));
       /* `[data-tema]` y no `.tm-op` a secas: «Cerrar sesión» comparte la clase
          para heredar el aspecto, pero es un `menuitem` y no un
          `menuitemradio` — ponerle `aria-checked` lo convertiría en una opción
@@ -194,6 +205,15 @@ export function montarTema(caja, { alSalir } = {}) {
         o.setAttribute('aria-checked', String(o.dataset.tema === id)));
       cerrar();
       abrir.focus();
+    });
+  });
+
+  // El idioma: quien monta el panel escucha el cambio y lo vuelve a pintar
+  // todo, este menú incluido (ver `alCambiarIdioma` en index.html).
+  lista.querySelectorAll('.tm-id[data-idioma]').forEach(b => {
+    b.addEventListener('click', () => {
+      cerrar();
+      globalThis.plsI18n?.poner(b.dataset.idioma);
     });
   });
 

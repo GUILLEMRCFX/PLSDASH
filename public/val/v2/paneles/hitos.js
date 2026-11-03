@@ -40,6 +40,7 @@
  */
 
 import { fmt, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Cómo se ha construido';
 
@@ -90,7 +91,7 @@ export function hitosDesde(detalle = [], tzMin = new Date().getTimezoneOffset())
 const FECHA = { day: 'numeric', month: 'long', year: 'numeric' };
 
 /** «10 validadores» / «1 validador». */
-const cuantos = n => (n === 1 ? '1 validador' : `${fmt(n)} validadores`);
+const cuantos = n => (n === 1 ? t('1 validador') : t('{n} validadores', { n: fmt(n) }));
 
 /**
  * Los índices de un hito, abreviados si son muchos.
@@ -109,8 +110,8 @@ export function panelHitos(datos) {
   if (!detalle.length) {
     return `
       <section class="panel" aria-labelledby="ph-t">
-        <header class="p-cab"><h2 id="ph-t">${TITULO}</h2></header>
-        <p class="vacio">Sin detalle de validadores.</p>
+        <header class="p-cab"><h2 id="ph-t">${t(TITULO)}</h2></header>
+        <p class="vacio">${t('Sin detalle de validadores.')}</p>
       </section>`;
   }
 
@@ -118,8 +119,8 @@ export function panelHitos(datos) {
   if (!hitos.length && !enCola.length && !esperando.length) {
     return `
       <section class="panel" aria-labelledby="ph-t">
-        <header class="p-cab"><h2 id="ph-t">${TITULO}</h2></header>
-        <p class="vacio">Ninguna activación con fecha conocida.</p>
+        <header class="p-cab"><h2 id="ph-t">${t(TITULO)}</h2></header>
+        <p class="vacio">${t('Ninguna activación con fecha conocida.')}</p>
       </section>`;
   }
 
@@ -130,9 +131,9 @@ export function panelHitos(datos) {
         <span class="hi-punto" aria-hidden="true"></span>
         <span class="hi-fecha">${escapar(f)}</span>
         <span class="hi-que">${escapar(cuantos(h.indices.length))}</span>
-        <span class="hi-idx mono" title="Índices: ${escapar(h.indices.join(', '))}">${
+        <span class="hi-idx mono" title="${t('Índices')}: ${escapar(h.indices.join(', '))}">${
           escapar(indicesDe(h.indices))}</span>
-        <span class="hi-acum">${fmt(h.acumulado)} en total</span>
+        <span class="hi-acum">${t('{n} en total', { n: fmt(h.acumulado) })}</span>
       </li>`;
   }).join('');
 
@@ -141,10 +142,10 @@ export function panelHitos(datos) {
   const cola = !enCola.length ? '' : `
       <li class="hi-fila hi-cola">
         <span class="hi-punto" aria-hidden="true"></span>
-        <span class="hi-fecha">en cola</span>
+        <span class="hi-fecha">${t('en cola')}</span>
         <span class="hi-que">${escapar(cuantos(enCola.length))}</span>
         <span class="hi-idx mono">${escapar(indicesDe(enCola.map(d => Number(d.indice))))}</span>
-        <span class="hi-acum">esperando turno</span>
+        <span class="hi-acum">${t('esperando turno')}</span>
       </li>`;
 
   /* El hito de más arriba de todos: la clave existe y la cadena no la conoce.
@@ -152,24 +153,21 @@ export function panelHitos(datos) {
   const espera = !esperando.length ? '' : `
       <li class="hi-fila hi-cola">
         <span class="hi-punto" aria-hidden="true"></span>
-        <span class="hi-fecha">sin fecha</span>
+        <span class="hi-fecha">${t('sin fecha')}</span>
         <span class="hi-que">${escapar(cuantos(esperando.length))}</span>
         <span class="hi-idx mono">${escapar(esperando.length === 1
           ? (esperando[0].pubkey_corta || '')
-          : `${esperando.length} claves`)}</span>
-        <span class="hi-acum">esperando a entrar en la cadena</span>
+          : t('{n} claves', { n: esperando.length }))}</span>
+        <span class="hi-acum">${t('esperando a entrar en la cadena')}</span>
       </li>`;
 
   return `
     <section class="panel" aria-labelledby="ph-t">
       <header class="p-cab">
-        <h2 id="ph-t">${TITULO}</h2>
+        <h2 id="ph-t">${t(TITULO)}</h2>
         <span class="p-marca">${fmt(detalle.length)}</span>
       </header>
       <ol class="hi-lista">${filas}${cola}${espera}</ol>
-      <p class="c-sub">Cada hito es un día con activaciones. Los que entraron
-        juntos van en la misma línea: diez depósitos a la vez se activan con
-        minutos de diferencia y contarlos por separado sería el mismo hecho
-        diez veces.</p>
+      <p class="c-sub">${t('Cada hito es un día con activaciones. Los que entraron juntos van en la misma línea: diez depósitos a la vez se activan con minutos de diferencia y contarlos por separado sería el mismo hecho diez veces.')}</p>
     </section>`;
 }

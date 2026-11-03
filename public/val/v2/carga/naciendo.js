@@ -60,6 +60,7 @@
  */
 
 import { crearEsfera } from '../escena/esfera.js';
+import { t } from '../paneles/i18n.js';
 
 const T_NACER = 2300;      // del punto a la esfera con todos los validadores
 const T_ASENTAR = 180;     // el respiro entre que cierra y se da por hecha
@@ -103,7 +104,7 @@ export function montar(caja, { reducido = false, manual = false, opcionesEsfera 
   const capa = document.createElement('div');
   capa.className = 'cg cg-naciendo';
   capa.innerHTML = '<div class="cg-escena"></div><div class="cg-fogonazo"></div>'
-    + '<p class="cg-marca">PLSDASH</p><p class="cg-pie">Conectando con el nodo</p>';
+    + `<p class="cg-marca">PLSDASH</p><p class="cg-pie">${t('Conectando con el nodo')}</p>`;
   caja.appendChild(capa);
 
   const hueco = capa.querySelector('.cg-escena');
@@ -121,14 +122,14 @@ export function montar(caja, { reducido = false, manual = false, opcionesEsfera 
   let laSalida = null;
 
   let ultimoPie = '';
-  const ponerPie = t => { if (t !== ultimoPie) { pie.textContent = t; ultimoPie = t; } };
+  const ponerPie = x => { x = t(x); if (x !== ultimoPie) { pie.textContent = x; ultimoPie = x; } };
 
   const pintarEstado = p => {
     const { nodos, encendidos } = nodosA(p, escena?.nodos);
     esfera?.actualizar({ nodos, energia: escena?.energia ?? 0.6, frescura: escena?.frescura ?? 1 });
     if (!escena) ponerPie(p < 0.5 ? 'Encendiendo la red' : 'Esperando datos del nodo');
     else if (p < P_NODOS[0]) ponerPie('Encendiendo la red');
-    else ponerPie(`Validadores · ${encendidos} de ${nodos.length}`);
+    else ponerPie(t('Validadores · {a} de {b}', { a: encendidos, b: nodos.length }));
   };
 
   /* ⚠ AL PRINCIPIO TODA LA RED ESTÁ EN UN PUNTO, y cientos de aristas sumadas
