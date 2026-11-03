@@ -42,6 +42,7 @@
 import { gananciaAcumulada, ritmoDiario } from '/val/compartido/ganancias.js';
 import { activacionTs } from '../datos.js';
 import { fmt, fmtPrecio, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Si PLS valiera otra cosa';
 
@@ -126,8 +127,8 @@ function fila(etiqueta, valor, extra = '') {
   return `
     <div class="cifra">
       <span class="c-num">${valor}</span>
-      <span class="c-eti">${escapar(etiqueta)}</span>
-      ${extra ? `<span class="c-sub">${extra}</span>` : ''}
+      <span class="c-eti">${escapar(t(etiqueta))}</span>
+      ${extra ? `<span class="c-sub">${t(extra)}</span>` : ''}
     </div>`;
 }
 
@@ -140,8 +141,8 @@ export function panelPrecioSimulado(datos) {
   if (real == null) {
     return `
       <section class="panel" aria-labelledby="pps-t">
-        <header class="p-cab"><h2 id="pps-t">${TITULO}</h2></header>
-        <p class="vacio">Sin precio de PLS: no hay desde dónde partir.</p>
+        <header class="p-cab"><h2 id="pps-t">${t(TITULO)}</h2></header>
+        <p class="vacio">${t('Sin precio de PLS: no hay desde dónde partir.')}</p>
       </section>`;
   }
 
@@ -158,14 +159,14 @@ export function panelPrecioSimulado(datos) {
   return `
     <section class="panel" aria-labelledby="pps-t">
       <header class="p-cab">
-        <h2 id="pps-t">${TITULO}</h2>
+        <h2 id="pps-t">${t(TITULO)}</h2>
         <!-- Los dos precios que importan, como atajos. No son ajustes: son los
              dos sitios del carril a los que uno quiere volver. -->
         <div class="ps-atajos">
           <button type="button" class="p-marca ps-ir" id="psAhora"
-                  title="Llevar el deslizador al precio de ahora">ahora</button>
+                  title="${t('Llevar el deslizador al precio de ahora')}">${t('ahora')}</button>
           <button type="button" class="p-marca ps-ir" id="psSacrificio"
-                  title="Llevar el deslizador al precio del sacrificio: ${escapar(fmtPrecio(SACRIFICIO))} $">sacrificio</button>
+                  title="${t('Llevar el deslizador al precio del sacrificio')}: ${escapar(fmtPrecio(SACRIFICIO))} $">${t('sacrificio')}</button>
         </div>
       </header>
 
@@ -175,8 +176,8 @@ export function panelPrecioSimulado(datos) {
         <input type="range" class="sim-rango ps-rango" id="psRango"
                style="--t:${(pos / PASOS * 100).toFixed(1)}%"
                min="0" max="${PASOS}" step="1" value="${pos}"
-               aria-label="Precio de PLS simulado"
-               aria-valuetext="${escapar(fmtPrecio(real))} dólares">
+               aria-label="${t('Precio de PLS simulado')}"
+               aria-valuetext="${t('{n} dólares', { n: escapar(fmtPrecio(real)) })}">
         <!-- Las DOS marcas, en la misma escala logarítmica que el mando: así no
              se descuadran si algún día cambia el rango. La de «ahora» se mueve
              con el precio en cada repintado; la del sacrificio no se mueve
@@ -207,7 +208,7 @@ export function panelPrecioSimulado(datos) {
 export function marcas(real) {
   const uno = (clase, p, texto) =>
     `<span class="ps-marca ${clase}" style="--p:${(posicionDe(p) / PASOS).toFixed(4)}"
-           title="${escapar(texto)}: ${escapar(fmtPrecio(p))} $" aria-hidden="true"></span>`;
+           title="${escapar(t(texto))}: ${escapar(fmtPrecio(p))} $" aria-hidden="true"></span>`;
   return (real != null && real > 0 ? uno('ps-marca-ahora', real, 'Precio de ahora') : '')
     + uno('ps-marca-sac', SACRIFICIO, 'Precio del sacrificio');
 }
@@ -235,8 +236,8 @@ export function cifras(r) {
       `<span class="${baja ? 'ps-baja' : 'ps-sube'}">${
         r.vsEntrada > 0 ? '+' : ''}${fmt(r.vsEntrada, 1)}<span class="u pct">%</span></span>`,
       r.paraVolver
-        ? `necesita ×${escapar(fmt(r.paraVolver, r.paraVolver < 10 ? 1 : 0))} para volver a ${ref}`
-        : `por encima del sacrificio, ${ref}`));
+        ? t('necesita ×{x} para volver a {r}', { x: escapar(fmt(r.paraVolver, r.paraVolver < 10 ? 1 : 0)), r: ref })
+        : t('por encima del sacrificio, {r}', { r: ref })));
   }
   return partes.join('');
 }
@@ -271,7 +272,7 @@ export function engancharPrecioSimulado(raiz, datos) {
       plsDia: ritmo?.pls_dia,
     });
     salida.innerHTML = `${fmtPrecio(p)}<span class="u">$</span>`;
-    mando.setAttribute('aria-valuetext', `${fmtPrecio(p)} dólares`);
+    mando.setAttribute('aria-valuetext', t('{n} dólares', { n: fmtPrecio(p) }));
     mando.style.setProperty('--t', `${(Number(mando.value) / PASOS * 100).toFixed(1)}%`);
     caja.innerHTML = cifras(r);
     // Marcado cuando NO está en el precio real: así se sabe que lo que se mira

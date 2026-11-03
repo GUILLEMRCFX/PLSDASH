@@ -24,6 +24,7 @@ import {
 import { activacionTs } from '../datos.js';
 import { fmt, fmtEdad, escapar } from './formato.js';
 import { htmlTreintaDias } from './treinta-dias.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Ganancias';
 
@@ -31,7 +32,7 @@ export const TITULO = 'Ganancias';
 const cifraPLS = (pls, etiqueta, sub = '') => `
   <div class="cifra">
     <span class="c-num">${pls == null ? '–' : fmt(pls)}<span class="u">PLS</span></span>
-    <span class="c-eti">${escapar(etiqueta)}</span>
+    <span class="c-eti">${escapar(t(etiqueta))}</span>
     ${sub ? `<span class="c-sub">${escapar(sub)}</span>` : ''}
   </div>`;
 
@@ -41,8 +42,8 @@ export function panelGanancias(datos) {
   if (!estado && !serie.length) {
     return `
       <section class="panel" data-alerta aria-labelledby="pgan-t">
-        <header class="p-cab"><h2 id="pgan-t">${TITULO}</h2></header>
-        <p class="p-aviso">Sin serie de snapshots: no se puede calcular la ganancia.</p>
+        <header class="p-cab"><h2 id="pgan-t">${t(TITULO)}</h2></header>
+        <p class="p-aviso">${t('Sin serie de snapshots: no se puede calcular la ganancia.')}</p>
       </section>`;
   }
 
@@ -59,10 +60,10 @@ export function panelGanancias(datos) {
   if (acum && hayPrecio) {
     const usd = acum.total * precio.precio;
     dolares = precioViejo
-      ? `<span class="c-sub alerta">≈ ${fmt(usd, 2)} $ · precio ${fmtEdad(precio.edad_s)}, no está fresco</span>`
+      ? `<span class="c-sub alerta">≈ ${fmt(usd, 2)} $ · ${t('precio {e}, no está fresco', { e: fmtEdad(precio.edad_s) })}</span>`
       : `<span class="c-sub">≈ ${fmt(usd, 2)} $</span>`;
   } else if (acum) {
-    dolares = '<span class="c-sub alerta">Sin precio de PLS: no se convierte a dólares.</span>';
+    dolares = `<span class="c-sub alerta">${t('Sin precio de PLS: no se convierte a dólares.')}</span>`;
   }
 
   /* ── Lo que valía AL COBRARLO ───────────────────────────────────────────
@@ -80,10 +81,10 @@ export function panelGanancias(datos) {
      «0 $ de 0 barridos» no informa, ocupa. */
   const val = datos?.ganancia?.valorado;
   const cobrado = val && val.con_precio > 0
-    ? `<p class="c-sub">Valor al cobrarlo: <b>${fmt(val.usd, 2)} $</b>`
-      + ` · sobre ${fmt(val.con_precio)} de ${fmt(val.barridos)} barridos`
+    ? `<p class="c-sub">${t('Valor al cobrarlo:')} <b>${fmt(val.usd, 2)} $</b>`
+      + ` · ${t('sobre {a} de {b} barridos', { a: fmt(val.con_precio), b: fmt(val.barridos) })}`
       + (val.con_precio < val.barridos
-          ? '. Los anteriores no tienen precio guardado y no se puede reconstruir.'
+          ? '. ' + t('Los anteriores no tienen precio guardado y no se puede reconstruir.')
           : '.')
       + '</p>'
     : '';
@@ -91,21 +92,22 @@ export function panelGanancias(datos) {
   // De dónde sale el total. Sin esto, una cifra que incluye barridos es
   // indistinguible de una que no, y ese error ya fue invisible una vez.
   const procedencia = acum
-    ? `${fmt(acum.barrido)} retirados en ${fmt(acum.barridos)} barrido${acum.barridos === 1 ? '' : 's'}`
-      + ` · ${fmt(acum.excedente)} sin barrer`
-      + (acum.fuente === 'snapshots' && !acum.completo ? ' · suelo: falta lo anterior al registro' : '')
+    ? (acum.barridos === 1 ? t('{a} retirados en 1 barrido', { a: fmt(acum.barrido) })
+        : t('{a} retirados en {b} barridos', { a: fmt(acum.barrido), b: fmt(acum.barridos) }))
+      + ` · ${t('{n} sin barrer', { n: fmt(acum.excedente) })}`
+      + (acum.fuente === 'snapshots' && !acum.completo ? ` · ${t('suelo: falta lo anterior al registro')}` : '')
     : null;
 
   return `
     <section class="panel" aria-labelledby="pgan-t">
       <header class="p-cab">
-        <h2 id="pgan-t">${TITULO}</h2>
-        ${precioViejo ? '<span class="p-marca alerta">Precio no fresco</span>' : ''}
+        <h2 id="pgan-t">${t(TITULO)}</h2>
+        ${precioViejo ? `<span class="p-marca alerta">${t('Precio no fresco')}</span>` : ''}
       </header>
 
       <div class="cifra">
         <span class="c-num">${acum ? fmt(acum.total) : '–'}<span class="u">PLS</span></span>
-        <span class="c-eti">Total generado</span>
+        <span class="c-eti">${t('Total generado')}</span>
         ${dolares}
       </div>
 

@@ -22,6 +22,8 @@
  * `fallos` para que el panel lo diga en vez de enseñar un hueco mudo.
  */
 
+import { t } from './paneles/i18n.js';
+
 const API = '/api/val';
 
 /**
@@ -189,27 +191,27 @@ export function saludGlobal(datos) {
      pinta con la sesión caída, que lo diga en vez de enseñar números viejos
      como si fueran de ahora. */
   if (!datos.sesion) {
-    return { palabra: 'SIN SESIÓN', tono: 'aviso', nota: 'La sesión ha caducado. Vuelve a meter el PIN.' };
+    return { palabra: t('SIN SESIÓN'), tono: 'aviso', nota: t('La sesión ha caducado. Vuelve a meter el PIN.') };
   }
   if (!estado) {
-    return { palabra: 'SIN DATOS', tono: 'critico', nota: 'El panel no ha podido leer el estado.' };
+    return { palabra: t('SIN DATOS'), tono: 'critico', nota: t('El panel no ha podido leer el estado.') };
   }
 
   const edadMin = (ahoraS - Number(estado.generado_ts || 0)) / 60;
   if (!Number.isFinite(edadMin) || edadMin > 15) {
     const txt = edadMin > 120 ? `${Math.round(edadMin / 60)} h` : `${Math.round(edadMin)} min`;
-    return { palabra: 'DESFASADO', tono: 'critico', desfasado: true,
-             nota: `El NUC no reporta desde hace ${txt}. Lo que ves es el último dato bueno.` };
+    return { palabra: t('DESFASADO'), tono: 'critico', desfasado: true,
+             nota: t('El NUC no reporta desde hace {x}. Lo que ves es el último dato bueno.', { x: txt }) };
   }
 
   if (estado.salud === 'sin_datos') {
-    return { palabra: 'SIN DATOS', tono: 'critico',
-             nota: 'El nodo responde pero sus lecturas no se admiten.' };
+    return { palabra: t('SIN DATOS'), tono: 'critico',
+             nota: t('El nodo responde pero sus lecturas no se admiten.') };
   }
 
   const n = estado.nodo || {};
   if (n.sincronizado === false) {
-    return { palabra: 'CRÍTICO', tono: 'critico', nota: 'El nodo no está sincronizado.' };
+    return { palabra: t('CRÍTICO'), tono: 'critico', nota: t('El nodo no está sincronizado.') };
   }
 
   const v = estado.validadores || {};
@@ -222,10 +224,10 @@ export function saludGlobal(datos) {
   const enCola = Number(v.pendientes) || 0;
   const fuera = Number(v.total) - Number(v.activos) - enCola;
   if (fuera > 0) {
-    return { palabra: 'AVISO', tono: 'aviso',
+    return { palabra: t('AVISO'), tono: 'aviso',
              nota: fuera === 1
-               ? 'Un validador fuera de servicio.'
-               : `${fuera} validadores fuera de servicio.` };
+               ? t('Un validador fuera de servicio.')
+               : t('{n} validadores fuera de servicio.', { n: fuera }) };
   }
   /* La cola sí se dice, pero no como aviso: es informacion, y el tono es el
      mismo que cuando todo va bien.
@@ -244,22 +246,23 @@ export function saludGlobal(datos) {
     const partes = [];
     if (esperando > 0) {
       partes.push(esperando === 1
-        ? 'Un validador esperando a entrar en la cadena'
-        : `${esperando} validadores esperando a entrar en la cadena`);
+        ? t('Un validador esperando a entrar en la cadena')
+        : t('{n} validadores esperando a entrar en la cadena', { n: esperando }));
     }
     if (enCola > 0) {
       partes.push(enCola === 1
-        ? (esperando > 0 ? 'otro en cola de activación' : 'Un validador en cola de activación')
-        : `${enCola} ${esperando > 0 ? 'más' : 'validadores'} en cola de activación`);
+        ? (esperando > 0 ? t('otro en cola de activación') : t('Un validador en cola de activación'))
+        : (esperando > 0 ? t('{n} más en cola de activación', { n: enCola })
+          : t('{n} validadores en cola de activación', { n: enCola })));
     }
-    return { palabra: 'OPERATIVO', tono: 'ok', nota: `${partes.join(' · ')}.` };
+    return { palabra: t('OPERATIVO'), tono: 'ok', nota: `${partes.join(' · ')}.` };
   }
   if (estado.salud === 'aviso' || n.optimistic) {
-    return { palabra: 'AVISO', tono: 'aviso',
-             nota: n.optimistic ? 'Cabeza optimistic: aún sin verificar.' : 'El recolector avisa.' };
+    return { palabra: t('AVISO'), tono: 'aviso',
+             nota: n.optimistic ? t('Cabeza optimistic: aún sin verificar.') : t('El recolector avisa.') };
   }
 
-  return { palabra: 'OPERATIVO', tono: 'ok', nota: null };
+  return { palabra: t('OPERATIVO'), tono: 'ok', nota: null };
 }
 
 /**

@@ -47,6 +47,7 @@ import { activacionTs } from '../datos.js';
 import { desglosarSaldo } from './aportaciones.js';
 import { aporteGuardado, proyectar, mandoSimulador, textoDetalle, fmtPlazo } from './simulador.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 /**
  * El objetivo es el siguiente al que ya se tiene. Si no hay recuento todavía,
@@ -62,8 +63,8 @@ export function tituloObjetivo(estado) {
      y una clave en el disco ya la tienes. */
   const espera = Number(v.esperando) || 0;
   return Number.isFinite(total) && total > 0
-    ? `Validador #${total + espera + 1}`
-    : 'Siguiente validador';
+    ? t('Validador #{n}', { n: total + espera + 1 })
+    : t('Siguiente validador');
 }
 
 export function panelTrayectoria(datos, aporte = aporteGuardado()) {
@@ -82,7 +83,7 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
     return `
       <section class="panel" aria-labelledby="pt-t">
         <header class="p-cab"><h2 id="pt-t">${escapar(titulo)}</h2></header>
-        <p class="vacio">Faltan datos para calcular la trayectoria.</p>
+        <p class="vacio">${t('Faltan datos para calcular la trayectoria.')}</p>
       </section>`;
   }
 
@@ -148,10 +149,10 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
     : `<i class="a-ganado" style="width:${pct.toFixed(2)}%"></i>`;
 
   const pieBarra = aportado > 0
-    ? `${fmtCompacto(reunido - aportado)} generados · ${fmtCompacto(aportado)} aportados`
+    ? t('{a} generados · {b} aportados', { a: fmtCompacto(reunido - aportado), b: fmtCompacto(aportado) })
     : desglose && desglose.hayRegistro
-      ? `saldo de la wallet · ${fmtCompacto(desglose.aportado)} aportados en total`
-      : (deWallet ? 'saldo de la wallet' : 'lo generado');
+      ? `${t('saldo de la wallet')} · ${t('{n} aportados en total', { n: fmtCompacto(desglose.aportado) })}`
+      : (deWallet ? t('saldo de la wallet') : t('lo generado'));
 
   return `
     <section class="panel" aria-labelledby="pt-t">
@@ -163,24 +164,23 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
       ${yaEsta ? `
       <div class="cifra">
         <span class="c-num sim-gana">${fmt(Math.floor(reunido / deposito))}<span class="u">${
-          Math.floor(reunido / deposito) === 1 ? 'validador' : 'validadores'}</span></span>
-        <span class="c-eti">Ya lo tienes reunido</span>
-        <span class="c-sub">${fmt(reunido)} PLS en la wallet · el depósito son ${
-          fmtCompacto(deposito)} PLS${
-          reunido - deposito > 0 ? ` · sobran ${fmtCompacto(reunido - deposito)}` : ''}</span>
+          Math.floor(reunido / deposito) === 1 ? t('validador') : t('validadores')}</span></span>
+        <span class="c-eti">${t('Ya lo tienes reunido')}</span>
+        <span class="c-sub">${t('{a} PLS en la wallet · el depósito son {b} PLS', { a: fmt(reunido), b: fmtCompacto(deposito) })}${
+          reunido - deposito > 0 ? ` · ${t('sobran {n}', { n: fmtCompacto(reunido - deposito) })}` : ''}</span>
       </div>` : `
       <div class="cifra">
         <span class="c-num">${fmt(falta)}<span class="u">PLS</span></span>
-        <span class="c-eti">Faltan para el depósito</span>
+        <span class="c-eti">${t('Faltan para el depósito')}</span>
         ${hayPrecio
           ? `<span class="c-sub">≈ ${fmt(falta * precio.precio, 2)} $</span>`
-          : '<span class="c-sub alerta">Sin precio de PLS: no se convierte a dólares.</span>'}
+          : `<span class="c-sub alerta">${t('Sin precio de PLS: no se convierte a dólares.')}</span>`}
       </div>`}
 
       <div class="avance" role="presentation">
         <div class="a-barra">${barra}</div>
         <div class="a-pie">
-          <span class="mono">${fmtCompacto(reunido)} de ${fmtCompacto(deposito)}&nbsp;PLS</span>
+          <span class="mono">${t('{a} de {b}', { a: fmtCompacto(reunido), b: fmtCompacto(deposito) })}&nbsp;PLS</span>
           <span>${escapar(pieBarra)}</span>
         </div>
       </div>
@@ -190,14 +190,12 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
       ${mandoSimulador(aporte)}
 
       ${yaEsta ? `
-      <p class="c-sub">Cuando lo deposites, este panel vuelve a contar hacia el
-        siguiente: el objetivo sale de <code>stake_total / total</code>, así que
-        se mueve solo.</p>
+      <p class="c-sub">${t('Cuando lo deposites, este panel vuelve a contar hacia el siguiente: el objetivo sale de <code>stake_total / total</code>, así que se mueve solo.')}</p>
       ` : plazo ? `
       <div class="cifra" id="simPlazo">
         <span class="c-num">${escapar(plazo)}</span>
-        <span class="c-eti">${aporte > 0 ? 'Aportando eso' : 'Al ritmo actual'}</span>
-        <span class="c-sub">hacia ${escapar(fecha)} · proyección, no promesa</span>
+        <span class="c-eti">${aporte > 0 ? t('Aportando eso') : t('Al ritmo actual')}</span>
+        <span class="c-sub">${t('hacia {f} · proyección, no promesa', { f: escapar(fecha) })}</span>
       </div>
 
       <div class="rejilla sim-detalle" id="simDetalle">
@@ -205,12 +203,11 @@ export function panelTrayectoria(datos, aporte = aporteGuardado()) {
       </div>
 
       <p class="c-sub">
-        Sobre lo que falta al ritmo medido —${escapar(ritmo?.base || 'sin base')}—
-        más lo que compra la aportación al precio de ahora.
-        ${r.hayPrecio ? '' : '<span class="alerta">Sin precio de PLS: la aportación no se puede convertir y solo cuenta el ritmo.</span>'}
+        ${t('Sobre lo que falta al ritmo medido —{b}— más lo que compra la aportación al precio de ahora.', { b: escapar(ritmo?.base || t('sin base')) })}
+        ${r.hayPrecio ? '' : `<span class="alerta">${t('Sin precio de PLS: la aportación no se puede convertir y solo cuenta el ritmo.')}</span>`}
       </p>
-      ` : '<p class="c-sub">Sin ritmo medible para estimar el plazo.</p>'}
+      ` : `<p class="c-sub">${t('Sin ritmo medible para estimar el plazo.')}</p>`}
 
-      ${deWallet ? '' : '<p class="c-sub alerta">Sin lectura de la wallet: se usa lo generado, que puede no estar disponible.</p>'}
+      ${deWallet ? '' : `<p class="c-sub alerta">${t('Sin lectura de la wallet: se usa lo generado, que puede no estar disponible.')}</p>`}
     </section>`;
 }

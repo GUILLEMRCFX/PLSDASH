@@ -78,6 +78,13 @@
  * acumulado después de él. Queda algo por debajo de la verdad —se pierde el
  * trozo entre el último snapshot y el instante del barrido— nunca por encima.
  */
+
+/* Idioma (3-nov-2026). Este módulo no depende del panel —lo prueban en Node sin
+   navegador—, así que no importa el motor: lo usa si está cargado, y si no
+   devuelve el español de siempre. */
+const tt = (k, v) => (globalThis.plsI18n ? globalThis.plsI18n.t(k, v)
+  : String(k).replace(/\{(\w+)\}/g, (m, x) => (v && x in v ? String(v[x]) : m)));
+
 export function ganadoEntre(anterior, actual) {
   const a = Number(anterior), c = Number(actual);
   if (!Number.isFinite(a) || !Number.isFinite(c)) return 0;
@@ -106,7 +113,7 @@ export function gananciaAcumulada({ estado, ganancia, serie = [], activacionTs }
       barridos: ganancia.barridos,
       bloques: ganancia.bloques,
       excedente,
-      fuente: ganancia.obsoleto ? 'cadena (dato en caché)' : 'cadena',
+      fuente: ganancia.obsoleto ? tt('cadena (dato en caché)') : tt('cadena'),
       completo: true,
     };
   }
@@ -197,7 +204,7 @@ export function ritmoDiario({
   if (cerrados.length >= 2) {
     return {
       pls_dia: cerrados.reduce((a, d) => a + d.ganado_dia, 0) / cerrados.length,
-      base: `media de ${cerrados.length} días`,
+      base: tt('media de {n} días', { n: cerrados.length }),
       provisional: false,
     };
   }
@@ -210,11 +217,11 @@ export function ritmoDiario({
     let acumulado = 0;
     for (let i = 1; i < s.length; i++) acumulado += ganadoEntre(s[i - 1].ganado, s[i].ganado);
     if (horas >= 2 && acumulado > 0) {
-      return { pls_dia: (acumulado / horas) * 24, base: `medido en ${fmt(horas, 0)} h`, provisional: true };
+      return { pls_dia: (acumulado / horas) * 24, base: tt('medido en {n} h', { n: fmt(horas, 0) }), provisional: true };
     }
   }
 
-  return { pls_dia: plsDiaKV, base: 'media desde la activación', provisional: true };
+  return { pls_dia: plsDiaKV, base: tt('media desde la activación'), provisional: true };
 }
 
 /**

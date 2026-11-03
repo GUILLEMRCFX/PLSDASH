@@ -31,6 +31,7 @@
 
 import { ritmoDiario } from '/val/compartido/ganancias.js';
 import { fmt, fmtEdad, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 // Días por periodo. La media real, no números redondos.
 export const PERIODOS = [
@@ -73,7 +74,7 @@ export function tablaRitmo(datos) {
     const pls = ritmo.pls_dia * dias;
     return `
       <div class="rfila">
-        <span class="r-per">${escapar(nombre)}</span>
+        <span class="r-per">${escapar(t(nombre))}</span>
         <span class="r-pls">${fmt(pls)}<span class="u">PLS</span></span>
         ${hayPrecio ? `<span class="r-usd">${fmtUsd(pls * precio.precio)}</span>` : ''}
       </div>`;
@@ -88,9 +89,8 @@ export function tablaRitmo(datos) {
     // 390px, y cada línea de más empuja el panel fuera de la primera pantalla.
     nota: `${
       hayPrecio
-        ? `Proyección · ${ritmo.base} · precio ${
-            precioViejo ? fmtEdad(precio.edad_s) : 'actual'}.`
-        : `Proyección · ${ritmo.base}. Sin precio de PLS: no se convierte a dólares.`
-    }${ritmo.provisional ? ' El ritmo aún es provisional.' : ''}`,
+        ? t('Proyección · {b} · precio {p}.', { b: ritmo.base, p: precioViejo ? fmtEdad(precio.edad_s) : t('actual') })
+        : t('Proyección · {b}. Sin precio de PLS: no se convierte a dólares.', { b: ritmo.base })
+    }${ritmo.provisional ? ' ' + t('El ritmo aún es provisional.') : ''}`,
   };
 }

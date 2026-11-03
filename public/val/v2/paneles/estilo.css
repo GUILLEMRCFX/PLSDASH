@@ -1545,6 +1545,19 @@
 .tm-op[data-tema="ambar"]  { color: #fbbf24; }
 .tm-op[data-tema="papel"]  { color: #ececef; }
 
+/* El idioma, en el mismo menú (3-nov-2026): una fila de tres, separada de los
+   temas por una raya. El que está puesto lleva fondo y no solo color. */
+.tm-idiomas {
+  display: flex; gap: 4px; margin-top: 5px; padding-top: 6px;
+  border-top: 1px solid var(--borde);
+}
+.tm-id {
+  flex: 1; min-height: 36px; border: 0; border-radius: 7px; cursor: pointer;
+  background: none; color: var(--apagado); font: 600 12.5px/1 var(--cifra); letter-spacing: .04em;
+}
+.tm-id:hover, .tm-id:focus-visible { background: rgba(255, 255, 255, .06); outline: none; color: var(--dato-suave); }
+.tm-id[aria-checked="true"] { background: var(--dato-tinte); color: var(--dato); box-shadow: inset 0 0 0 1px var(--borde-vivo); }
+
 
 /* ─────────────────────────────────────────── el simulador
 

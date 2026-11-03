@@ -28,3 +28,9 @@
   Cache-Control: no-cache
 /val/index.html
   Cache-Control: no-cache
+
+# Los idiomas (3-nov-2026): el motor y los diccionarios cambian junto con el
+# código que los usa. Uno viejo no rompe nada —una clave que falta sale en
+# español—, pero dejaría textos sin traducir hasta que el navegador quisiera.
+/i18n/*
+  Cache-Control: no-cache

@@ -717,48 +717,54 @@
        El arranque por «/» lo cubre `init()`, que recupera el código de la
        caché. Ver la nota larga allí. -->
   <link rel="manifest" href="/manifest.webmanifest">
+  <!-- Idiomas (3-nov-2026): el motor, compartido con el panel, y los textos de
+       la portada. Síncronos y antes del script principal, que los usa al
+       pintar por primera vez. Ver /i18n/idioma.js. -->
+  <link rel="stylesheet" href="/i18n/idioma.css">
+  <script src="/i18n/idioma.js"></script>
+  <script src="/i18n/portada.js"></script>
 </head>
 <body data-view="combined">
 <div class="wrap">
 
   <!-- NAV -->
   <nav>
-    <div class="brand" onclick="goHome()" role="link" tabindex="0" aria-label="PLSDASH inicio">
+    <div class="brand" onclick="goHome()" role="link" tabindex="0" aria-label="PLSDASH inicio" data-i18n-aria-label="PLSDASH inicio">
       <span class="mark">
         <img src="/icons/plsdash-96x96.png" alt="" width="34" height="34" decoding="async">
       </span>
       <div><b>pls</b><span>dash</span></div>
     </div>
     <div class="nav-actions">
-      <button class="code-badge local" id="codeBadge" onclick="openCloudModal()" aria-label="Portfolio en la nube">
+      <button class="code-badge local" id="codeBadge" onclick="openCloudModal()" aria-label="Portfolio en la nube" data-i18n-aria-label="Portfolio en la nube">
         <svg viewBox="0 0 24 24" fill="none"><path d="M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.6A3.5 3.5 0 0 1 18 18H7Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
         <span class="code-txt" id="codeTxt">Modo local</span>
       </button>
-      <button class="btn btn-ghost" onclick="openLoadModal()" aria-label="Cargar portfolio">
+      <button class="btn btn-ghost" onclick="openLoadModal()" aria-label="Cargar portfolio" data-i18n-aria-label="Cargar portfolio">
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span class="bt-txt">Cargar</span>
+        <span class="bt-txt" data-i18n="Cargar">Cargar</span>
       </button>
-      <button class="btn btn-primary" onclick="openWalletModal()" aria-label="Añadir wallet">
+      <button class="btn btn-primary" onclick="openWalletModal()" aria-label="Añadir wallet" data-i18n-aria-label="Añadir wallet">
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#031015" stroke-width="2.4" stroke-linecap="round"/></svg>
-        <span class="bt-txt">Añadir wallet</span>
+        <span class="bt-txt" data-i18n="Añadir wallet">Añadir wallet</span>
       </button>
     </div>
   </nav>
 
   <!-- HERO -->
   <section class="hero">
-    <div class="eyebrow"><span class="live" id="liveDot"></span> Valor total del portfolio</div>
+    <div class="eyebrow"><span class="live" id="liveDot"></span> <span data-i18n="Valor total del portfolio">Valor total del portfolio</span></div>
     <div class="total" id="totalVal">$0<span class="cents">.00</span></div>
     <div class="hero-meta" id="heroMeta">
-      <span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>
+      <span class="chip" style="color:var(--faint)" data-i18n="Añade una wallet para empezar">Añade una wallet para empezar</span>
     </div>
     <div class="hgraf" id="heroGraf" data-no-vault hidden>
       <div class="hg-lienzo" id="hgLienzo">
-        <svg viewBox="0 0 600 118" preserveAspectRatio="none" role="img" aria-label="Valor del portfolio en el tiempo"></svg>
+        <svg viewBox="0 0 600 118" preserveAspectRatio="none" role="img" aria-label="Valor del portfolio en el tiempo" data-i18n-aria-label="Valor del portfolio en el tiempo"></svg>
         <div class="hg-tip" id="hgTip"></div>
       </div>
       <div class="hg-pie">
-        <div class="rangos" role="group" aria-label="Tramo del gráfico">
+        <div class="rangos" role="group" aria-label="Tramo del gráfico" data-i18n-aria-label="Tramo del gráfico">
           <button type="button" data-r="24h" aria-pressed="true">24 h</button>
           <button type="button" data-r="7d" aria-pressed="false">7 d</button>
           <button type="button" data-r="30d" aria-pressed="false">30 d</button>
@@ -778,7 +784,7 @@
        24h»: decía lo mismo que la píldora del total. En su sitio, el reparto a
        la vista; todo él es el botón que abre el radial. -->
   <button class="reparto" id="distBtn" onclick="abrirDist()" hidden
-          aria-haspopup="dialog" aria-label="Ver la distribución del portfolio">
+          aria-haspopup="dialog" aria-label="Ver la distribución del portfolio" data-i18n-aria-label="Ver la distribución del portfolio">
     <span class="rp-barra" id="rpBarra"></span>
     <span class="rp-ley" id="rpLey"></span>
   </button>
@@ -787,10 +793,10 @@
   <section class="panel">
     <div class="panel-head">
       <div class="tabs">
-        <button class="tab on" onclick="setView('combined',this)">Combinado</button>
-        <button class="tab" onclick="setView('wallet',this)">Por wallet</button>
-        <button class="tab" onclick="setView('history',this)">Historial</button>
-        <button class="tab" onclick="setView('invest',this)">Inversiones</button>
+        <button class="tab on" onclick="setView('combined',this)" data-i18n="Combinado">Combinado</button>
+        <button class="tab" onclick="setView('wallet',this)" data-i18n="Por wallet">Por wallet</button>
+        <button class="tab" onclick="setView('history',this)" data-i18n="Historial">Historial</button>
+        <button class="tab" onclick="setView('invest',this)" data-i18n="Inversiones">Inversiones</button>
       </div>
       <div class="head-tools">
         <button class="tool" id="sortTool" onclick="cycleSort()">
@@ -802,10 +808,10 @@
 
     <!-- COMBINED column header -->
     <div class="thead hide-on-wallet">
-      <div>Activo</div>
-      <div class="r">Balance</div>
-      <div class="r">Precio</div>
-      <div class="r">Valor</div>
+      <div data-i18n="Activo">Activo</div>
+      <div class="r" data-i18n="Balance">Balance</div>
+      <div class="r" data-i18n="Precio">Precio</div>
+      <div class="r" data-i18n="Valor">Valor</div>
     </div>
 
     <!-- ROWS render target -->
@@ -814,88 +820,88 @@
     <div class="foot">
       <button class="add-tok" onclick="openTokenModal()">
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        Añadir token personalizado (pega el contrato 0x…)
+        <span data-i18n="Añadir token personalizado (pega el contrato 0x…)">Añadir token personalizado (pega el contrato 0x…)</span>
       </button>
-      <div>Precios vía <a href="https://dexscreener.com" target="_blank" rel="noopener">DexScreener</a> · balances vía <a href="https://pulsechain.com" target="_blank" rel="noopener">PulseChain RPC</a></div>
+      <div data-i18n='Precios vía <a href="https://dexscreener.com" target="_blank" rel="noopener">DexScreener</a> · balances vía <a href="https://pulsechain.com" target="_blank" rel="noopener">PulseChain RPC</a>'>Precios vía <a href="https://dexscreener.com" target="_blank" rel="noopener">DexScreener</a> · balances vía <a href="https://pulsechain.com" target="_blank" rel="noopener">PulseChain RPC</a></div>
     </div>
   </section>
 
-  <div class="note" id="footNote">◆ Pega una dirección de wallet pública de PulseChain (0x…) para ver tu cartera en tiempo real. No se conecta ninguna wallet — solo lectura.</div>
+  <div class="note" id="footNote" data-i18n="◆ Pega una dirección de wallet pública de PulseChain (0x…) para ver tu cartera en tiempo real. No se conecta ninguna wallet — solo lectura.">◆ Pega una dirección de wallet pública de PulseChain (0x…) para ver tu cartera en tiempo real. No se conecta ninguna wallet — solo lectura.</div>
 
 </div>
 
 <!-- ============ MODALS ============ -->
 <div class="modal-bg" id="walletModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wmTitle">
-    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-    <h2 id="wmTitle">Añadir wallet</h2>
-    <p class="lead">Pega una dirección pública de PulseChain. No conectas tu wallet: solo se lee el balance público.</p>
-    <label for="wmAddr">Dirección</label>
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar" data-i18n-aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="wmTitle" data-i18n="Añadir wallet">Añadir wallet</h2>
+    <p class="lead" data-i18n="Pega una dirección pública de PulseChain. No conectas tu wallet: solo se lee el balance público.">Pega una dirección pública de PulseChain. No conectas tu wallet: solo se lee el balance público.</p>
+    <label for="wmAddr" data-i18n="Dirección">Dirección</label>
     <input class="field" id="wmAddr" placeholder="0x…" autocomplete="off" spellcheck="false" oninput="document.getElementById('wmErr').textContent=''">
-    <label for="wmLabel">Etiqueta (opcional)</label>
+    <label for="wmLabel" data-i18n="Etiqueta (opcional)">Etiqueta (opcional)</label>
     <input class="field" id="wmLabel" placeholder="Main, Cold, Trading…" autocomplete="off" maxlength="24">
     <div class="field-err" id="wmErr"></div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitWallet()">Añadir</button>
+      <button class="btn btn-ghost" onclick="closeModals()" data-i18n="Cancelar">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitWallet()" data-i18n="Añadir">Añadir</button>
     </div>
   </div>
 </div>
 
 <div class="modal-bg" id="tokenModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="tmTitle">
-    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-    <h2 id="tmTitle">Añadir token personalizado</h2>
-    <p class="lead">Pega el contrato del token (0x…). Lo buscamos en DexScreener para confirmar que existe.</p>
-    <label for="tmAddr">Contrato del token</label>
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar" data-i18n-aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="tmTitle" data-i18n="Añadir token personalizado">Añadir token personalizado</h2>
+    <p class="lead" data-i18n="Pega el contrato del token (0x…). Lo buscamos en DexScreener para confirmar que existe.">Pega el contrato del token (0x…). Lo buscamos en DexScreener para confirmar que existe.</p>
+    <label for="tmAddr" data-i18n="Contrato del token">Contrato del token</label>
     <input class="field" id="tmAddr" placeholder="0x…" autocomplete="off" spellcheck="false" oninput="onTokenInput()">
     <div class="field-err" id="tmErr"></div>
     <div class="tok-preview" id="tmPreview"></div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
-      <button class="btn btn-primary" id="tmAddBtn" onclick="submitToken()" disabled style="opacity:.5">Añadir</button>
+      <button class="btn btn-ghost" onclick="closeModals()" data-i18n="Cancelar">Cancelar</button>
+      <button class="btn btn-primary" id="tmAddBtn" onclick="submitToken()" disabled style="opacity:.5" data-i18n="Añadir">Añadir</button>
     </div>
   </div>
 </div>
 
 <div class="modal-bg" id="cloudModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cmTitle">
-    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar" data-i18n-aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <div id="cloudCreate">
-      <h2 id="cmTitle">Portfolio en la nube</h2>
-      <p class="lead">Crea un código para sincronizar tu portfolio entre dispositivos. Sin cuenta ni contraseña.</p>
+      <h2 id="cmTitle" data-i18n="Portfolio en la nube">Portfolio en la nube</h2>
+      <p class="lead" data-i18n="Crea un código para sincronizar tu portfolio entre dispositivos. Sin cuenta ni contraseña.">Crea un código para sincronizar tu portfolio entre dispositivos. Sin cuenta ni contraseña.</p>
       <div class="seg">
-        <button class="on" id="segAuto" onclick="setCodeMode('auto')">Código automático</button>
-        <button id="segCustom" onclick="setCodeMode('custom')">Personalizado</button>
+        <button class="on" id="segAuto" onclick="setCodeMode('auto')" data-i18n="Código automático">Código automático</button>
+        <button id="segCustom" onclick="setCodeMode('custom')" data-i18n="Personalizado">Personalizado</button>
       </div>
       <div id="customWrap" style="display:none">
-        <label for="cmCode">Tu código</label>
+        <label for="cmCode" data-i18n="Tu código">Tu código</label>
         <input class="field" id="cmCode" placeholder="guillem" autocomplete="off" spellcheck="false" oninput="document.getElementById('cmErr').textContent=''">
       </div>
       <div class="field-err" id="cmErr"></div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
-        <button class="btn btn-primary" id="cmCreateBtn" onclick="submitCreatePortfolio()">Crear portfolio</button>
+        <button class="btn btn-ghost" onclick="closeModals()" data-i18n="Cancelar">Cancelar</button>
+        <button class="btn btn-primary" id="cmCreateBtn" onclick="submitCreatePortfolio()" data-i18n="Crear portfolio">Crear portfolio</button>
       </div>
       <div class="priv">
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-        <span>Quien tenga tu código puede ver y editar este portfolio. Trátalo como un enlace privado. Las direcciones de blockchain son públicas de todos modos.</span>
+        <span data-i18n="Quien tenga tu código puede ver y editar este portfolio. Trátalo como un enlace privado. Las direcciones de blockchain son públicas de todos modos.">Quien tenga tu código puede ver y editar este portfolio. Trátalo como un enlace privado. Las direcciones de blockchain son públicas de todos modos.</span>
       </div>
     </div>
     <div id="cloudInfo" style="display:none">
-      <h2>Tu portfolio en la nube</h2>
-      <p class="lead">Abre esta URL en cualquier dispositivo para cargar el mismo portfolio.</p>
-      <label>Tu código</label>
-      <div class="copy-row"><code id="ciCode"></code><button onclick="copyCode()">Copiar</button></div>
-      <label>URL para compartir</label>
-      <div class="copy-row"><code id="ciUrl"></code><button onclick="copyUrl()">Copiar</button></div>
+      <h2 data-i18n="Tu portfolio en la nube">Tu portfolio en la nube</h2>
+      <p class="lead" data-i18n="Abre esta URL en cualquier dispositivo para cargar el mismo portfolio.">Abre esta URL en cualquier dispositivo para cargar el mismo portfolio.</p>
+      <label data-i18n="Tu código">Tu código</label>
+      <div class="copy-row"><code id="ciCode"></code><button onclick="copyCode()" data-i18n="Copiar">Copiar</button></div>
+      <label data-i18n="URL para compartir">URL para compartir</label>
+      <div class="copy-row"><code id="ciUrl"></code><button onclick="copyUrl()" data-i18n="Copiar">Copiar</button></div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" onclick="disconnectCloud()">Desconectar</button>
-        <button class="btn btn-primary" onclick="closeModals()">Listo</button>
+        <button class="btn btn-ghost" onclick="disconnectCloud()" data-i18n="Desconectar">Desconectar</button>
+        <button class="btn btn-primary" onclick="closeModals()" data-i18n="Listo">Listo</button>
       </div>
       <div class="priv">
         <svg viewBox="0 0 24 24" fill="none"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-        <span>Quien tenga este código puede ver y editar tu portfolio. Compártelo solo con quien confíes.</span>
+        <span data-i18n="Quien tenga este código puede ver y editar tu portfolio. Compártelo solo con quien confíes.">Quien tenga este código puede ver y editar tu portfolio. Compártelo solo con quien confíes.</span>
       </div>
     </div>
   </div>
@@ -903,23 +909,23 @@
 
 <div class="modal-bg" id="loadModal">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="lmTitle">
-    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-    <h2 id="lmTitle">Cargar portfolio existente</h2>
-    <p class="lead">Introduce tu código de portfolio o pega la URL completa para abrirlo en este dispositivo.</p>
-    <label for="lmInput">Código o URL</label>
-    <input class="field" id="lmInput" placeholder="Código o URL (plsdash.com/p/...)" autocomplete="off" spellcheck="false" oninput="document.getElementById('lmErr').textContent=''">
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar" data-i18n-aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="lmTitle" data-i18n="Cargar portfolio existente">Cargar portfolio existente</h2>
+    <p class="lead" data-i18n="Introduce tu código de portfolio o pega la URL completa para abrirlo en este dispositivo.">Introduce tu código de portfolio o pega la URL completa para abrirlo en este dispositivo.</p>
+    <label for="lmInput" data-i18n="Código o URL">Código o URL</label>
+    <input class="field" id="lmInput" placeholder="Código o URL (plsdash.com/p/...)" data-i18n-placeholder="Código o URL (plsdash.com/p/...)" autocomplete="off" spellcheck="false" oninput="document.getElementById('lmErr').textContent=''">
     <div class="field-err" id="lmErr"></div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModals()">Cancelar</button>
-      <button class="btn btn-primary" onclick="submitLoad()">Cargar</button>
+      <button class="btn btn-ghost" onclick="closeModals()" data-i18n="Cancelar">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitLoad()" data-i18n="Cargar">Cargar</button>
     </div>
   </div>
 </div>
 
 <div class="modal-bg" id="distModal">
   <div class="modal modal-wide dist-modal" role="dialog" aria-modal="true" aria-labelledby="distTitle">
-    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-    <h2 id="distTitle">Distribución</h2>
+    <button class="modal-close" onclick="closeModals()" aria-label="Cerrar" data-i18n-aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <h2 id="distTitle" data-i18n="Distribución">Distribución</h2>
     <!-- El total va en el centro del anillo y solo ahí. Estaba también aquí
          arriba y se leían dos veces la misma cifra a diez centímetros. -->
     <p class="lead" id="distN">—</p>
@@ -934,11 +940,11 @@
 
 <div class="modal-bg" id="chartModal">
   <div class="modal modal-wide" role="dialog" aria-modal="true" aria-labelledby="chTitle">
-    <button class="modal-close" onclick="closeChart()" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
+    <button class="modal-close" onclick="closeChart()" aria-label="Cerrar" data-i18n-aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
     <h2 id="chTitle">Gráfico</h2>
-    <p class="lead" style="margin-bottom:8px">Gráfico en vivo de DexScreener.</p>
+    <p class="lead" style="margin-bottom:8px" data-i18n="Gráfico en vivo de DexScreener.">Gráfico en vivo de DexScreener.</p>
     <div class="chart-wrap" id="chartWrap"></div>
-    <div class="chart-foot"><a id="chOpen" href="#" target="_blank" rel="noopener">Abrir en DexScreener ↗</a></div>
+    <div class="chart-foot"><a id="chOpen" href="#" target="_blank" rel="noopener" data-i18n="Abrir en DexScreener ↗">Abrir en DexScreener ↗</a></div>
   </div>
 </div>
 
@@ -1013,6 +1019,9 @@ const PRICE_TTL = 25000;
    UTILIDADES
    ============================================================ */
 const $ = id => document.getElementById(id);
+/* El idioma (3-nov-2026). `tr` y no `t`: en este fichero `t` es un token en
+   cien sitios. El motor y su nota larga están en /i18n/idioma.js. */
+const tr = (k, v) => (window.plsI18n ? plsI18n.t(k, v) : String(k));
 const isAddr = a => /^0x[0-9a-fA-F]{40}$/.test((a||'').trim());
 const lc = a => (a||'').trim().toLowerCase();
 
@@ -1416,7 +1425,7 @@ async function refresh(){
       .catch(()=>{});
   }catch(e){
     console.error(e);
-    if(!tokensCombined.length)renderError('No pudimos cargar los balances. Reintentando en 30s.');
+    if(!tokensCombined.length)renderError(tr('No pudimos cargar los balances. Reintentando en 30s.'));
   }finally{
     isFetching=false;
   }
@@ -1462,7 +1471,7 @@ function logoHtml(t,size){
 
 function chartBtnHtml(t){
   if(!t.pair)return '';
-  return `<button class="chartbtn" data-pair="${escapeHtml(t.pair)}" data-sym="${escapeHtml(t.symbol||'')}" aria-label="Gráfico en vivo de ${escapeHtml(t.symbol||'token')} en DexScreener"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 14l3-4 3 3 4-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Gráfico en vivo</button>`;
+  return `<button class="chartbtn" data-pair="${escapeHtml(t.pair)}" data-sym="${escapeHtml(t.symbol||'')}" aria-label="${tr('Gráfico en vivo de {s} en DexScreener',{s:escapeHtml(t.symbol||'token')})}"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M7 14l3-4 3 3 4-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>${tr('Gráfico en vivo')}</button>`;
 }
 
 /* ---------- la fila de un token ----------
@@ -1503,10 +1512,10 @@ function rowHtml(t,ctx={}){
 }
 
 function detalleHtml(t,cuota,color){
-  const datos=[`<span>Precio <b>${t.price==null?'—':fmtPrice(t.price)}</b></span>`];
+  const datos=[`<span>${tr('Precio')} <b>${t.price==null?'—':fmtPrice(t.price)}</b></span>`];
   const chg=tokenChange(t);
   if(chg!=null)datos.push(`<span>24 h <b class="${chg>=0?'up':'down'}">${fmtPct(chg)}</b></span>`);
-  if(cuota>0)datos.push(`<span><b>${fmtCuota(cuota)}</b> de la cartera</span>`);
+  if(cuota>0)datos.push(`<span>${tr('<b>{p}</b> de la cartera',{p:fmtCuota(cuota)})}</span>`);
   // Cuánto hay en cada wallet, si está repartido en más de una.
   const ws=Object.entries(t.perWallet||{}).filter(([,a])=>a>0);
   if(ws.length>1)for(const [a,amt] of ws){
@@ -1530,7 +1539,7 @@ function curvaTokenHtml(t,color){
   const y=v=>H-4-(v-mn)/(mx-mn||1)*(H-8);
   const camino=ps.map((v,i)=>`${i?'L':'M'}${(i/(n-1)*W).toFixed(1)},${y(v).toFixed(1)}`).join('');
   const c=(ps[n-1]-ps[0])/ps[0]*100;
-  return `<div class="det-graf" title="${escapeHtml(t.symbol||'')} · ${RANGO_TXT[graf.rango]} · ${fmtPct(c)}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Precio de ${escapeHtml(t.symbol||'token')} en ${RANGO_TXT[graf.rango]}: ${fmtPct(c)}"><path d="${camino}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></div>`;
+  return `<div class="det-graf" title="${escapeHtml(t.symbol||'')} · ${tr(RANGO_TXT[graf.rango])} · ${fmtPct(c)}"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="${tr('Precio de {s} en {r}',{s:escapeHtml(t.symbol||'token'),r:tr(RANGO_TXT[graf.rango])})}: ${fmtPct(c)}"><path d="${camino}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg></div>`;
 }
 
 /* El pie del polvo: cuántos hay, cuánto suman, y el botón para desplegarlos.
@@ -1541,12 +1550,11 @@ function polvoHtml(){
   if(!polvo.length)return '';
 
   const suma=polvo.reduce((s,t)=>s+t.value,0);
-  const plural=polvo.length===1?'token':'tokens';
-  const resumen=`${polvo.length} ${plural} bajo ${fmtUsd(UMBRAL_DUST_USD)} · ${fmtUsd(suma)}`;
+  const resumen=`${polvo.length===1?tr('1 token bajo {u}',{u:fmtUsd(UMBRAL_DUST_USD)}):tr('{n} tokens bajo {u}',{n:polvo.length,u:fmtUsd(UMBRAL_DUST_USD)})} · ${fmtUsd(suma)}`;
 
   const boton=`<button class="dust-btn${state.verPolvo?' abierto':''}" onclick="togglePolvo()"
       aria-expanded="${state.verPolvo?'true':'false'}" aria-controls="polvoLista">
-    <span class="db-lbl">${state.verPolvo?'HIDE':'SHOW'}</span>
+    <span class="db-lbl">${state.verPolvo?tr('HIDE'):tr('SHOW')}</span>
     <span class="db-sub">${resumen}</span>
   </button>`;
 
@@ -1557,7 +1565,7 @@ function polvoHtml(){
   // tienes de cada cosa.
   const filas=sortTokens(polvo).map(t=>rowHtml(t,{grupo:'polvo'})).join('');
   return `<div class="dust-foot">
-    <div class="dust-sep">Polvo · por debajo de ${fmtUsd(UMBRAL_DUST_USD)}</div>
+    <div class="dust-sep">${tr('Polvo · por debajo de {u}',{u:fmtUsd(UMBRAL_DUST_USD)})}</div>
     <div id="polvoLista" class="dust-lista">${filas}</div>${boton}</div>`;
 }
 
@@ -1578,8 +1586,9 @@ function render(){
      deshacerlo. */
   if(!walletsQueCuentan().length){
     $('rows').innerHTML=`<div class="state-block">
-      <h3>Ninguna wallet suma ahora mismo</h3>
-      <p>Tienes ${state.wallets.length} wallet${state.wallets.length===1?'':'s'} guardada${state.wallets.length===1?'':'s'}, pero está${state.wallets.length===1?'':'n'} sin sumar. Vuelve a encender alguna con el interruptor de su chapita para ver la cartera.</p>
+      <h3>${tr('Ninguna wallet suma ahora mismo')}</h3>
+      <p>${state.wallets.length===1?tr('Tienes 1 wallet guardada, pero está sin sumar. Vuelve a encender alguna con el interruptor de su chapita para ver la cartera.')
+        :tr('Tienes {n} wallets guardadas, pero están sin sumar. Vuelve a encender alguna con el interruptor de su chapita para ver la cartera.',{n:state.wallets.length})}</p>
     </div>`;
     updateHeader();
     renderWalletBar();
@@ -1641,9 +1650,9 @@ function render(){
       html+=`<div class="wgroup">
         <div class="wl"><div class="wd">${escapeHtml((w.label||'W')[0].toUpperCase())}</div>
           <div class="wn"><b>${escapeHtml(w.label||'Wallet')}</b><span>${shortAddr(lc(w.address))}</span></div></div>
-        <div class="wv">${fmtUsd(wtotal)}<span>${pct}% del total</span></div>
+        <div class="wv">${fmtUsd(wtotal)}<span>${tr('{p}% del total',{p:pct})}</span></div>
       </div>`;
-      html+=sorted.length?sorted.map(t=>rowHtml(t,{base:wtotal,grupo:addr})).join(''):'<div class="state-block" style="padding:26px"><p>Sin tokens con balance en esta wallet.</p></div>';
+      html+=sorted.length?sorted.map(t=>rowHtml(t,{base:wtotal,grupo:addr})).join(''):`<div class="state-block" style="padding:26px"><p>${tr('Sin tokens con balance en esta wallet.')}</p></div>`;
     }
     /* En la vista por wallet el polvo va también al final, del conjunto y no
        de cada wallet: repetir el bloque por grupo llenaría la pantalla de
@@ -1690,19 +1699,19 @@ function updateHeader(){
 
   const meta=$('heroMeta');
   if(!state.wallets.length){
-    meta.innerHTML='<span class="chip" style="color:var(--faint)">Añade una wallet para empezar</span>';
+    meta.innerHTML=`<span class="chip" style="color:var(--faint)">${tr('Añade una wallet para empezar')}</span>`;
     return;
   }
   const up=diff>=0;
-  const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} hoy</span><span class="dot-sep"></span>`:'';
+  const pill=has?`<span class="chip pill ${up?'':'down'}">${up?'▲':'▼'} ${fmtPct(pct)} &nbsp;·&nbsp; ${up?'+':'−'}${fmtUsd(Math.abs(diff)).slice(1).replace('$','')} ${tr('hoy')}</span><span class="dot-sep"></span>`:'';
   const ago=Math.max(0,Math.round((Date.now()-lastUpdate)/1000));
   /* La cuenta de wallets es la de las que SUMAN, y si hay alguna apagada se
      dice. Un número grande más bajo de lo esperado sin ninguna explicación a la
      vista es lo que hace dudar del panel entero. */
   const n=walletsQueCuentan().length, fuera=state.wallets.length-n, nTok=visibles.length;
-  const cuantas=`<span class="chip">${n} wallet${n===1?'':'s'}${
-    fuera?` <span style="color:var(--faint)">(${fuera} sin sumar)</span>`:''}</span>`;
-  meta.innerHTML=`${pill}${cuantas}<span class="dot-sep"></span><span class="chip">${nTok} token${nTok===1?'':'s'}</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">actualizado hace ${ago}s</span>`;
+  const cuantas=`<span class="chip">${n===1?tr('1 wallet'):tr('{n} wallets',{n})}${
+    fuera?` <span style="color:var(--faint)">(${tr('{n} sin sumar',{n:fuera})})</span>`:''}</span>`;
+  meta.innerHTML=`${pill}${cuantas}<span class="dot-sep"></span><span class="chip">${nTok===1?tr('1 token'):tr('{n} tokens',{n:nTok})}</span><span class="dot-sep"></span><span class="chip" style="color:var(--faint)" id="agoChip">${tr('actualizado hace {n}s',{n:ago})}</span>`;
 }
 
 function renderStats(){
@@ -1882,14 +1891,14 @@ function renderReparto(){
   const grandes=lista.slice(0,REPARTO_MAX), resto=lista.slice(REPARTO_MAX);
   const otros=resto.reduce((s,t)=>s+t.value,0);
   const trozos=grandes.map(t=>({sym:t.symbol||'?',v:t.value,c:colorDe(t)}));
-  if(otros>0)trozos.push({sym:'Otros',v:otros,c:'rgba(156,193,206,.35)'});
+  if(otros>0)trozos.push({sym:tr('Otros'),v:otros,c:'rgba(156,193,206,.35)'});
   $('rpBarra').innerHTML=trozos.map(x=>`<i style="flex-grow:${(x.v/total).toFixed(5)};background:${x.c}"></i>`).join('');
   // En la leyenda, hasta cuatro y «otros»: más no cabe en una línea del móvil.
   const ley=trozos.slice(0,4);
   const resLey=trozos.slice(4).reduce((s,x)=>s+x.v,0);
   $('rpLey').innerHTML=ley.map(x=>`<span><i style="background:${x.c}"></i>${escapeHtml(x.sym)} ${fmtCuota(x.v/total*100)}</span>`).join('')
-    +(resLey>0?`<span><i style="background:rgba(156,193,206,.35)"></i>Otros ${fmtCuota(resLey/total*100)}</span>`:'')
-    +'<span class="rp-ver">Distribución ›</span>';
+    +(resLey>0?`<span><i style="background:rgba(156,193,206,.35)"></i>${tr('Otros')} ${fmtCuota(resLey/total*100)}</span>`:'')
+    +`<span class="rp-ver">${tr('Distribución')} ›</span>`;
 }
 
 /** Los tokens del gráfico: exactamente los de la tabla. Si no se ve en la
@@ -1903,13 +1912,13 @@ function renderDist(animar=false){
   const total=lista.reduce((s,t)=>s+t.value,0);
   const graf=$('distGraf'), ley=$('distLeyenda');
 
-  $('distN').textContent=lista.length===1?'1 posición':`${lista.length} posiciones`;
+  $('distN').textContent=lista.length===1?tr('1 posición'):tr('{n} posiciones',{n:lista.length});
 
   if(!lista.length||!total){
     graf.querySelectorAll('svg').forEach(s=>s.remove());
     ley.innerHTML='';
     distTrozos=[]; distSuma=0; distSel=null;
-    $('distCentro').innerHTML='<span class="dz-pista">Sin tokens</span>';
+    $('distCentro').innerHTML=`<span class="dz-pista">${tr('Sin tokens')}</span>`;
     return;
   }
 
@@ -1928,7 +1937,7 @@ function renderDist(animar=false){
   const sectores=trozos.map(s=>`<path class="dist-sector" d="${sectorPath(s.a0,s.a1)}"
       fill="${s.color}" style="color:${s.color};animation-delay:${(s.i*38)}ms"
       data-k="${escapeHtml(s.t.key)}" tabindex="0" role="button"
-      aria-label="${escapeHtml(s.t.symbol||'?')}, ${fmtCuota(s.cuota)} del portfolio, ${fmtUsd(s.t.value)}"></path>`).join('');
+      aria-label="${escapeHtml(s.t.symbol||'?')}, ${tr('{p} del portfolio',{p:fmtCuota(s.cuota)})}, ${fmtUsd(s.t.value)}"></path>`).join('');
 
   // Logos sobre el anillo, solo donde caben sin pisarse.
   const logos=trozos.map(s=>{
@@ -1940,7 +1949,7 @@ function renderDist(animar=false){
   }).join('');
 
   const svg=`<svg viewBox="0 0 320 320" role="img"
-      aria-label="Reparto del portfolio entre ${lista.length} posiciones. El detalle está en la lista de al lado.">
+      aria-label="${tr('Reparto del portfolio entre {n} posiciones. El detalle está en la lista de al lado.',{n:lista.length})}">
     <defs>
       <clipPath id="distRedondo" clipPathUnits="objectBoundingBox">
         <circle cx=".5" cy=".5" r=".5"/>
@@ -2007,7 +2016,7 @@ function pintarSeleccion(){
          <div class="dz-pct" style="color:${sel.color}">${fmtCuota(sel.cuota)}</div>
          <div class="dz-val">${fmtUsd(sel.t.value)}</div></div>`
     : `<div><div class="dz-pct">${fmtUsd(distSuma)}</div>
-         <div class="dz-pista">Toca una porción</div></div>`;
+         <div class="dz-pista">${tr('Toca una porción')}</div></div>`;
   ajustarCentro();
 }
 
@@ -2075,28 +2084,28 @@ function renderWalletBar(){
   let html=state.wallets.map((w,i)=>{
     const addr=lc(w.address);
     const on=cuentaW(w);
-    const nombre=w.label||'Wallet '+(i+1);
+    const nombre=w.label||tr('Wallet {n}',{n:i+1});
     const v=perWalletTotals[addr]||0;
     const valor=!on?'—':listo?fmtUsd(v):'…';
-    const parte=!on?'no suma en los totales':listo&&total>0?`${fmtCuota(v/total*100)} del total`:'';
+    const parte=!on?tr('no suma en los totales'):listo&&total>0?tr('{p} del total',{p:fmtCuota(v/total*100)}):'';
     const menu=menuWallet===addr;
     return `<div class="wchip${on?'':' apagada'}"><div class="wc-top">
       <div class="wch-d" style="background:${gradientFor(addr)}">${escapeHtml((w.label||'W')[0].toUpperCase())}</div>
       <div class="wch-i"><b>${escapeHtml(nombre)}</b><span>${shortAddr(addr)}</span></div>
       <button class="w-sw" role="switch" aria-checked="${on}"
-        title="${on?'Dejar de sumar esta wallet en los totales':'Volver a sumar esta wallet en los totales'}"
-        aria-label="${escapeHtml(nombre)}: ${on?'suma en los totales':'no suma en los totales'}"
+        title="${on?tr('Dejar de sumar esta wallet en los totales'):tr('Volver a sumar esta wallet en los totales')}"
+        aria-label="${escapeHtml(nombre)}: ${on?tr('suma en los totales'):tr('no suma en los totales')}"
         onclick="toggleWallet('${addr}')"><span class="w-sw-p"></span></button></div>
       <div class="wch-v">${valor}</div>
       <div class="wch-s"><span>${parte}</span>
-        <button class="wc-mas" aria-label="Más opciones de ${escapeHtml(nombre)}" aria-expanded="${menu}" onclick="alternarMenuWallet('${addr}')"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div>
+        <button class="wc-mas" aria-label="${tr('Más opciones de {w}',{w:escapeHtml(nombre)})}" aria-expanded="${menu}" onclick="alternarMenuWallet('${addr}')"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button></div>
       <div class="wc-menu"${menu?'':' hidden'}>
-        <button class="lbl-btn" onclick="renameWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17v3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>Renombrar</button>
-        <button class="x" onclick="removeWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Quitar</button>
+        <button class="lbl-btn" onclick="renameWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0-2.8-2.8L5 17v3Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>${tr('Renombrar')}</button>
+        <button class="x" onclick="removeWallet('${addr}')"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${tr('Quitar')}</button>
       </div>
     </div>`;
   }).join('');
-  html+=`<button class="add-wallet-chip" onclick="openWalletModal()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>Añadir wallet</button>`;
+  html+=`<button class="add-wallet-chip" onclick="openWalletModal()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>${tr('Añadir wallet')}</button>`;
   bar.innerHTML=html;
 }
 function alternarMenuWallet(addr){
@@ -2108,14 +2117,14 @@ function alternarMenuWallet(addr){
 function renderEmpty(){
   $('rows').innerHTML=`<div class="state-block">
     <div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M3 7h18v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" stroke="currentColor" stroke-width="2"/><path d="M3 7l2-3h14l2 3M16 13h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
-    <h3>Tu cartera, en tiempo real</h3>
-    <p>Pega una dirección pública de PulseChain (0x…) y verás todos tus tokens, precios y el valor total al instante.</p>
-    <button class="btn btn-primary" onclick="openWalletModal()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#031015" stroke-width="2.4" stroke-linecap="round"/></svg>Añadir wallet</button>
+    <h3>${tr('Tu cartera, en tiempo real')}</h3>
+    <p>${tr('Pega una dirección pública de PulseChain (0x…) y verás todos tus tokens, precios y el valor total al instante.')}</p>
+    <button class="btn btn-primary" onclick="openWalletModal()"><svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="#031015" stroke-width="2.4" stroke-linecap="round"/></svg>${tr('Añadir wallet')}</button>
   </div>`;
 }
 function emptyHoldingsHtml(){
   return `<div class="state-block"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
-    <h3>Sin tokens con balance</h3><p>Esta dirección no tiene tokens con saldo, o aún se están cargando. Añade un token personalizado si falta alguno.</p></div>`;
+    <h3>${tr('Sin tokens con balance')}</h3><p>${tr('Esta dirección no tiene tokens con saldo, o aún se están cargando. Añade un token personalizado si falta alguno.')}</p></div>`;
 }
 function renderEmptyHoldings(){$('rows').innerHTML=emptyHoldingsHtml();}
 function renderSkeleton(){
@@ -2125,7 +2134,7 @@ function renderSkeleton(){
 }
 function renderError(msg){
   $('rows').innerHTML=`<div class="state-block error"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div>
-    <h3>No se pudieron cargar los datos</h3><p>${escapeHtml(msg)}</p><button class="btn btn-ghost" onclick="refresh()">Reintentar ahora</button></div>`;
+    <h3>${tr('No se pudieron cargar los datos')}</h3><p>${escapeHtml(msg)}</p><button class="btn btn-ghost" onclick="refresh()">${tr('Reintentar ahora')}</button></div>`;
 }
 
 /* ============================================================
@@ -2170,8 +2179,8 @@ function toggleWallet(addr){
 
 function addWallet(address,label){
   const addr=lc(address);
-  if(!isAddr(addr))return {ok:false,msg:'Esa dirección no parece válida (debe ser 0x + 40 caracteres).'};
-  if(state.wallets.some(w=>lc(w.address)===addr))return {ok:false,msg:'Esa wallet ya está en tu portfolio.'};
+  if(!isAddr(addr))return {ok:false,msg:tr('Esa dirección no parece válida (debe ser 0x + 40 caracteres).')};
+  if(state.wallets.some(w=>lc(w.address)===addr))return {ok:false,msg:tr('Esa wallet ya está en tu portfolio.')};
   state.wallets.push({address:addr,label:(label||'').trim(),cuenta:true});
   savePortfolio();
   tokensCombined=[];
@@ -2186,12 +2195,12 @@ function removeWallet(addr){
   tokensCombined=[];
   render();
   if(state.wallets.length)refresh();
-  toast('Wallet eliminada');
+  toast(tr('Wallet eliminada'));
 }
 function renameWallet(addr){
   const w=state.wallets.find(x=>lc(x.address)===lc(addr));
   if(!w)return;
-  const label=prompt('Etiqueta para esta wallet:',w.label||'');
+  const label=prompt(tr('Etiqueta para esta wallet:'),w.label||'');
   if(label===null)return;
   w.label=label.trim().slice(0,24);
   menuWallet=null;
@@ -2200,8 +2209,8 @@ function renameWallet(addr){
 }
 async function addCustomToken(addr){
   const a=lc(addr);
-  if(!isAddr(a))return {ok:false,msg:'Contrato no válido.'};
-  if(state.customTokens.includes(a))return {ok:false,msg:'Ese token ya está añadido.'};
+  if(!isAddr(a))return {ok:false,msg:tr('Contrato no válido.')};
+  if(state.customTokens.includes(a))return {ok:false,msg:tr('Ese token ya está añadido.')};
   state.customTokens.push(a);
   savePortfolio();
   tokensCombined=[];
@@ -2224,10 +2233,13 @@ function setView(v,el){
 }
 function cycleSort(){
   const order=['value','change','name'];
-  const labels={value:'Valor',change:'Cambio 24h',name:'Nombre'};
   state.sort=order[(order.indexOf(state.sort)+1)%order.length];
-  $('sortLbl').textContent=labels[state.sort];
+  pintarOrden();
   render();
+}
+function pintarOrden(){
+  const labels={value:'Valor',change:'Cambio 24h',name:'Nombre'};
+  $('sortLbl').textContent=tr(labels[state.sort]||'Valor');
 }
 /* Desplegar el polvo no se guarda: ver la nota de `verPolvo` en el estado. */
 function togglePolvo(){
@@ -2392,7 +2404,7 @@ function cuandoTxt(ts,rango,ahora){
   const d=new Date(ts*1000);
   if(rango==='24h'){
     const h=Math.round((ahora-ts)/3600);
-    return h<=0?'ahora':`hace ${h} h`;
+    return h<=0?tr('ahora'):tr('hace {n} h',{n:h});
   }
   if(rango==='7d')return d.toLocaleString('es-ES',{weekday:'short',hour:'2-digit',minute:'2-digit'});
   return d.toLocaleDateString('es-ES',{day:'numeric',month:'short'});
@@ -2415,8 +2427,8 @@ function pintarGraf(){
   };
   if(!d){
     lienzo.classList.add('cargando');
-    if(graf.fallo[graf.rango]){svg.innerHTML='';ponerAviso(`Sin histórico de ${RANGO_TXT[graf.rango]} ahora mismo`);}
-    else ponerAviso('Cargando…');
+    if(graf.fallo[graf.rango]){svg.innerHTML='';ponerAviso(tr('Sin histórico de {r} ahora mismo',{r:tr(RANGO_TXT[graf.rango])}));}
+    else ponerAviso(tr('Cargando…'));
     $('hgCambio').textContent='';
     graf.serie=null;
     return;
@@ -2449,14 +2461,15 @@ function pintarGraf(){
   if(graf.rango==='24h'||!(ini>0)){cambio.textContent='';}
   else{
     cambio.className='hg-cambio '+(dif>=0?'up':'down');
-    cambio.textContent=`${dif>=0?'▲':'▼'} ${fmtPct(pc)} · ${dif>=0?'+':'−'}${fmtUsd(Math.abs(dif))} en ${RANGO_TXT[graf.rango]}`;
+    cambio.textContent=`${dif>=0?'▲':'▼'} ${fmtPct(pc)} · ${dif>=0?'+':'−'}${fmtUsd(Math.abs(dif))} ${tr('en {r}',{r:tr(RANGO_TXT[graf.rango])})}`;
   }
   const otros=S.conCurva-(S.conSaldo?1:0);
   let nota=S.conSaldo
-    ?(otros>0?'PLS con su saldo de cada día; el resto, con lo que tienes hoy.':'PLS con su saldo de cada día.')
-    :'Con lo que tienes hoy, a los precios de cada momento.';
-  if(S.fijos)nota+=` ${S.fijos} token${S.fijos===1?' cuenta':'s cuentan'} fijo${S.fijos===1?'':'s'}: sin histórico fiable de su precio.`;
-  $('hgNota').textContent=nota+' Precios: PulseX.';
+    ?(otros>0?tr('PLS con su saldo de cada día; el resto, con lo que tienes hoy.'):tr('PLS con su saldo de cada día.'))
+    :tr('Con lo que tienes hoy, a los precios de cada momento.');
+  if(S.fijos)nota+=' '+(S.fijos===1?tr('1 token cuenta fijo: sin histórico fiable de su precio.')
+    :tr('{n} tokens cuentan fijos: sin histórico fiable de su precio.',{n:S.fijos}));
+  $('hgNota').textContent=nota+' '+tr('Precios: PulseX.');
 }
 
 function colocarPunto(i){
@@ -2517,10 +2530,10 @@ function colocarPunto(i){
 function openChart(pair,sym){
   if(!pair)return;
   closeModals();
-  $('chTitle').textContent='Gráfico'+(sym?' · '+sym:'');
+  $('chTitle').textContent=tr('Gráfico')+(sym?' · '+sym:'');
   const url=`https://dexscreener.com/${CHAIN_ID}/${pair}`;
   $('chOpen').href=url;
-  $('chartWrap').innerHTML=`<iframe src="${url}?embed=1&theme=dark&info=0&trades=0" title="Gráfico DexScreener" loading="lazy"></iframe>`;
+  $('chartWrap').innerHTML=`<iframe src="${url}?embed=1&theme=dark&info=0&trades=0" title="${tr('Gráfico DexScreener')}" loading="lazy"></iframe>`;
   $('chartModal').classList.add('show');
 }
 function closeChart(){$('chartModal').classList.remove('show');$('chartWrap').innerHTML='';}
@@ -2665,30 +2678,30 @@ async function loadHistory(){
 function renderHistory(){
   const rows=$('rows');
   const monthLbl=historyState.month.toLocaleDateString('es-ES',{month:'long',year:'numeric'});
-  const walletOpts=`<option value="all">Todas las wallets</option>`+state.wallets.map(w=>{
+  const walletOpts=`<option value="all">${tr('Todas las wallets')}</option>`+state.wallets.map(w=>{
     const a=lc(w.address);
     return `<option value="${a}" ${historyState.wallet===a?'selected':''}>${escapeHtml(w.label||shortAddr(a))}</option>`;
   }).join('');
   const minOpts=[['10','Desde $10'],['5','Desde $5'],['1','Desde $1'],['0.1','Desde $0.10'],['0','Ver todo']]
-    .map(([v,l])=>`<option value="${v}" ${(+historyState.minUsd===+v)?'selected':''}>${l}</option>`).join('');
+    .map(([v,l])=>`<option value="${v}" ${(+historyState.minUsd===+v)?'selected':''}>${tr(l)}</option>`).join('');
   let html=`<div class="hist-bar">
     <div class="month-nav">
-      <button class="mn-btn" onclick="histShiftMonth(-1)" aria-label="Mes anterior">‹</button>
+      <button class="mn-btn" onclick="histShiftMonth(-1)" aria-label="${tr('Mes anterior')}">‹</button>
       <span class="mn-lbl">${escapeHtml(monthLbl)}</span>
-      <button class="mn-btn" onclick="histShiftMonth(1)" aria-label="Mes siguiente">›</button>
+      <button class="mn-btn" onclick="histShiftMonth(1)" aria-label="${tr('Mes siguiente')}">›</button>
     </div>
     <div class="hist-filters">
-      <select class="hist-min field" onchange="histSetMin(this.value)" aria-label="Valor mínimo de la transacción">${minOpts}</select>
-      <select class="hist-wallet field" onchange="histSetWallet(this.value)" aria-label="Filtrar por wallet">${walletOpts}</select>
+      <select class="hist-min field" onchange="histSetMin(this.value)" aria-label="${tr('Valor mínimo de la transacción')}">${minOpts}</select>
+      <select class="hist-wallet field" onchange="histSetWallet(this.value)" aria-label="${tr('Filtrar por wallet')}">${walletOpts}</select>
     </div>
   </div>`;
 
   if(historyState.loading){
-    rows.innerHTML=html+`<div class="state-block"><div class="spinner"></div><p>Cargando historial desde el explorer…</p></div>`;
+    rows.innerHTML=html+`<div class="state-block"><div class="spinner"></div><p>${tr('Cargando historial desde el explorer…')}</p></div>`;
     return;
   }
   if(historyState.error){
-    rows.innerHTML=html+`<div class="state-block error"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div><h3>No se pudo cargar el historial</h3><p>El explorer de PulseChain no respondió. Inténtalo de nuevo.</p><button class="btn btn-ghost" onclick="loadHistory()">Reintentar</button></div>`;
+    rows.innerHTML=html+`<div class="state-block error"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v5M12 16h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/></svg></div><h3>${tr('No se pudo cargar el historial')}</h3><p>${tr('El explorer de PulseChain no respondió. Inténtalo de nuevo.')}</p><button class="btn btn-ghost" onclick="loadHistory()">${tr('Reintentar')}</button></div>`;
     return;
   }
 
@@ -2704,14 +2717,14 @@ function renderHistory(){
   for(const d in byDay){const s=byDay[d].reduce((a,t)=>a+(t.usd||0),0);dayTotals[d]=s;if(s>maxTotal)maxTotal=s;}
 
   if(!monthTx.length){
-    rows.innerHTML=html+`<div class="state-block"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>Sin movimientos${min>0?' por encima de '+escapeHtml(fmtUsd(min)):''} este mes</h3><p>${min>0?`No hay adquisiciones por encima de ${escapeHtml(fmtUsd(min))} en ${escapeHtml(monthLbl)}. Baja el mínimo o elige "Ver todo".`:`No hay tokens recibidos en ${escapeHtml(monthLbl)}.`}</p></div>`+histDisclaimer();
+    rows.innerHTML=html+`<div class="state-block"><div class="ico"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="17" rx="2" stroke="currentColor" stroke-width="2"/><path d="M3 9h18M8 2v4M16 2v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div><h3>${min>0?tr('Sin movimientos por encima de {u} este mes',{u:escapeHtml(fmtUsd(min))}):tr('Sin movimientos este mes')}</h3><p>${min>0?tr('No hay adquisiciones por encima de {u} en {m}. Baja el mínimo o elige "Ver todo".',{u:escapeHtml(fmtUsd(min)),m:escapeHtml(monthLbl)}):tr('No hay tokens recibidos en {m}.',{m:escapeHtml(monthLbl)})}</p></div>`+histDisclaimer();
     return;
   }
 
   // Cuadrícula del mes (semana empieza en lunes).
   const firstWd=(new Date(y,mo,1).getDay()+6)%7;
   const days=new Date(y,mo+1,0).getDate();
-  const wd=['L','M','X','J','V','S','D'];
+  const wd=tr('L,M,X,J,V,S,D').split(',');
   html+=`<div class="cal-grid">`+wd.map(d=>`<div class="cal-wd">${d}</div>`).join('');
   for(let i=0;i<firstWd;i++)html+=`<div class="cal-pad"></div>`;
   for(let day=1;day<=days;day++){
@@ -2725,8 +2738,8 @@ function renderHistory(){
       const shown=toks.slice(0,3);
       const moreN=toks.length-shown.length;
       const chips=shown.map(t=>`<span class="cal-tok">${miniLogo(t)}<span class="ctk-amt">${escapeHtml(fmtAmount(t.amount))}</span><span class="ctk-usd">${t.usd!=null?escapeHtml(fmtCompactUsd(t.usd)):'—'}</span></span>`).join('');
-      const more=moreN>0?`<span class="cal-more">+${moreN} más</span>`:'';
-      html+=`<button class="cal-cell active${sel}" onclick="histSelectDay('${key}')" aria-label="${day}: ${escapeHtml(fmtUsd(tot))}, ${toks.length} token(s)"><span class="cal-fill" style="opacity:${i.toFixed(2)}"></span><span class="cal-d">${day}</span><span class="cal-toks">${chips}${more}</span><span class="cal-tot">${escapeHtml(fmtCompactUsd(tot))}</span></button>`;
+      const more=moreN>0?`<span class="cal-more">${tr('+{n} más',{n:moreN})}</span>`:'';
+      html+=`<button class="cal-cell active${sel}" onclick="histSelectDay('${key}')" aria-label="${day}: ${escapeHtml(fmtUsd(tot))}, ${tr('{n} token(s)',{n:toks.length})}"><span class="cal-fill" style="opacity:${i.toFixed(2)}"></span><span class="cal-d">${day}</span><span class="cal-toks">${chips}${more}</span><span class="cal-tot">${escapeHtml(fmtCompactUsd(tot))}</span></button>`;
     }else{
       html+=`<div class="cal-cell"><span class="cal-d" style="opacity:.5;font-weight:400">${day}</span></div>`;
     }
@@ -2767,7 +2780,7 @@ function histMonthSummary(monthTx,monthLbl){
       <div class="hs-i"><b>+${escapeHtml(fmtAmount(t.amount))} ${escapeHtml(t.symbol||'')}</b><span>${escapeHtml(t.name||'')}</span></div>
       <div class="hs-v">${t.hasPrice?escapeHtml(fmtUsd(t.usd)):'—'}</div></div>`;
   }).join('');
-  return `<div class="hist-summary"><div class="hs-head"><b>Tokens incorporados · ${escapeHtml(monthLbl)}</b><span>${list.length} ${list.length===1?'token':'tokens'} · ${escapeHtml(fmtUsd(total))}</span></div>${rows}</div>`;
+  return `<div class="hist-summary"><div class="hs-head"><b>${tr('Tokens incorporados')} · ${escapeHtml(monthLbl)}</b><span>${list.length===1?tr('1 token'):tr('{n} tokens',{n:list.length})} · ${escapeHtml(fmtUsd(total))}</span></div>${rows}</div>`;
 }
 
 function histDayDetail(key,transfers){
@@ -2784,10 +2797,10 @@ function histDayDetail(key,transfers){
       <div class="htx-v">${usd}</div></div>`;
   }).join('');
   const n=transfers.length;
-  return `<div class="hist-detail"><div class="hd-head"><b>${escapeHtml(fdate)}</b><span>${n} ${n===1?'token recibido':'tokens recibidos'} · ${escapeHtml(fmtUsd(total))}</span></div>${items}</div>`;
+  return `<div class="hist-detail"><div class="hd-head"><b>${escapeHtml(fdate)}</b><span>${n===1?tr('1 token recibido'):tr('{n} tokens recibidos',{n})} · ${escapeHtml(fmtUsd(total))}</span></div>${items}</div>`;
 }
 function histDisclaimer(){
-  return `<div class="hist-note">Valores calculados con precios actuales (no históricos)</div>`;
+  return `<div class="hist-note">${tr('Valores calculados con precios actuales (no históricos)')}</div>`;
 }
 function histShiftMonth(delta){
   historyState.month=new Date(historyState.month.getFullYear(),historyState.month.getMonth()+delta,1);
@@ -2915,7 +2928,7 @@ function invDia(d){
 
   if(entradas.length&&d.reparto){
     // Caso limpio: el dibujo.
-    const nodo=entradas.map(e=>`<span class="iv-ent">${invLogo(e,26)}<b>${escapeHtml(fmtAmount(e.cant))} ${escapeHtml(e.sim)}</b>${e.moneda==='usd'?`<span class="iv-ent-usd">${escapeHtml(invUsd(e.usd))}</span>`:'<span class="iv-ent-nota">no cuenta en dólares</span>'}</span>`).join('');
+    const nodo=entradas.map(e=>`<span class="iv-ent">${invLogo(e,26)}<b>${escapeHtml(fmtAmount(e.cant))} ${escapeHtml(e.sim)}</b>${e.moneda==='usd'?`<span class="iv-ent-usd">${escapeHtml(invUsd(e.usd))}</span>`:`<span class="iv-ent-nota">${tr('no cuenta en dólares')}</span>`}</span>`).join('');
     const flechas=d.reparto.map(r=>`<li class="iv-fl">
         <span class="iv-pct">${Math.round(r.pct)}%</span>
         <span class="iv-flecha" aria-hidden="true"></span>
@@ -2927,8 +2940,8 @@ function invDia(d){
     const sueltos=movs.filter(m=>!(m.gastoUsd>0));
     if(sueltos.length)cuerpo+=`<ul class="iv-movs">${sueltos.map(invMov).join('')}</ul>`;
   }else if(entradas.length){
-    cuerpo=`<div class="iv-nodo">${entradas.map(e=>`<span class="iv-ent">${invLogo(e,26)}<b>Entraron ${escapeHtml(fmtAmount(e.cant))} ${escapeHtml(e.sim)}</b>${e.moneda==='usd'?`<span class="iv-ent-usd">${escapeHtml(invUsd(e.usd))}</span>`:'<span class="iv-ent-nota">no cuenta en el resumen en dólares</span>'}</span>`).join('')}</div>
-      <p class="iv-quieto">sin mover todavía</p>`;
+    cuerpo=`<div class="iv-nodo">${entradas.map(e=>`<span class="iv-ent">${invLogo(e,26)}<b>${tr('Entraron {c} {s}',{c:escapeHtml(fmtAmount(e.cant)),s:escapeHtml(e.sim)})}</b>${e.moneda==='usd'?`<span class="iv-ent-usd">${escapeHtml(invUsd(e.usd))}</span>`:`<span class="iv-ent-nota">${tr('no cuenta en el resumen en dólares')}</span>`}</span>`).join('')}</div>
+      <p class="iv-quieto">${tr('sin mover todavía')}</p>`;
   }else{
     cuerpo=`<ul class="iv-movs">${movs.map(invMov).join('')}</ul>`;
   }
@@ -2995,8 +3008,8 @@ function invAgrupar(descuadres){
 
 function invGrupo(g){
   return `<li class="iv-grupo">
-    <span class="iv-desc-m">Probablemente depósitos de validador
-      <span class="iv-grupo-sub">${g.items.length} envíos idénticos al mismo destino, <code>${escapeHtml(shortAddr(g.hacia))}</code> · se deduce de la forma, no está confirmado contra el contrato</span></span>
+    <span class="iv-desc-m">${tr('Probablemente depósitos de validador')}
+      <span class="iv-grupo-sub">${tr('{n} envíos idénticos al mismo destino, {d} · se deduce de la forma, no está confirmado contra el contrato',{n:g.items.length,d:`<code>${escapeHtml(shortAddr(g.hacia))}</code>`})}</span></span>
     <span class="iv-desc-c"><span class="iv-chip sale">${invLogo(g,18)}${g.items.length} × ${escapeHtml(fmtAmount(g.cant))} ${escapeHtml(g.sim)}</span></span>
   </li>`;
 }
@@ -3013,15 +3026,15 @@ const INV_MOTIVOS={
 function renderInvest(){
   const rows=$('rows');
   if(!state.wallets.length){
-    rows.innerHTML=`<div class="state-block"><h3>Añade una wallet</h3><p>Las inversiones se sacan de las wallets que tengas puestas.</p></div>`;
+    rows.innerHTML=`<div class="state-block"><h3>${tr('Añade una wallet')}</h3><p>${tr('Las inversiones se sacan de las wallets que tengas puestas.')}</p></div>`;
     return;
   }
   if(investState.loading&&!investState.datos){
-    rows.innerHTML=`<div class="state-block"><div class="spinner"></div><p>Leyendo el historial desde el explorer…</p></div>`;
+    rows.innerHTML=`<div class="state-block"><div class="spinner"></div><p>${tr('Leyendo el historial desde el explorer…')}</p></div>`;
     return;
   }
   if(investState.error){
-    rows.innerHTML=`<div class="state-block error"><h3>No se pudo cargar</h3><p>El explorer de PulseChain no respondió.</p><button class="btn btn-ghost" onclick="loadInvest()">Reintentar</button></div>`;
+    rows.innerHTML=`<div class="state-block error"><h3>${tr('No se pudo cargar')}</h3><p>${tr('El explorer de PulseChain no respondió.')}</p><button class="btn btn-ghost" onclick="loadInvest()">${tr('Reintentar')}</button></div>`;
     return;
   }
   const d=investState.datos;
@@ -3036,21 +3049,21 @@ function renderInvest(){
      veían exactamente igual —«Sin movimientos»—. Un fallo invisible cuesta más
      que un fallo feo. */
   if(d.fallos&&d.fallos.length){
-    html+=`<div class="iv-fallo"><b>No se pudo leer ${d.fallos.length===1?'una wallet':d.fallos.length+' wallets'}.</b> `
-      +`Lo que se ve abajo, si hay algo, es lo que había guardado de antes.<ul>`
+    html+=`<div class="iv-fallo"><b>${d.fallos.length===1?tr('No se pudo leer una wallet.'):tr('No se pudo leer {n} wallets.',{n:d.fallos.length})}</b> `
+      +`${tr('Lo que se ve abajo, si hay algo, es lo que había guardado de antes.')}<ul>`
       +d.fallos.map(f=>`<li><code>${escapeHtml(shortAddr(f.wallet))}</code> — ${escapeHtml(f.error)}</li>`).join('')
       +`</ul></div>`;
   }
   if(d.sembrando){
-    html+=`<div class="iv-sembrando"><div class="spinner"></div><span>Trayendo el historial por tandas. Lo que ya está se ve; el resto va apareciendo.</span></div>`;
+    html+=`<div class="iv-sembrando"><div class="spinner"></div><span>${tr('Trayendo el historial por tandas. Lo que ya está se ve; el resto va apareciendo.')}</span></div>`;
   }
 
   // Resúmenes semanales. Solo entradas reales de stablecoin: un swap no es
   // dinero que entra, y una entrada en PLS no se convierte a dólares.
   if(d.semanas.length){
-    html+=`<div class="iv-semanas"><h3 class="iv-tit">Dólares que entraron, por semana</h3><ul>`
+    html+=`<div class="iv-semanas"><h3 class="iv-tit">${tr('Dólares que entraron, por semana')}</h3><ul>`
       +d.semanas.slice(0,12).map(w=>`<li><span class="iv-sem-f">${escapeHtml(invFecha(w.desde))}</span><span class="iv-sem-u">${escapeHtml(invUsd(w.usd))}</span></li>`).join('')
-      +`</ul><p class="iv-nota">Solo entradas en stablecoin. Los swaps no cuentan: mover lo que ya tenías no es invertir.</p></div>`;
+      +`</ul><p class="iv-nota">${tr('Solo entradas en stablecoin. Los swaps no cuentan: mover lo que ya tenías no es invertir.')}</p></div>`;
   }
 
   if(!d.dias.length&&!d.descuadres.length){
@@ -3059,14 +3072,14 @@ function renderInvest(){
        elementos vinieron y por dónde va cada flujo. Con eso se distingue «no
        llega» de «no hay», que es lo único que hacía falta saber. */
     const ventana=d.desde?Math.round((Date.now()/1000-d.desde)/86400):null;
-    html+=`<div class="state-block"><h3>Sin movimientos</h3>`
-      +`<p>No se ha encontrado ninguna entrada ni swap${ventana?` en los últimos ${ventana} días`:''}.</p></div>`;
+    html+=`<div class="state-block"><h3>${tr('Sin movimientos')}</h3>`
+      +`<p>${ventana?tr('No se ha encontrado ninguna entrada ni swap en los últimos {n} días.',{n:ventana}):tr('No se ha encontrado ninguna entrada ni swap.')}</p></div>`;
     if(d.diag&&d.diag.length){
-      html+=`<details class="iv-desc iv-parte"><summary>Ver qué se ha leído</summary>`
-        +`<p class="iv-nota">Si aquí todo viene a cero, no es que no tengas movimientos: es que no están llegando.</p>`
+      html+=`<details class="iv-desc iv-parte"><summary>${tr('Ver qué se ha leído')}</summary>`
+        +`<p class="iv-nota">${tr('Si aquí todo viene a cero, no es que no tengas movimientos: es que no están llegando.')}</p>`
         +d.diag.map(w=>`<div class="iv-parte-w"><code>${escapeHtml(shortAddr(w.wallet))}</code>`
           +`<ul>`+w.parte.map(f=>`<li><span>${escapeHtml(f.flujo)}</span>`
-            +`<span>${f.paginas} pág · ${f.traidos} elem · ${escapeHtml(f.estado)}</span></li>`).join('')
+            +`<span>${tr('{p} pág · {e} elem',{p:f.paginas,e:f.traidos})} · ${escapeHtml(f.estado)}</span></li>`).join('')
           +`</ul></div>`).join('')
         +`</details>`;
     }
@@ -3084,17 +3097,17 @@ function renderInvest(){
        esconder cosas en silencio. Ahora hay margen y, si se pasa, se dice. */
     const TOPE=150;
     const ver=sueltos.slice(0,TOPE);
-    html+=`<details class="iv-desc"><summary>${d.descuadres.length} movimiento${d.descuadres.length===1?'':'s'} que no cuadra${d.descuadres.length===1?'':'n'}</summary>
-      <p class="iv-nota">Ni entradas de dinero ni cambios de una cosa por otra. Buena parte de los airdrops que llegan solos son estafa: no los toques.</p>
+    html+=`<details class="iv-desc"><summary>${d.descuadres.length===1?tr('1 movimiento que no cuadra'):tr('{n} movimientos que no cuadran',{n:d.descuadres.length})}</summary>
+      <p class="iv-nota">${tr('Ni entradas de dinero ni cambios de una cosa por otra. Buena parte de los airdrops que llegan solos son estafa: no los toques.')}</p>
       <ul class="iv-desc-lista">`
       +juntos.map(invGrupo).join('')
       +ver.map(x=>{
         const piezas=[...x.sale.map(p=>['sale',p]),...x.entra.map(p=>['entra',p])];
         const chips=piezas.map(([lado,p])=>`<span class="iv-chip ${lado}">${invLogo(p,18)}${escapeHtml(fmtAmount(p.cant))} ${escapeHtml(p.sim)}</span>`).join('');
-        return `<li><span class="iv-desc-m">${escapeHtml(INV_MOTIVOS[x.motivo]||x.motivo)}</span><span class="iv-desc-c">${chips}</span></li>`;
+        return `<li><span class="iv-desc-m">${escapeHtml(tr(INV_MOTIVOS[x.motivo]||x.motivo))}</span><span class="iv-desc-c">${chips}</span></li>`;
       }).join('')
       +`</ul>`
-      +(sueltos.length>TOPE?`<p class="iv-nota">Se enseñan los ${TOPE} más recientes de ${sueltos.length}.</p>`:'')
+      +(sueltos.length>TOPE?`<p class="iv-nota">${tr('Se enseñan los {a} más recientes de {b}.',{a:TOPE,b:sueltos.length})}</p>`:'')
       +`</details>`;
   }
   rows.innerHTML=html;
@@ -3143,7 +3156,7 @@ async function pushToKV(){
       body:JSON.stringify(serialize())
     });
     if(!r.ok)throw new Error('PUT '+r.status);
-  }catch(e){toast('No se pudo sincronizar con la nube (guardado local OK)',true);}
+  }catch(e){toast(tr('No se pudo sincronizar con la nube (guardado local OK)'),true);}
 }
 async function loadPortfolio(code){
   // localStorage primero (arranque instantáneo), KV como fuente de verdad.
@@ -3158,7 +3171,7 @@ async function loadPortfolio(code){
   // Traer de KV.
   try{
     const r=await fetch(`/api/portfolio/${encodeURIComponent(code)}`);
-    if(r.status===404){toast('Ese portfolio no existe. Trabajando en modo local.',true);state.code=null;updateCodeBadge();saveLocal();return;}
+    if(r.status===404){toast(tr('Ese portfolio no existe. Trabajando en modo local.'),true);state.code=null;updateCodeBadge();saveLocal();return;}
     if(r.ok){
       const d=await r.json();
       if(d){applyData(d);saveLocal();render();if(state.wallets.length)refresh();}
@@ -3190,7 +3203,7 @@ async function createPortfolio(code){
 function openWalletModal(){closeModals();$('walletModal').classList.add('show');$('wmAddr').value='';$('wmLabel').value='';$('wmErr').textContent='';setTimeout(()=>$('wmAddr').focus(),50);}
 function submitWallet(){
   const r=addWallet($('wmAddr').value,$('wmLabel').value);
-  if(r.ok){closeModals();toast('Wallet añadida');}
+  if(r.ok){closeModals();toast(tr('Wallet añadida'));}
   else $('wmErr').textContent=r.msg;
 }
 
@@ -3198,11 +3211,11 @@ function submitWallet(){
 function openLoadModal(){closeModals();$('loadModal').classList.add('show');$('lmInput').value='';$('lmErr').textContent='';setTimeout(()=>$('lmInput').focus(),50);}
 function submitLoad(){
   const raw=$('lmInput').value.trim();
-  if(!raw){$('lmErr').textContent='Introduce un código o una URL.';return;}
+  if(!raw){$('lmErr').textContent=tr('Introduce un código o una URL.');return;}
   // Si pegan una URL con /p/<code>, extraer el código; si no, usar tal cual.
   let code=raw;
   if(raw.includes('/p/'))code=raw.split('/p/')[1].split(/[/?#]/)[0];
-  if(!/^[A-Za-z0-9_-]{3,32}$/.test(code)){$('lmErr').textContent='Ese código no parece válido (3–32 caracteres: letras, números, guion o guion bajo).';return;}
+  if(!/^[A-Za-z0-9_-]{3,32}$/.test(code)){$('lmErr').textContent=tr('Ese código no parece válido (3–32 caracteres: letras, números, guion o guion bajo).');return;}
   location.href='/p/'+code;
 }
 
@@ -3217,11 +3230,11 @@ function onTokenInput(){
   const a=$('tmAddr').value.trim();
   clearTimeout(tokenLookupTimer);
   if(!isAddr(a))return;
-  if(state.customTokens.includes(lc(a))){$('tmErr').textContent='Ese token ya está añadido.';return;}
+  if(state.customTokens.includes(lc(a))){$('tmErr').textContent=tr('Ese token ya está añadido.');return;}
   tokenLookupTimer=setTimeout(async()=>{
-    $('tmErr').textContent='Buscando en DexScreener…';
+    $('tmErr').textContent=tr('Buscando en DexScreener…');
     const tok=await lookupToken(a);
-    if(!tok){$('tmErr').textContent='No encontramos ese token en DexScreener. Revisa el contrato.';return;}
+    if(!tok){$('tmErr').textContent=tr('No encontramos ese token en DexScreener. Revisa el contrato.');return;}
     $('tmErr').textContent='';
     pendingToken=tok;
     const grad=gradientFor(tok.address);
@@ -3234,7 +3247,7 @@ function onTokenInput(){
 async function submitToken(){
   if(!pendingToken)return;
   const r=await addCustomToken(pendingToken.address);
-  if(r.ok){closeModals();toast('Token añadido');}
+  if(r.ok){closeModals();toast(tr('Token añadido'));}
   else $('tmErr').textContent=r.msg;
 }
 
@@ -3266,15 +3279,15 @@ async function submitCreatePortfolio(){
     let code;
     if(codeMode==='custom'){
       code=$('cmCode').value.trim();
-      if(!/^[a-zA-Z0-9_-]{3,32}$/.test(code)){$('cmErr').textContent='Usa 3–32 caracteres: letras, números, guion o guion bajo.';return;}
-      $('cmErr').textContent='Comprobando disponibilidad…';
-      if(await codeExists(code)){$('cmErr').textContent='Ese código ya está en uso. Prueba otro.';return;}
+      if(!/^[a-zA-Z0-9_-]{3,32}$/.test(code)){$('cmErr').textContent=tr('Usa 3–32 caracteres: letras, números, guion o guion bajo.');return;}
+      $('cmErr').textContent=tr('Comprobando disponibilidad…');
+      if(await codeExists(code)){$('cmErr').textContent=tr('Ese código ya está en uso. Prueba otro.');return;}
     }else{
       code=randomCode();
     }
     await createPortfolio(code);
     openCloudModal(); // ahora muestra la info
-    toast('Portfolio creado en la nube');
+    toast(tr('Portfolio creado en la nube'));
   }finally{btn.disabled=false;btn.style.opacity='1';}
 }
 function disconnectCloud(){
@@ -3283,10 +3296,10 @@ function disconnectCloud(){
   saveLocal();
   updateCodeBadge();
   closeModals();
-  toast('Desconectado de la nube (datos locales conservados)');
+  toast(tr('Desconectado de la nube (datos locales conservados)'));
 }
-function copyCode(){navigator.clipboard.writeText(state.code).then(()=>toast('Código copiado'));}
-function copyUrl(){navigator.clipboard.writeText(`${location.origin}/p/${state.code}`).then(()=>toast('URL copiada'));}
+function copyCode(){navigator.clipboard.writeText(state.code).then(()=>toast(tr('Código copiado')));}
+function copyUrl(){navigator.clipboard.writeText(`${location.origin}/p/${state.code}`).then(()=>toast(tr('URL copiada')));}
 
 function closeModals(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('show'));const cw=$('chartWrap');if(cw)cw.innerHTML='';}
 document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModals();}));
@@ -3302,7 +3315,7 @@ document.addEventListener('keydown',e=>{
 function updateCodeBadge(){
   const b=$('codeBadge'),t=$('codeTxt');
   if(state.code){b.classList.remove('local');t.textContent=state.code;b.setAttribute('aria-label','Portfolio: '+state.code);}
-  else{b.classList.add('local');t.textContent='Modo local';}
+  else{b.classList.add('local');t.textContent=tr('Modo local');}
 }
 function goHome(){if(location.pathname!=='/'){location.href='/';}}
 
@@ -3342,7 +3355,7 @@ function startTimers(){
     const chip=$('agoChip');
     if(chip&&lastUpdate){
       const ago=Math.round((Date.now()-lastUpdate)/1000);
-      chip.textContent=`actualizado hace ${ago}s`;
+      chip.textContent=tr('actualizado hace {n}s',{n:ago});
       $('liveDot').classList.toggle('stale',ago>90);
     }
   },1000);
@@ -3398,6 +3411,28 @@ async function init(){
   if(state.wallets.length)refresh();
   startTimers();
 }
+/* ── el idioma (3-nov-2026) ─────────────────────────────────────────────
+   El botón va en la barra de arriba, delante de la nube. Al cambiar se repinta
+   lo que ya hay —sin volver a pedir nada— y el HTML fijo lo traduce el motor
+   por sus `data-i18n`. */
+(function(){
+  if(!window.plsI18n)return;
+  const acc=document.querySelector('.nav-actions');
+  if(acc)acc.prepend(plsI18n.boton('nav-idioma'));
+  plsI18n.traducirDom(document);
+  pintarOrden();
+  plsI18n.alCambiar(()=>{
+    pintarOrden();
+    updateCodeBadge();
+    if(state.view==='history')renderHistory();
+    else if(state.view==='invest')renderInvest();
+    else render();
+    updateHeader();
+    renderWalletBar();
+    renderReparto();
+    if($('distModal').classList.contains('show'))renderDist();
+  });
+})();
 init();
 </script>
   <!-- VaultEasterEgg: quitar esta línea lo desactiva por completo -->

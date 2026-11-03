@@ -33,6 +33,7 @@
  */
 
 import { fmt, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Registro';
 
@@ -61,15 +62,30 @@ function fmtHora(ts) {
 
 /** El día, en UTC como la hora: «Hoy», «Ayer» o «27 oct». */
 export function fmtDia(ts, ahoraS) {
-  const dia = t => Math.floor(t / 86400);
+  const dia = x => Math.floor(x / 86400);
   const n = Number.isFinite(ahoraS) ? dia(ahoraS) - dia(ts) : NaN;
-  if (n === 0) return 'Hoy';
-  if (n === 1) return 'Ayer';
+  if (n === 0) return t('Hoy');
+  if (n === 1) return t('Ayer');
   const d = new Date(ts * 1000);
   return `${d.getUTCDate()} ${MESES[d.getUTCMonth()]}`;
 }
 
 const lista = vs => vs.map(v => escapar(v ?? '?')).join(', ');
+
+/**
+ * Los títulos y detalles que escribe el recolector llegan en español desde
+ * D1. Los que tienen forma conocida se traducen; uno nuevo sale tal cual —en
+ * español, nunca vacío—. Comprobado contra D1 el 3-nov-2026.
+ */
+export function tituloD1(s) {
+  const x = String(s ?? '');
+  let m;
+  if ((m = x.match(/^Validador (\d+) activado$/))) return t('Validador {n} activado', { n: m[1] });
+  if ((m = x.match(/^(\d+) validadores nuevos esperando a entrar en la cadena$/))) return t('{n} validadores nuevos esperando a entrar en la cadena', { n: m[1] });
+  if ((m = x.match(/^Validador (\d+)$/))) return t('Validador {n}', { n: m[1] });
+  if ((m = x.match(/^(\d+) validadores retirados$/))) return t('{n} validadores retirados', { n: m[1] });
+  return t(x);
+}
 
 /**
  * Qué dice una línea del registro: tipo (para el icono), título completo,
@@ -84,38 +100,39 @@ export function describirCiclo(c) {
   const nb = bloques.length;
   const plsBloques = bloques.some(b => b.pls != null)
     ? bloques.reduce((a, b) => a + (Number(b.pls) || 0), 0) : null;
-  const extras = c.otros.map(o => escapar(o.titulo || o.tipo));
+  const extras = c.otros.map(o => escapar(tituloD1(o.titulo || o.tipo)));
 
   if (c.barrido) {
     const sub = [];
-    if (nb) sub.push(`con ${nb === 1 ? 'el bloque' : `${nb} bloques`} de ${lista(bloques.map(b => b.validador))}${
+    if (nb) sub.push(`${nb === 1 ? t('con el bloque de {v}', { v: lista(bloques.map(b => b.validador)) })
+      : t('con {n} bloques de {v}', { n: nb, v: lista(bloques.map(b => b.validador)) })}${
       plsBloques != null ? ` · ${fmt(plsBloques)} PLS` : ''}`);
     sub.push(...extras);
-    return { tipo: 'barrido', titulo: 'Barrido a la wallet', sub: sub.join(' · '),
+    return { tipo: 'barrido', titulo: t('Barrido a la wallet'), sub: sub.join(' · '),
              pls: c.barrido.pls != null ? Number(c.barrido.pls) : null };
   }
   if (nb) {
     return {
       tipo: 'bloque',
-      titulo: nb === 1 ? `Bloque propuesto por ${escapar(bloques[0].validador ?? '?')}` : `${nb} bloques propuestos`,
-      sub: [nb > 1 ? `de ${lista(bloques.map(b => b.validador))}` : '', ...extras].filter(Boolean).join(' · '),
+      titulo: nb === 1 ? t('Bloque propuesto por {v}', { v: escapar(bloques[0].validador ?? '?') }) : t('{n} bloques propuestos', { n: nb }),
+      sub: [nb > 1 ? t('de {v}', { v: lista(bloques.map(b => b.validador)) }) : '', ...extras].filter(Boolean).join(' · '),
       pls: plsBloques,
     };
   }
-  if (!c.otros.length) return { tipo: 'otro', titulo: 'Suceso sin detalle', sub: '', pls: null };
+  if (!c.otros.length) return { tipo: 'otro', titulo: t('Suceso sin detalle'), sub: '', pls: null };
 
   // Varias activaciones en el mismo instante —una ampliación— son una línea.
   const act = c.otros.filter(o => o.tipo === 'activacion');
   if (act.length > 1 && act.length === c.otros.length) {
-    return { tipo: 'activacion', titulo: `${act.length} validadores activados`,
+    return { tipo: 'activacion', titulo: t('{n} validadores activados', { n: act.length }),
              sub: lista(act.map(o => o.validador).sort((a, b) => Number(a) - Number(b))), pls: null };
   }
   const [o, ...resto] = c.otros;
   const tipo = ICONO[o.tipo] ? o.tipo : 'otro';
-  const titulo = o.titulo ? escapar(o.titulo)
-    : o.tipo === 'activacion' && o.validador != null ? `Validador ${escapar(o.validador)} activado`
-    : escapar(o.tipo || 'Suceso');
-  const sub = [o.detalle ? escapar(o.detalle) : '', ...resto.map(x => escapar(x.titulo || x.tipo))].filter(Boolean).join(' · ');
+  const titulo = o.titulo ? escapar(tituloD1(o.titulo))
+    : o.tipo === 'activacion' && o.validador != null ? t('Validador {n} activado', { n: escapar(o.validador) })
+    : escapar(o.tipo || t('Suceso'));
+  const sub = [o.detalle ? escapar(tituloD1(o.detalle)) : '', ...resto.map(x => escapar(tituloD1(x.titulo || x.tipo)))].filter(Boolean).join(' · ');
   return { tipo, titulo, sub, pls: o.pls != null ? Number(o.pls) : null };
 }
 
@@ -152,8 +169,8 @@ export function panelRegistro(datos) {
   if (!ciclos.length) {
     return `
       <section class="panel" aria-labelledby="pl-t">
-        <header class="p-cab"><h2 id="pl-t">${TITULO}</h2></header>
-        <p class="vacio">Sin sucesos registrados todavía.</p>
+        <header class="p-cab"><h2 id="pl-t">${t(TITULO)}</h2></header>
+        <p class="vacio">${t('Sin sucesos registrados todavía.')}</p>
       </section>`;
   }
 
@@ -183,16 +200,16 @@ export function panelRegistro(datos) {
   return `
     <section class="panel" aria-labelledby="pl-t">
       <header class="p-cab">
-        <h2 id="pl-t">${TITULO}</h2>
-        <span class="p-marca">${fmt(ciclos.length)} sucesos</span>
+        <h2 id="pl-t">${t(TITULO)}</h2>
+        <span class="p-marca">${t('{n} sucesos', { n: fmt(ciclos.length) })}</span>
       </header>
 
       <ul class="elista">${filas}</ul>
 
       <p class="c-sub">${
         horas < 1
-          ? 'Último suceso hace menos de una hora.'
-          : `Sin novedades desde hace ${fmt(horas, 0)} h. Es lo normal: hay unos seis sucesos al día.`
+          ? t('Último suceso hace menos de una hora.')
+          : t('Sin novedades desde hace {n} h. Es lo normal: hay unos seis sucesos al día.', { n: fmt(horas, 0) })
       }</p>
     </section>`;
 }

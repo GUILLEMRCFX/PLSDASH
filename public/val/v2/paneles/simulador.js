@@ -56,6 +56,7 @@
 
 import { ritmoDiario } from '/val/compartido/ganancias.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 /** Días por mes, de media. 365,25/12 y no 30. */
 const DIAS_MES = 30.44;
@@ -164,9 +165,9 @@ export function proyectar({ falta, plsDia, precio, aporteMes }) {
 /** Días → «11 meses», «1,4 años», «23 días». */
 export function fmtPlazo(dias) {
   if (!Number.isFinite(dias) || dias <= 0) return null;
-  if (dias < 60) return `${fmt(dias, 0)} días`;
-  if (dias < 730) return `${fmt(dias / 30.44, 0)} meses`;
-  return `${fmt(dias / 365.25, 1)} años`;
+  if (dias < 60) return t('{n} días', { n: fmt(dias, 0) });
+  if (dias < 730) return t('{n} meses', { n: fmt(dias / 30.44, 0) });
+  return t('{n} años', { n: fmt(dias / 365.25, 1) });
 }
 
 /**
@@ -179,9 +180,9 @@ export function mandoSimulador(aporte) {
   const pos = posicionDe(aporte);
   return `
     <div class="sim-mando">
-      <label class="sim-eti" for="simAporte">Si aporto cada mes</label>
+      <label class="sim-eti" for="simAporte">${t('Si aporto cada mes')}</label>
       <output class="sim-valor" id="simSalida" for="simAporte">${
-        aporte > 0 ? `${fmt(aporte)} $` : 'nada'}</output>
+        aporte > 0 ? `${fmt(aporte)} $` : t('nada')}</output>
       <!-- ⚠ La variable --t la fija JS y también aquí, para el primer pintado.
            WebKit no tiene ::-moz-range-progress, así que el tramo ya recorrido
            se pinta con un degradado y hay que decirle dónde cortar. Sin el
@@ -194,8 +195,8 @@ export function mandoSimulador(aporte) {
       <input type="range" class="sim-rango" id="simAporte"
              style="--t:${(pos / PASOS * 100).toFixed(1)}%"
              min="0" max="${PASOS}" step="1" value="${pos}"
-             aria-label="Aportación mensual en dólares"
-             aria-valuetext="${aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada'}">
+             aria-label="${t('Aportación mensual en dólares')}"
+             aria-valuetext="${aporte > 0 ? t('{n} dólares al mes', { n: fmt(aporte) }) : t('sin aportar nada')}">
       <div class="sim-topes" aria-hidden="true"><span>0</span><span>${TOPE} $</span></div>
     </div>`;
 }
@@ -207,8 +208,8 @@ export function textoDetalle(r, ritmo, aporte) {
     partes.push(`
       <div class="cifra">
         <span class="c-num">${fmtCompacto(r.plsMes)}<span class="u">PLS</span></span>
-        <span class="c-eti">Es lo que compra al mes</span>
-        <span class="c-sub">al precio de ahora</span>
+        <span class="c-eti">${t('Es lo que compra al mes')}</span>
+        <span class="c-sub">${t('al precio de ahora')}</span>
       </div>`);
   }
 
@@ -217,8 +218,8 @@ export function textoDetalle(r, ritmo, aporte) {
     partes.push(`
       <div class="cifra">
         <span class="c-num sim-gana">${escapar(fmtPlazo(r.adelanta) || '—')}</span>
-        <span class="c-eti">Antes que sin aportar</span>
-        <span class="c-sub">frente a ${escapar(fmtPlazo(r.diasBase) || '—')} al ritmo solo</span>
+        <span class="c-eti">${t('Antes que sin aportar')}</span>
+        <span class="c-sub">${t('frente a {d} al ritmo solo', { d: escapar(fmtPlazo(r.diasBase) || '—') })}</span>
       </div>`);
   }
 
@@ -226,7 +227,7 @@ export function textoDetalle(r, ritmo, aporte) {
     partes.push(`
       <div class="cifra">
         <span class="c-num">${fmt((ritmo?.pls_dia) || 0)}<span class="u">PLS</span></span>
-        <span class="c-eti">Al día, medido</span>
+        <span class="c-eti">${t('Al día, medido')}</span>
         <span class="c-sub">${escapar(ritmo?.base || '')}</span>
       </div>`);
   }
@@ -269,16 +270,16 @@ export function engancharSimulador(raiz, datos) {
     const r = proyectar({ falta, plsDia: ritmo?.pls_dia, precio: hayPrecio ? p : null, aporteMes: aporte });
     if (!r || r.dias == null) return;
 
-    salida.textContent = aporte > 0 ? `${fmt(aporte)} $` : 'nada';
+    salida.textContent = aporte > 0 ? `${fmt(aporte)} $` : t('nada');
     mando.style.setProperty('--t', `${(Number(mando.value) / PASOS * 100).toFixed(1)}%`);
     mando.setAttribute('aria-valuetext',
-      aporte > 0 ? `${fmt(aporte)} dólares al mes` : 'sin aportar nada');
+      aporte > 0 ? t('{n} dólares al mes', { n: fmt(aporte) }) : t('sin aportar nada'));
 
     const f = new Date((ahoraS + r.dias * 86400) * 1000)
       .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     plazo.querySelector('.c-num').textContent = fmtPlazo(r.dias) || '—';
-    plazo.querySelector('.c-eti').textContent = aporte > 0 ? 'Aportando eso' : 'Al ritmo actual';
-    plazo.querySelector('.c-sub').textContent = `hacia ${f} · proyección, no promesa`;
+    plazo.querySelector('.c-eti').textContent = aporte > 0 ? t('Aportando eso') : t('Al ritmo actual');
+    plazo.querySelector('.c-sub').textContent = t('hacia {f} · proyección, no promesa', { f });
     detalle.innerHTML = textoDetalle(r, ritmo, aporte);
 
     try { localStorage.setItem(CLAVE, String(aporte)); } catch { /* da igual */ }

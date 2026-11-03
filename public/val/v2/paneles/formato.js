@@ -10,6 +10,8 @@
  * 7585, 85.265— y ahí la que no lleva punto parece rota o de otra magnitud.
  * En una columna de datos manda la comparación, no la regla.
  */
+import { t } from './i18n.js';
+
 export const fmt = (n, d = 0) =>
   Number(n ?? 0).toLocaleString('es-ES', {
     minimumFractionDigits: d, maximumFractionDigits: d, useGrouping: 'always',
@@ -40,15 +42,15 @@ export const fmtPrecio = precio => {
 /** Duración en horas → «19 h» o «7,9 días». */
 export const fmtHoras = h => {
   h = Number(h) || 0;
-  return h < 48 ? `${fmt(h, 1)} h` : `${fmt(h / 24, 1)} días`;
+  return h < 48 ? `${fmt(h, 1)} h` : t('{n} días', { n: fmt(h / 24, 1) });
 };
 
 /** Antigüedad en segundos → «hace 12 min». */
 export const fmtEdad = s => {
   s = Math.max(0, Number(s) || 0);
-  if (s < 3600) return `hace ${Math.max(1, Math.round(s / 60))} min`;
-  if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
-  return `hace ${Math.round(s / 86400)} d`;
+  if (s < 3600) return t('hace {n} min', { n: Math.max(1, Math.round(s / 60)) });
+  if (s < 86400) return t('hace {n} h', { n: Math.round(s / 3600) });
+  return t('hace {n} d', { n: Math.round(s / 86400) });
 };
 
 export const escapar = s => String(s).replace(/[&<>"']/g,

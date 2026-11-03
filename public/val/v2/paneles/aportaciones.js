@@ -37,6 +37,7 @@
  */
 
 import { fmt, fmtPrecio, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Aportaciones';
 
@@ -127,9 +128,9 @@ export function depositadoEnAmpliaciones(datos) {
 /** «hace 3 días» / «12 ago». Corto: la fecha exacta va en el `title`. */
 function cuando(ts, ahoraS) {
   const dias = Math.floor((ahoraS - ts) / 86400);
-  if (dias <= 0) return 'hoy';
-  if (dias === 1) return 'ayer';
-  if (dias < 30) return `hace ${dias} días`;
+  if (dias <= 0) return t('hoy');
+  if (dias === 1) return t('ayer');
+  if (dias < 30) return t('hace {n} días', { n: dias });
   return new Date(ts * 1000).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
 }
 
@@ -141,8 +142,8 @@ export function panelAportaciones(datos) {
   if (!ap) {
     return `
       <section class="panel" data-alerta aria-labelledby="pap-t">
-        <header class="p-cab"><h2 id="pap-t">${TITULO}</h2></header>
-        <p class="p-aviso">No se ha podido leer el registro de aportaciones.</p>
+        <header class="p-cab"><h2 id="pap-t">${t(TITULO)}</h2></header>
+        <p class="p-aviso">${t('No se ha podido leer el registro de aportaciones.')}</p>
       </section>`;
   }
 
@@ -158,18 +159,18 @@ export function panelAportaciones(datos) {
         <span class="ap-pls">${fmt(Number(a.pls))}<span class="u">PLS</span></span>
         <span class="ap-usd">${
           usd != null
-            ? `${fmt(usd, 2)} $ <span class="ap-precio">a ${escapar(fmtPrecio(a.precio_pls))}</span>`
-            : '<span class="ap-precio">sin precio guardado</span>'
+            ? `${fmt(usd, 2)} $ <span class="ap-precio">${t('a {p}', { p: escapar(fmtPrecio(a.precio_pls)) })}</span>`
+            : `<span class="ap-precio">${t('sin precio guardado')}</span>`
         }</span>
         <button type="button" class="ap-x" data-borrar="${a.id}"
-                aria-label="Borrar la aportación de ${fmt(Number(a.pls))} PLS">×</button>
+                aria-label="${t('Borrar la aportación de {n} PLS', { n: fmt(Number(a.pls)) })}">×</button>
       </li>`;
   }).join('');
 
   return `
     <section class="panel" aria-labelledby="pap-t">
       <header class="p-cab">
-        <h2 id="pap-t">${TITULO}</h2>
+        <h2 id="pap-t">${t(TITULO)}</h2>
         ${lista.length
           ? `<span class="p-marca">${fmt(ap.total_pls)} PLS</span>`
           : ''}
@@ -192,34 +193,33 @@ export function panelAportaciones(datos) {
            en el banco de pruebas. -->
       <details class="ap-desp"${abiertoAp ? ' open' : ''}>
         <summary class="ap-abrir">${lista.length
-          ? `${lista.length} ${lista.length === 1 ? 'apuntada' : 'apuntadas'} · añadir o borrar`
-          : 'Apuntar una aportación'}</summary>
+          ? `${lista.length === 1 ? t('1 apuntada') : t('{n} apuntadas', { n: lista.length })} · ${t('añadir o borrar')}`
+          : t('Apuntar una aportación')}</summary>
 
       <form class="ap-form" id="apForm" autocomplete="off">
         <label class="ap-campo">
-          <span>Fecha</span>
+          <span>${t('Fecha')}</span>
           <input type="date" id="apFecha" name="fecha" value="${hoy}" max="${hoy}" required>
         </label>
         <label class="ap-campo">
-          <span>PLS aportados</span>
+          <span>${t('PLS aportados')}</span>
           <input type="number" id="apPls" name="pls" min="1" step="1" inputmode="numeric"
                  placeholder="1000000" required>
         </label>
-        <button type="submit" class="ap-guardar">Apuntar</button>
+        <button type="submit" class="ap-guardar">${t('Apuntar')}</button>
       </form>
       <p class="ap-aviso" id="apAviso" role="status" aria-live="polite"></p>
 
       ${lista.length ? `
         <ul class="ap-lista">${filas}</ul>
         <p class="c-sub">
-          ${fmt(ap.total_pls)} PLS aportados${
-            ap.total_usd > 0 ? ` · ${fmt(ap.total_usd, 2)} $ al precio de cada día` : ''}${
+          ${t('{n} PLS aportados', { n: fmt(ap.total_pls) })}${
+            ap.total_usd > 0 ? ` · ${t('{n} $ al precio de cada día', { n: fmt(ap.total_usd, 2) })}` : ''}${
             ap.sin_precio > 0
-              ? ` · ${ap.sin_precio} sin precio guardado`
+              ? ` · ${t('{n} sin precio guardado', { n: ap.sin_precio })}`
               : ''}.
         </p>`
-      : `<p class="vacio">Todavía no has apuntado ninguna. Mientras esté vacío, el
-         panel da por hecho que todo el saldo viene de validar.</p>`}
+      : `<p class="vacio">${t('Todavía no has apuntado ninguna. Mientras esté vacío, el panel da por hecho que todo el saldo viene de validar.')}</p>`}
       </details>
     </section>`;
 }
@@ -256,11 +256,11 @@ export function engancharAportaciones(raiz, repintar) {
       // `T12:00` y no medianoche: con medianoche local, en husos al este de
       // Greenwich la fecha se guardaba como el día anterior en UTC.
       const ts = Math.floor(new Date(`${fd.get('fecha')}T12:00:00`).getTime() / 1000);
-      if (!(pls > 0)) return decir('Pon una cantidad mayor que cero.', true);
+      if (!(pls > 0)) return decir(t('Pon una cantidad mayor que cero.'), true);
 
       const boton = form.querySelector('.ap-guardar');
       boton.disabled = true;
-      decir('Apuntando…');
+      decir(t('Apuntando…'));
       try {
         const r = await fetch('/api/val/aportaciones', {
           method: 'POST',
@@ -271,14 +271,14 @@ export function engancharAportaciones(raiz, repintar) {
         const d = await r.json();
         if (!r.ok) throw new Error(d?.error || `HTTP ${r.status}`);
         decir(d.motivo_sin_precio === 'fecha_pasada'
-          ? 'Apuntada. Sin valor en dólares: solo se guarda el precio de las que se apuntan el mismo día.'
+          ? t('Apuntada. Sin valor en dólares: solo se guarda el precio de las que se apuntan el mismo día.')
           : d.motivo_sin_precio === 'sin_precio'
-            ? 'Apuntada, pero no había precio de PLS en ese momento y no se ha guardado.'
-            : 'Apuntada.');
+            ? t('Apuntada, pero no había precio de PLS en ese momento y no se ha guardado.')
+            : t('Apuntada.'));
         form.reset();
         repintar();
       } catch (e) {
-        decir(`No se pudo apuntar: ${e.message}`, true);
+        decir(t('No se pudo apuntar: {e}', { e: e.message }), true);
       } finally {
         boton.disabled = false;
       }
@@ -298,7 +298,7 @@ export function engancharAportaciones(raiz, repintar) {
         repintar();
       } catch (e) {
         b.disabled = false;
-        decir(`No se pudo borrar: ${e.message}`, true);
+        decir(t('No se pudo borrar: {e}', { e: e.message }), true);
       }
     });
   });

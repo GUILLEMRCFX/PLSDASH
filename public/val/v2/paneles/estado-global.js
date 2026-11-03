@@ -29,6 +29,7 @@ export function costeHora(datos) {
   return d > 0 ? d / 24 : null;
 }
 
+import { t } from './i18n.js';
 export const TITULO = 'Estado global';
 
 export function panelEstadoGlobal(datos) {
@@ -43,10 +44,10 @@ export function panelEstadoGlobal(datos) {
     return `
       <section class="panel" data-alerta aria-labelledby="pg-t">
         <header class="p-cab">
-          <h2 id="pg-t">${TITULO}</h2>
+          <h2 id="pg-t">${t(TITULO)}</h2>
           <span class="p-marca alerta">${escapar(salud.palabra)}</span>
         </header>
-        <p class="p-aviso">${escapar(salud.nota || 'Sin datos del nodo.')}</p>
+        <p class="p-aviso">${escapar(salud.nota || t('Sin datos del nodo.'))}</p>
       </section>`;
   }
 
@@ -61,7 +62,7 @@ export function panelEstadoGlobal(datos) {
     : '';
 
   const sincronia = n.sincronizado === false
-    ? '<dd class="alerta">No</dd>'
+    ? `<dd class="alerta">${t('No')}</dd>`
     : `<dd${n.optimistic ? ' class="alerta"' : ''}>${n.optimistic ? 'Optimistic' : 'Verified'}</dd>`;
 
   // Un estado no puede viajar solo en el color: un «8» no dice por sí mismo
@@ -73,7 +74,7 @@ export function panelEstadoGlobal(datos) {
   return `
     <section class="panel"${alerta ? ' data-alerta' : ''} aria-labelledby="pg-t">
       <header class="p-cab">
-        <h2 id="pg-t">${TITULO}</h2>
+        <h2 id="pg-t">${t(TITULO)}</h2>
         <span class="p-marca${alerta ? ' alerta' : ''}">${escapar(salud.palabra)}</span>
       </header>
 
@@ -83,24 +84,24 @@ export function panelEstadoGlobal(datos) {
         <span class="c-num${Number(v.activos) < Number(v.total) ? ' alerta' : ''}">
           ${fmt(v.activos)}<span class="de">/${fmt(v.total)}</span>
         </span>
-        <span class="c-eti">Validadores activos</span>
+        <span class="c-eti">${t('Validadores activos')}</span>
       </div>
 
       <div class="rejilla">
         <div class="cifra">
           <span class="c-num">${fmtHoras(n.uptime_horas)}</span>
-          <span class="c-eti">Nodo en línea</span>
-          <span class="c-sub">desde el arranque</span>
+          <span class="c-eti">${t('Nodo en línea')}</span>
+          <span class="c-sub">${t('desde el arranque')}</span>
         </div>
         ${disp ? `
         <div class="cifra">
           <span class="c-num${disp.pct < 99.5 ? ' alerta' : ''}">${fmt(disp.pct, 2)}<span class="u pct">%</span></span>
-          <span class="c-eti">Disponibilidad</span>
-          <span class="c-sub">${disp.dias} días · ${
+          <span class="c-eti">${t('Disponibilidad')}</span>
+          <span class="c-sub">${t('{n} días', { n: disp.dias })} · ${
             disp.minutosCaidos > 0
-              ? `${fmt(disp.minutosCaidos)} min caído${
+              ? `${t('{n} min caído', { n: fmt(disp.minutosCaidos) })}${
                   porHora ? ` · ≈&nbsp;−${fmt((disp.minutosCaidos / 60) * porHora)}&nbsp;PLS` : ''}`
-              : 'sin caídas'
+              : t('sin caídas')
           }</span>
         </div>` : ''}
       </div>
@@ -110,14 +111,13 @@ export function panelEstadoGlobal(datos) {
            y no del momento. Los diez validadores cuelgan de una máquina, una
            conexión y un enchufe: una caída larga los para a los diez a la vez.
            Venía del v1 y no estaba en el v2. -->
-      <p class="c-sub alerta">Punto único de fallo: los ${fmt(vals)} validadores
-        dependen de una máquina, una conexión y un suministro. Una caída los para
-        a todos a la vez, y cuesta ~${fmt(porHora)} PLS por hora sin servicio.</p>` : ''}
+      <p class="c-sub alerta">${t('Punto único de fallo: los {n} validadores dependen de una máquina, una conexión y un suministro. Una caída los para a todos a la vez, y cuesta ~{p} PLS por hora sin servicio.', {
+        n: fmt(vals), p: fmt(porHora) })}</p>` : ''}
 
       <dl class="p-fondo">
         <div><dt>Epoch</dt><dd>${fmt(n.epoch_actual)}</dd></div>
-        <div><dt>Peers</dt><dd${pocosPeers ? ' class="alerta"' : ''}>${fmt(n.peers)}${pocosPeers ? ' · pocos' : ''}</dd></div>
-        <div><dt>Sincronía</dt>${sincronia}</div>
+        <div><dt>Peers</dt><dd${pocosPeers ? ' class="alerta"' : ''}>${fmt(n.peers)}${pocosPeers ? ` · ${t('pocos')}` : ''}</dd></div>
+        <div><dt>${t('Sincronía')}</dt>${sincronia}</div>
       </dl>
     </section>`;
 }

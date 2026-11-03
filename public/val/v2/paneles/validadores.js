@@ -28,6 +28,7 @@
 
 import { referenciaGrupo } from '/val/compartido/ganancias.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Validadores';
 
@@ -156,9 +157,9 @@ function esperando(d, eventos = [], ahoraS) {
   // cola ya dice «en cola», y la del que espera a la cadena ya dice
   // «esperando» — repetirlo daba «esperando a entrar en la cadena · esperando
   // 3 h», que a 1440 además partía la línea dejando la «h» sola.
-  if (h < 1) return 'menos de una hora';
+  if (h < 1) return t('menos de una hora');
   if (h < 48) return `${Math.round(h)} h`;
-  return `${Math.round(h / 24)} días`;
+  return t('{n} días', { n: Math.round(h / 24) });
 }
 
 function esReciente(d, desdeTs) {
@@ -194,8 +195,8 @@ export function panelValidadores(datos) {
   if (!detalle.length) {
     return `
       <section class="panel" aria-labelledby="pv-t">
-        <header class="p-cab"><h2 id="pv-t">${TITULO}</h2></header>
-        <p class="vacio">Sin detalle de validadores.</p>
+        <header class="p-cab"><h2 id="pv-t">${t(TITULO)}</h2></header>
+        <p class="vacio">${t('Sin detalle de validadores.')}</p>
       </section>`;
   }
 
@@ -285,12 +286,12 @@ export function panelValidadores(datos) {
     // naranja tiene que poder ver igualmente cuál está raro y por qué.
     const desde = espera(d);
     const nota = d.slashed ? 'slashed'
-      : fuera ? `esperando a entrar en la cadena${desde ? ` · ${desde}` : ''}`
-      : cola ? `en cola de activación${desde ? ` · esperando ${desde}` : ''}`
-      : d.estado !== 'active_ongoing' ? String(d.estado || 'inactivo')
-      : penalizado ? 'por debajo del depósito'
-      : rezagado ? 'rezagado'
-      : reciente ? 'recién activado · aún sin ciclo completo'
+      : fuera ? `${t('esperando a entrar en la cadena')}${desde ? ` · ${desde}` : ''}`
+      : cola ? `${t('en cola de activación')}${desde ? ` · ${t('esperando {d}', { d: desde })}` : ''}`
+      : d.estado !== 'active_ongoing' ? String(d.estado || t('inactivo'))
+      : penalizado ? t('por debajo del depósito')
+      : rezagado ? t('rezagado')
+      : reciente ? t('recién activado · aún sin ciclo completo')
       : '';
 
     /* ⚠ EL QUE ESPERA NO LLEVA ENLACE. El explorador indexa por índice y este
@@ -300,7 +301,7 @@ export function panelValidadores(datos) {
        falta del enlace. */
     const cuerpo = `
         <span class="v-id${fuera ? ' mono' : ''}">${
-          escapar(fuera ? (d.pubkey_corta || 'sin número') : d.indice)}</span>
+          escapar(fuera ? (d.pubkey_corta || t('sin número')) : d.indice)}</span>
         <span class="v-marca">${nBloques ? `⬦${nBloques}` : ''}</span>
         <!-- Ni ganado ni balance: no es que valgan cero, es que la cadena no
              sabe nada de él todavía. Un solo guion en la columna del balance
@@ -314,26 +315,26 @@ export function panelValidadores(datos) {
     // ── la celda del mapa y, si es la elegida, su hoja ──
     const k = String(clave(d));
     const est = fuera || cola ? 'espera' : mal ? 'mal' : reciente ? 'reciente' : 'ok';
-    const estTxt = nota || 'validando';
-    const nombre = fuera ? (d.pubkey_corta || 'sin número') : `Validador ${d.indice}`;
+    const estTxt = nota || t('validando');
+    const nombre = fuera ? (d.pubkey_corta || t('sin número')) : t('Validador {n}', { n: d.indice });
     const pips = nBloques ? `<span class="vc-pips" aria-hidden="true">${
       '<i></i>'.repeat(Math.min(4, nBloques))}${nBloques > 4 ? '<b>+</b>' : ''}</span>` : '';
     celdas.push(`<button type="button" class="vcelda ${est}" data-v="${escapar(k)}" aria-pressed="${selV === k}"
-        aria-label="${escapar(nombre)}: ${escapar(estTxt)}${nBloques ? `, ${nBloques} bloque${nBloques === 1 ? '' : 's'}` : ''}">
-        <span class="vc-id">${escapar(fuera ? 'nuevo' : d.indice)}</span>${pips}</button>`);
+        aria-label="${escapar(nombre)}: ${escapar(estTxt)}${nBloques ? `, ${nBloques === 1 ? t('1 bloque') : t('{n} bloques', { n: nBloques })}` : ''}">
+        <span class="vc-id">${escapar(fuera ? t('nuevo') : d.indice)}</span>${pips}</button>`);
     if (selV === k) {
       const frente = ref != null && !cola && !reciente ? (ganado / ref - 1) * 100 : null;
       hoja = `
       <div class="vhoja" role="region" aria-label="${escapar(nombre)}">
         <div class="vh-cab"><b class="${fuera ? 'mono' : ''}">${escapar(nombre)}</b><span class="vh-est ${est}">${escapar(estTxt)}</span></div>
         <dl>
-          <div><dt>Sin barrer</dt><dd>${fuera ? '—' : `${fmt(ganado)} PLS`}</dd></div>
-          <div><dt>Balance</dt><dd${penalizado ? ' class="alerta"' : ''}>${fuera ? '—' : `${fmtCompacto(balance)} PLS`}</dd></div>
-          <div><dt>Bloques</dt><dd>${fmt(nBloques)}</dd></div>
-          <div><dt>Frente al grupo</dt><dd>${frente == null ? '–'
+          <div><dt>${t('Sin barrer')}</dt><dd>${fuera ? '—' : `${fmt(ganado)} PLS`}</dd></div>
+          <div><dt>${t('Balance')}</dt><dd${penalizado ? ' class="alerta"' : ''}>${fuera ? '—' : `${fmtCompacto(balance)} PLS`}</dd></div>
+          <div><dt>${t('Bloques')}</dt><dd>${fmt(nBloques)}</dd></div>
+          <div><dt>${t('Frente al grupo')}</dt><dd>${frente == null ? '–'
             : `${frente < 0 ? '−' : '+'}${fmt(Math.abs(frente), 1)} %`}</dd></div>
         </dl>
-        ${fuera ? '' : `<a class="vh-ir" href="${EXPLORADOR}${encodeURIComponent(d.indice)}" target="_blank" rel="noopener noreferrer">Ver en g4mm4.io ↗</a>`}
+        ${fuera ? '' : `<a class="vh-ir" href="${EXPLORADOR}${encodeURIComponent(d.indice)}" target="_blank" rel="noopener noreferrer">${t('Ver en g4mm4.io')} ↗</a>`}
       </div>`;
     }
 
@@ -343,7 +344,7 @@ export function panelValidadores(datos) {
     if (fuera) {
       return `
       <div class="vfila espera" ${estilo}
-         title="${escapar(d.pubkey_corta || '')} — hay clave en el NUC y la cadena todavía no la conoce">
+         title="${escapar(d.pubkey_corta || '')} — ${t('hay clave en el NUC y la cadena todavía no la conoce')}">
         ${cuerpo}
       </div>`;
     }
@@ -351,7 +352,7 @@ export function panelValidadores(datos) {
     return `
       <a class="vfila${mal ? ' mal' : ''}" href="${EXPLORADOR}${encodeURIComponent(d.indice)}"
          target="_blank" rel="noopener noreferrer" ${estilo}
-         title="Validador ${escapar(d.indice)} · ${escapar(d.pubkey_corta || '')} — ver en g4mm4.io">
+         title="${t('Validador {n}', { n: escapar(d.indice) })} · ${escapar(d.pubkey_corta || '')} — ${t('ver en g4mm4.io')}">
         ${cuerpo}
       </a>`;
   }).join('');
@@ -359,42 +360,41 @@ export function panelValidadores(datos) {
   return `
     <section class="panel"${problemas ? ' data-alerta' : ''} aria-labelledby="pv-t">
       <header class="p-cab">
-        <h2 id="pv-t">${TITULO}</h2>
+        <h2 id="pv-t">${t(TITULO)}</h2>
         <span class="p-marca${problemas ? ' alerta' : ''}">${
-          problemas ? `${fmt(problemas)} con aviso` : `${fmt(activos)} activos`
+          problemas ? t('{n} con aviso', { n: fmt(problemas) }) : t('{n} activos', { n: fmt(activos) })
         }</span>
       </header>
 
-      <div class="vseg" role="group" aria-label="Cómo verlos">
-        <button type="button" data-vista="mapa" aria-pressed="${vista === 'mapa'}">Mapa</button>
-        <button type="button" data-vista="lista" aria-pressed="${vista === 'lista'}">Lista</button>
+      <div class="vseg" role="group" aria-label="${t('Cómo verlos')}">
+        <button type="button" data-vista="mapa" aria-pressed="${vista === 'mapa'}">${t('Mapa')}</button>
+        <button type="button" data-vista="lista" aria-pressed="${vista === 'lista'}">${t('Lista')}</button>
       </div>
 
       <div class="vmapa-caja"${vista === 'mapa' ? '' : ' hidden'}>
         <div class="vmapa">${celdas.join('')}</div>
-        <p class="vley" aria-hidden="true"><span><i class="ok"></i>validando</span><span><i class="espera"></i>en espera</span><span><i class="mal"></i>con aviso</span><span><i class="pip"></i>bloque</span></p>
-        ${hoja || '<p class="vh-pista">Toca uno para ver su detalle.</p>'}
+        <p class="vley" aria-hidden="true"><span><i class="ok"></i>${t('validando')}</span><span><i class="espera"></i>${t('en espera')}</span><span><i class="mal"></i>${t('con aviso')}</span><span><i class="pip"></i>${t('bloque')}</span></p>
+        ${hoja || `<p class="vh-pista">${t('Toca uno para ver su detalle.')}</p>`}
       </div>
 
       <div class="vlista"${vista === 'lista' ? '' : ' hidden'}>${filas}</div>
 
       <dl class="p-fondo">
-        <div><dt>Bloques</dt><dd>${fmt(totalBloques)}</dd></div>
+        <div><dt>${t('Bloques')}</dt><dd>${fmt(totalBloques)}</dd></div>
         <!-- ⚠ «Sin barrer ahora» y NO «Ganado ahora». Esta cifra es la suma
              del EXCEDENTE SIN BARRER, que vuelve a cero cada ~8,1 h — y tres
              líneas más abajo, en este mismo panel, «lo ganado» significa la
              ganancia acumulada, que solo sube. Dos sentidos opuestos a un
              palmo de distancia es exactamente lo que el glosario (documento
              28) existe para evitar: «ganado» a secas no se usa. -->
-        <div><dt>Sin barrer ahora</dt><dd>${fmt(detalle.reduce((a, d) => a + (Number(d.ganado) || 0), 0))}</dd></div>
-        <div><dt>Referencia</dt><dd>${ref == null ? '–' : fmt(ref)}</dd></div>
+        <div><dt>${t('Sin barrer ahora')}</dt><dd>${fmt(detalle.reduce((a, d) => a + (Number(d.ganado) || 0), 0))}</dd></div>
+        <div><dt>${t('Referencia')}</dt><dd>${ref == null ? '–' : fmt(ref)}</dd></div>
       </dl>
       ${peso != null ? `
       <!-- «lo generado» y no «lo ganado»: es la ganancia acumulada, y ahora
            comparte panel con «Sin barrer ahora», que es lo contrario. Era la
            mitad que quedaba de la misma confusión. -->
-      <p class="c-sub">${fmt(peso, 1)} % de lo generado viene de proponer bloques
-        —${fmtCompacto(plsBloques)} de ${fmtCompacto(totalGanado)} PLS—. El resto
-        son atestaciones, que es el rendimiento base y no depende de la suerte.</p>` : ''}
+      <p class="c-sub">${t('{p} % de lo generado viene de proponer bloques —{a} de {b} PLS—. El resto son atestaciones, que es el rendimiento base y no depende de la suerte.', {
+        p: fmt(peso, 1), a: fmtCompacto(plsBloques), b: fmtCompacto(totalGanado) })}</p>` : ''}
     </section>`;
 }

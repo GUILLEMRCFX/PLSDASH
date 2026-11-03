@@ -51,6 +51,8 @@
  * forma, y la regla de Cloudflare contra la fuerza bruta sigue igual.
  */
 
+import { t, botonIdioma } from './paneles/i18n.js';
+
 const API = '/api/val';
 const LARGO = 4;
 
@@ -127,7 +129,7 @@ export function montarPuerta(caja, { alEntrar } = {}) {
         <img src="/icons/plsdash-128x128.png" alt="" width="56" height="56" decoding="async">
       </div>
       <h1 class="pu-tit">Validator Dashboard</h1>
-      <p class="pu-sub">Introduce tu PIN</p>
+      <p class="pu-sub" data-i18n="Introduce tu PIN">${t('Introduce tu PIN')}</p>
 
       <p class="pu-error" id="puError" role="status" aria-live="polite"></p>
 
@@ -137,7 +139,7 @@ export function montarPuerta(caja, { alEntrar } = {}) {
         </svg>
         <span class="pu-centro" aria-hidden="true"></span>
         <span class="pu-sello" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7" pathLength="100"/></svg></span>
-        <div class="pu-puntos" id="puPuntos" role="img" aria-label="Ningún dígito introducido">
+        <div class="pu-puntos" id="puPuntos" role="img" aria-label="${t('Ningún dígito introducido')}">
           ${Array.from({ length: LARGO }, () => '<span class="pu-punto"></span>').join('')}
         </div>
       </div>
@@ -145,11 +147,14 @@ export function montarPuerta(caja, { alEntrar } = {}) {
       <div class="pu-pad" id="puPad">
         ${TECLAS.map(k => `
           <button type="button" class="pu-tecla${/^\d$/.test(k) ? '' : ' pu-tecla-sec'}"
-                  data-k="${k}"${ROTULO[k] ? ` aria-label="${ROTULO[k]}"` : ''}
-          >${ETIQUETA[k] || k}</button>`).join('')}
+                  data-k="${k}"${ROTULO[k] ? ` aria-label="${t(ROTULO[k])}" data-i18n-aria-label="${ROTULO[k]}"` : ''}
+          >${k === 'salir' ? `<span data-i18n="Salir">${t('Salir')}</span>` : ETIQUETA[k] || k}</button>`).join('')}
       </div>
     </div>`;
   caja.appendChild(capa);
+  // El idioma, arriba a la derecha: es lo primero que ve quien llega, y aquí
+  // aún no hay barra ni engranaje donde buscarlo.
+  capa.appendChild(botonIdioma('pu-idioma'));
 
   const puntos = capa.querySelector('#puPuntos');
   const zona = capa.querySelector('#puZona');
@@ -170,8 +175,8 @@ export function montarPuerta(caja, { alEntrar } = {}) {
     /* El número de dígitos SE DICE, no solo se pinta. Cuatro puntos que se
        rellenan son invisibles para un lector de pantalla. */
     puntos.setAttribute('aria-label', digitos.length === 0
-      ? 'Ningún dígito introducido'
-      : `${digitos.length} de ${LARGO} dígitos introducidos`);
+      ? t('Ningún dígito introducido')
+      : t('{a} de {b} dígitos introducidos', { a: digitos.length, b: LARGO }));
   }
 
   function reiniciar(msg) {
@@ -293,11 +298,11 @@ export function montarPuerta(caja, { alEntrar } = {}) {
       // porque el remedio no es el mismo: reintentar vs mirar qué pasa.
       await mal();
       reiniciar(res.status === 401
-        ? 'PIN incorrecto. Prueba otra vez.'
-        : `El servidor respondió ${res.status}.`);
+        ? t('PIN incorrecto. Prueba otra vez.')
+        : t('El servidor respondió {n}.', { n: res.status }));
     } catch {
       await subiendo; await mal();
-      reiniciar('No se pudo conectar. Revisa tu conexión.');
+      reiniciar(t('No se pudo conectar. Revisa tu conexión.'));
     } finally {
       enviando = false;
       teclas.forEach(b => { b.disabled = false; });

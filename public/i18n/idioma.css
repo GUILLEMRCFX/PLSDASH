@@ -1,0 +1,33 @@
+/* El botón de idioma (3-nov-2026). Lo usan la portada y la puerta del PIN; en
+   el panel el idioma va dentro del menú del engranaje. Lee las variables de
+   cada sitio y trae su propio respaldo. */
+.idioma { position: relative; display: inline-flex; }
+.idioma .id-btn {
+  min-width: 42px; height: 38px; padding: 0 10px; border-radius: 11px; cursor: pointer;
+  background: var(--surface, rgba(8, 20, 27, .9)); color: var(--dim, #9cc1ce);
+  border: 1px solid var(--line, rgba(255, 255, 255, .1));
+  font: 600 12.5px/1 'Space Grotesk', system-ui, sans-serif; letter-spacing: .06em;
+  transition: border-color .15s, color .15s;
+}
+.idioma .id-btn:hover, .idioma .id-btn[aria-expanded="true"] { color: var(--text, #e6f3f8); border-color: var(--dato, #2ad4f0); }
+.idioma .id-btn:focus-visible { outline: 2px solid var(--dato, #2ad4f0); outline-offset: 2px; }
+.idioma .id-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 120;
+  display: flex; flex-direction: column; min-width: 150px; padding: 5px;
+  border-radius: 12px; border: 1px solid rgba(42, 212, 240, .3);
+  background: #04090d; box-shadow: 0 12px 30px rgba(0, 0, 0, .6);
+}
+.idioma .id-menu[hidden] { display: none; }
+.idioma .id-menu button {
+  display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 8px 10px;
+  border: 0; border-radius: 8px; background: none; cursor: pointer; text-align: left;
+  color: var(--dim, #9cc1ce); font: 500 14px/1 'Inter', system-ui, sans-serif;
+}
+.idioma .id-menu button b { font: 600 11.5px/1 'Space Grotesk', system-ui, sans-serif; letter-spacing: .06em; width: 22px; color: var(--faint, #628b9b); }
+.idioma .id-menu button:hover, .idioma .id-menu button:focus-visible { background: rgba(255, 255, 255, .06); outline: none; color: var(--text, #e6f3f8); }
+.idioma .id-menu button[aria-checked="true"] { color: var(--dato, #2ad4f0); }
+.idioma .id-menu button[aria-checked="true"] b { color: var(--dato, #2ad4f0); }
+.idioma .id-menu button[aria-checked="true"]::after { content: '✓'; margin-left: auto; font-size: 13px; }
+
+/* En la puerta del PIN, arriba a la derecha. */
+.pu-idioma { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); }

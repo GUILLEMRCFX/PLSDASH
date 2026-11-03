@@ -18,6 +18,7 @@
 
 import { proximoBarrido } from '/val/compartido/ganancias.js';
 import { fmt, fmtCompacto, escapar } from './formato.js';
+import { t } from './i18n.js';
 
 export const TITULO = 'Ciclo de barrido';
 
@@ -80,8 +81,8 @@ export function panelCiclo(datos) {
   if (!serie || serie.length < 2) {
     return `
       <section class="panel" aria-labelledby="pc-t">
-        <header class="p-cab"><h2 id="pc-t">${TITULO}</h2></header>
-        <p class="vacio">Sin serie suficiente para dibujar el ciclo.</p>
+        <header class="p-cab"><h2 id="pc-t">${t(TITULO)}</h2></header>
+        <p class="vacio">${t('Sin serie suficiente para dibujar el ciclo.')}</p>
       </section>`;
   }
 
@@ -97,7 +98,7 @@ export function panelCiclo(datos) {
   const svg = dibujo ? `
     <figure class="sierra" id="sierra" data-desde="${dibujo.desde}" data-hasta="${dibujo.hasta}">
       <svg viewBox="0 0 ${ANCHO} ${ALTO}" preserveAspectRatio="none" role="img"
-           aria-label="Acumulación del excedente en las últimas 72 horas, con ${dibujo.caidas.length} barridos">
+           aria-label="${t('Acumulación del excedente en las últimas 72 horas, con {n} barridos', { n: dibujo.caidas.length })}">
         ${dibujo.caidas.map(c =>
           `<line class="s-caida" x1="${c.x.toFixed(2)}" y1="${c.yAlto.toFixed(2)}"
                  x2="${c.x.toFixed(2)}" y2="${ALTO - 2}"/>`).join('')}
@@ -107,15 +108,15 @@ export function panelCiclo(datos) {
       <figcaption class="s-pie">
         <span>72 h</span>
         <span id="sLectura"></span>
-        <span>${dibujo.caidas.length} barrido${dibujo.caidas.length === 1 ? '' : 's'}</span>
+        <span>${dibujo.caidas.length === 1 ? t('1 barrido') : t('{n} barridos', { n: dibujo.caidas.length })}</span>
       </figcaption>
-    </figure>` : '<p class="vacio">Sin datos en las últimas 72 h.</p>';
+    </figure>` : `<p class="vacio">${t('Sin datos en las últimas 72 h.')}</p>`;
 
   return `
     <section class="panel" aria-labelledby="pc-t">
       <header class="p-cab">
-        <h2 id="pc-t">${TITULO}</h2>
-        ${horasPeriodo ? `<span class="p-marca">cada ${fmt(horasPeriodo, 1)} h</span>` : ''}
+        <h2 id="pc-t">${t(TITULO)}</h2>
+        ${horasPeriodo ? `<span class="p-marca">${t('cada {n} h', { n: fmt(horasPeriodo, 1) })}</span>` : ''}
       </header>
 
       ${svg}
@@ -123,14 +124,14 @@ export function panelCiclo(datos) {
       <div class="rejilla">
         <div class="cifra">
           <span class="c-num">${acumulado == null ? '–' : fmt(acumulado)}<span class="u">PLS</span></span>
-          <span class="c-eti">Sin barrer</span>
-          ${prox ? `<span class="c-sub">desde hace ${fmt(prox.desde / 3600, 1)} h</span>` : ''}
+          <span class="c-eti">${t('Sin barrer')}</span>
+          ${prox ? `<span class="c-sub">${t('desde hace {n} h', { n: fmt(prox.desde / 3600, 1) })}</span>` : ''}
         </div>
         <div class="cifra">
           <span class="c-num">${ultimo ? fmt(ultimo.pls) : '–'}<span class="u">PLS</span></span>
-          <span class="c-eti">Último barrido</span>
-          ${ultimo ? `<span class="c-sub">${fmt(ultimo.validadores)} val.${
-            ultimo.bloques > 0 ? ` · ${fmt(ultimo.bloques)} bloque${ultimo.bloques === 1 ? '' : 's'}` : ''
+          <span class="c-eti">${t('Último barrido')}</span>
+          ${ultimo ? `<span class="c-sub">${t('{n} val.', { n: fmt(ultimo.validadores) })}${
+            ultimo.bloques > 0 ? ` · ${ultimo.bloques === 1 ? t('1 bloque') : t('{n} bloques', { n: fmt(ultimo.bloques) })}` : ''
           }</span>` : ''}
         </div>
       </div>
@@ -140,9 +141,9 @@ export function panelCiclo(datos) {
         <div class="a-barra"><i style="width:${(prox.avance * 100).toFixed(1)}%"></i></div>
         <div class="a-pie">${
           falta
-            ? `Próximo barrido en <b>${escapar(falta)}</b>`
-            : '<b class="tarde">Previsto ya · puede caer en cualquier momento</b>'
-        }<span>${fmt(prox.n)} ciclos medidos</span></div>
+            ? t('Próximo barrido en <b>{d}</b>', { d: escapar(falta) })
+            : `<b class="tarde">${t('Previsto ya · puede caer en cualquier momento')}</b>`
+        }<span>${t('{n} ciclos medidos', { n: fmt(prox.n) })}</span></div>
       </div>` : ''}
     </section>`;
 }
